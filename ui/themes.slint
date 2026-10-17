@@ -47,6 +47,9 @@ export global ThemeState {
     /// The editor is open (CUSTOMIZE): every window shows the draft.
     in property <bool> editing;
     in property <bool> draft-light;
+    /// THEME-05: SAVE AS writes only the tokens that differ from the base (the base fills the rest) while it
+    /// is on; off, as before, the whole theme. Urged by the user in the editor (ONLY CHANGES), off by default.
+    in-out property <bool> draft-partial;
     in-out property <string> draft-name;
     in property <[string]> groups;
     in property <int> group;
@@ -385,7 +388,7 @@ component Editor inherits Rectangle {
         padding: Theme.space-lg;
         spacing: Theme.space-md;
         Text { text: "CUSTOMIZE"; color: Theme.accent-hi; font-family: Theme.font; font-size: Theme.font-md; font-weight: Theme.weight-bold; }
-        Note { text: "Every change shows in the whole app at once. Give the theme a name and SAVE AS to keep it (a file in your themes folder); DISCARD goes back to the applied theme."; }
+        Note { text: "Every change shows in the whole app at once. Give the theme a name and SAVE AS to keep it (a file in your themes folder); ONLY CHANGES keeps just the tokens that differ from the base, the base fills the rest; DISCARD goes back to the applied theme."; }
         HorizontalLayout {
             spacing: Theme.space-md;
             height: Theme.h-ctl;
@@ -397,6 +400,7 @@ component Editor inherits Rectangle {
                 accepted(t) => { ThemeState.save(t); }
             }
             Chip { text: "SAVE AS"; width: 84px; horizontal-stretch: 0; active: true; clicked => { ThemeState.save(ThemeState.draft-name); } }
+            Chip { text: "ONLY CHANGES"; width: 96px; horizontal-stretch: 0; active: ThemeState.draft-partial; tooltip: "SAVE AS keeps only the tokens that differ from the base (the base values fill the rest, so the theme inherits what the base improves); unchecked, it saves every token, as before"; clicked => { ThemeState.draft-partial = !ThemeState.draft-partial; } }
             Chip { text: "DISCARD"; width: 84px; horizontal-stretch: 0; clicked => { ThemeState.discard(); } }
             Chip { text: "RESET ALL"; width: 84px; horizontal-stretch: 0; tooltip: "Every token back to how it was when the editor opened"; clicked => { ThemeState.reset-all(); } }
             Rectangle { width: Theme.space-lg; }

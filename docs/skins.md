@@ -41,11 +41,14 @@ copy them into `~/.config/openfader/extension/skin/`, or point `OPENFADER_SKINS`
   * **RESET** (per token) and **RESET ALL** go back to the values the theme had when the editor opened; edited tokens are shown in blue
     and bold;
   * **BASE** (dark / light) sets the values the tokens you did not touch have, and the menu bar's colours;
-  * **SAVE AS** writes `<name>.json` in your themes folder (`~/.config/openfader/extension/skin/`) with every token, applies it and
-    closes the editor; **DISCARD** drops the changes. The name of a built-in or bundled theme cannot be used; saving under the name of
-    one of your own replaces it. Listing every token is deliberate: a saved theme stops depending on its base, so it keeps looking the
-    same even when the built-in palette evolves. The cost is the reverse — a later improvement of the built-in base is not inherited by
-    saved themes an application later; a theme that lists only what it changes (a hand-written one) does.
+  * **SAVE AS** writes `<name>.json` in your themes folder (`~/.config/openfader/extension/skin/`), applies it and closes the editor;
+    **DISCARD** drops the changes. The name of a built-in or bundled theme cannot be used; saving under the name of one of your own
+    replaces it. What goes in the file is your choice:
+    * **ONLY CHANGES off** (the default) lists every token: the theme stops depending on its base, so it keeps looking exactly the same
+      even when the built-in palette evolves — the price is that a later improvement of the built-in base is not inherited.
+    * **ONLY CHANGES on** lists only the tokens that differ from the base: the base fills the rest, so the theme inherits what the base
+      improves later. The look is the draft's either way (the base's values are the parser's fallback); a draft that touches nothing
+      still saves complete.
 * **DUPLICATE** copies the applied theme into your folder as `<name> copy`; **DELETE** removes the applied theme when it is one of
   yours (bundled ones are not yours to delete); **IMPORT…** adds a theme file (a file chooser: zenity or kdialog); **OPEN FOLDER**
   opens your themes folder; **RESCAN** reads the folders again.
@@ -99,7 +102,7 @@ Put `*.json` files in any of these folders (the first folder that has a name win
 | `base` | `"dark"` (default) or `"light"`: the built-in values every token you do not list keeps. It also picks the light or dark scheme of the menu bar and its menus, which Slint draws itself and which no token reaches. |
 | `schemaVersion` | `1`, the format these files write. Optional: a file without it is read as 1, and another value is noted on stderr and read as 1 too. |
 | `layout` | VIEW settings the theme sets when it is chosen (optional), see below. |
-| `tokens` | Token name to value. Anything you leave out is the base's value. Files written by the editor list every token. |
+| `tokens` | Token name to value. Anything you leave out is the base's value. Files written by the editor list every token, unless the editor's ONLY CHANGES is on: then just the tokens that differ from the base. |
 
 A theme sets *every* token (yours, else the base's), so switching from one theme to another, or back to a built-in one, never leaves
 anything of the previous theme behind. Files from before `author`, `description`, `layout` or `schemaVersion` existed load unchanged.

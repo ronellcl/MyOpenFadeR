@@ -271,14 +271,19 @@ fn customize(s: &ThemeState) {
         }
         .into(),
     );
+    s.set_draft_partial(false);
     s.set_group(0);
     say(s, "", false);
     show_editor(s);
 }
 
-/// Saves the draft as a theme called `name`, makes it the chosen skin and closes the editor.
+/// Saves the draft as a theme called `name`, makes it the chosen skin and closes the editor. `partial` (the
+/// editor's ONLY CHANGES) keeps only the tokens that differ from the base; the base fills the rest and the
+/// saved theme inherits what the base improves later.
 fn save(s: &ThemeState, name: &str) {
-    let Some(skin) = draft::with(|d| d.to_skin(name)) else {
+    let partial = s.get_draft_partial();
+    let Some(skin) = draft::with(|d| if partial { d.to_skin_partial(name) } else { d.to_skin(name) })
+    else {
         return;
     };
     let saved = store::ensure_user_dir().and_then(|dir| store::write_into(&dir, &found(), &skin));

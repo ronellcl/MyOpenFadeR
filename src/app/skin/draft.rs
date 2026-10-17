@@ -232,6 +232,31 @@ impl Draft {
             path: None,
         }
     }
+
+    /// The draft as a skin called `name`, keeping **only the tokens that differ from the base** (THEME-05):
+    /// the reader fills the rest from the base the file names, so the theme inherits what the base improves.
+    /// The look stays what the draft shows (the base's values are the parser's fallback); the editor's own
+    /// reset and the per-row CHANGED hint go by [`Self::start`], but what decides here is the base, because
+    /// the saved file re-reads straight off it. When nothing differs, there is nothing to trim: the complete
+    /// skin comes back.
+    pub fn to_skin_partial(&self, name: &str) -> Skin {
+        let deltas: Vec<(&'static str, Value)> = TOKENS
+            .iter()
+            .zip(&self.values)
+            .zip(&self.defaults)
+            .filter(|((_, v), d)| v != d)
+            .map(|(((n, _), v), _)| (*n, v.clone()))
+            .collect();
+        Skin {
+            tokens: if deltas.is_empty() {
+                // a draft that equals its base has nothing to trim: the complete skin, as before
+                super::complete(self.values.clone())
+            } else {
+                deltas
+            },
+            ..self.to_skin(name)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -389,5 +414,64 @@ mod tests {
         skin::restyle(&app, &[], skin::BUILTIN[1]);
         assert_ne!(skin::read_all(&app)[at("accent")], shown[at("accent")]);
         assert!(!is_open());
+    }
+    #[test]
+    fn save_as_only_changes_keeps_the_diff_from_the_base_and_its_look() {
+        let app = dark();
+        let (partial, read_back) = with(|d| {
+            d.set(at("accent"), Value::Color(Color::from_rgb_u8(1, 2, 3)));
+            d.set_text(at("font-size"), "13px").unwrap();
+            (d.to_skin_partial("Trimmed"), d.to_skin("Full"))
+        })
+        .unwrap();
+        // Only the tokens that moved away from the base's values; the look is the draft's values all the same.
+        assert_eq!(
+            partial.tokens.iter().map(|(n, _)| *n).collect::<Vec<_>>(),
+            vec!["accent", "font-size"]
+        );
+        let (skin, notes) = file::parse(&file::serialize(&partial), "trimmed").unwrap();
+        assert!(notes.is_empty(), "{notes:?}");
+        assert_eq!(skin.tokens, partial.tokens, "the file round-trips");
+        let yes = crate::app::skin::values_of(&[skin], "Trimmed").unwrap();
+        let full = crate::app::skin::values_of(&[read_back], "Full").unwrap();
+        assert_eq!(yes, full, "partial and complete render the same");
+        // And nothing changed: the complete skin, as before.
+        let no = with(|d| {
+            d.reset_all();
+            d.to_skin_partial("Nothing")
+        })
+        .unwrap();
+        assert_eq!(no.tokens.len(), TOKENS.len());
+        close();
+    }
+
+    #[test]
+    fn save_as_only_changes_differs_from_the_base_the_file_names() {
+        let app = dark();
+        close();
+        // a draft of the light built-in: the diffs are the light ones
+        skin::restyle(&app, &[], skin::BUILTIN[1]);
+        assert!(open(&[], skin::BUILTIN[1]));
+        with(|d| {
+            d.set(at("accent"), Value::Color(Color::from_rgb_u8(1, 2, 3)));
+            let partial = d.to_skin_partial("Light-trim");
+            assert_eq!(partial.base, Base::Light);
+            // every kept token differs from the base the file names
+            let light = crate::app::skin::defaults(Base::Light);
+            for (n, v) in &partial.tokens {
+                let i = TOKENS.iter().position(|t| t.0 == *n).unwrap();
+                assert_ne!(&light[i], v, "token {n} is worth a base value");
+            }
+            // and it renders exactly what the complete skin would
+            let full = d.to_skin("Full");
+            let a = file::parse(&file::serialize(&partial), "old").unwrap().0;
+            let b = file::parse(&file::serialize(&full), "new").unwrap().0;
+            assert_eq!(
+                crate::app::skin::values_of(&[a], "old"),
+                crate::app::skin::values_of(&[b], "new")
+            );
+        })
+        .unwrap();
+        close();
     }
 }
