@@ -1,6 +1,9 @@
 //! One line of a dialog page ↔ `PrefRowData` (ui/prefs-state.slint). Pages build `Vec<Row>` from the settings;
-//! a click comes back as `choose(key, index)`.
+//! a click comes back as `choose(key, index)`. Every label and fixed option goes through [`crate::app::i18n::t`]
+//! (the LANGUAGE setting); keys, hints and values from outside (`Row::dropdown_of`, the plugins' manifests) pass
+//! through untouched.
 
+use crate::app::i18n::t;
 use crate::app::PrefRowData;
 use slint::{ModelRc, SharedString, VecModel};
 
@@ -37,10 +40,10 @@ impl Row {
     fn new(kind: Kind, key: &str, label: &str, options: &[&str], current: usize) -> Row {
         Row {
             key: key.into(),
-            label: label.into(),
+            label: t(label).into(),
             hint: String::new(),
             kind,
-            options: options.iter().map(|s| s.to_string()).collect(),
+            options: options.iter().map(|s| t(s).to_string()).collect(),
             current,
             enabled: true,
         }
@@ -48,7 +51,10 @@ impl Row {
 
     /// A row for a [`Choice`] value: chips for up to 4 options, else a drop-down; names are shown upper-case.
     pub fn of<T: super::Choice>(key: &str, label: &str, current: T) -> Row {
-        let names: Vec<String> = T::ALL.iter().map(|c| c.name().to_uppercase()).collect();
+        let names: Vec<String> = T::ALL
+            .iter()
+            .map(|c| t(&c.name().to_uppercase()).to_uppercase())
+            .collect();
         let at = T::ALL.iter().position(|&c| c == current).unwrap_or(0);
         let kind = if names.len() <= 4 {
             Kind::Chips

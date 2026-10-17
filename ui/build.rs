@@ -13,7 +13,12 @@ const MIRRORED: [(&str, bool); 7] = [
 ];
 
 fn main() {
-    slint_build::compile("app.slint").unwrap();
+    // Bundled translations (X-04): every @tr in the .slint files looks up `translations/<lang>/LC_MESSAGES/openfader-ui.po`;
+    // English (the literals themselves) is the default, Spanish ships under `es`. `slint::select_bundled_translation`
+    // switches at run time (src/app/i18n.rs follows the LANGUAGE setting).
+    let config = slint_build::CompilerConfiguration::new()
+        .with_bundled_translations(concat!(env!("CARGO_MANIFEST_DIR"), "/translations"));
+    slint_build::compile_with_config("app.slint", config).unwrap();
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     fs::write(out.join("mirror.rs"), mirror()).unwrap();
     fs::write(out.join("skin_tokens.rs"), skin_tokens()).unwrap();

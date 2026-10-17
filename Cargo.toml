@@ -45,8 +45,9 @@ wayland-backend = { version = "0.3", optional = true, features = ["client_system
 libc = "0.2"
 
 # Removable drives (GetDriveTypeW...), ejecting them (DeviceIoControl) and the analysis threads' priority.
+# The user's locale (Win32_Globalization: GetUserDefaultLocaleName), added for the UI language (src/app/i18n.rs).
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_Threading"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_Threading", "Win32_Globalization"] }
 
 # The program icon in the .exe (build.rs, assets/openfader.rc).
 [target.'cfg(windows)'.build-dependencies]

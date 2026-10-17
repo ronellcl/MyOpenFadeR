@@ -81,6 +81,12 @@ choice!(
     DeckLayout { #[default] Horizontal = "horizontal", Vertical = "vertical" }
 );
 choice!(
+    /// The UI language (Preferences > View > LANGUAGE): System follows the operating system's locale, else
+    /// English (the literals of the program) or Spanish (shipped with it). Applied by [`crate::app::i18n`]
+    /// (`t` for the rows, `slint::select_bundled_translation` for the `@tr` of ui/app.slint, ui/translations).
+    Language { #[default] System = "system", English = "english", Spanish = "spanish" }
+);
+choice!(
     /// The EXPORT mode layout: 1 PLAYER, 2 PLAYER, DUAL PLAYER, SIMPLE PLAYER (one 69 px player strip over the
     /// browser) or FULL BROWSER (no player). The default is 2 PLAYER.
     ExportLayout { OnePlayer = "1-player", #[default] TwoPlayer = "2-player", DualPlayer = "dual-player", SimplePlayer = "simple-player", FullBrowser = "full-browser" }
@@ -141,6 +147,9 @@ section!(
         export_layout: ExportLayout = ExportLayout::TwoPlayer;
         /// The mixer column and strip (View menu > Mixer, the global bar's MIXER button, a theme's layout hint `show_mixer`).
         show_mixer: bool = true;
+        /// The UI language (Preferences > View > LANGUAGE; System = the operating system's locale). Read by
+        /// [`crate::app::i18n`], not by the per-frame renderers that clone `View`.
+        language: Language = Language::System;
         /// Pane sizes dragged with the Splitters (ui/panes.slint `PaneState`), in px from the default size, 0 = the default: the
         /// enlarged-waveform area, the EXPORT player panel, the browser's tree column, track info and palette, and the track table's
         /// column widths (the title takes the rest). Written by [`panes_read`], restored by [`panes_apply`].
@@ -217,7 +226,12 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     };
     vec![
         Row::header("DISPLAY TYPE"),
-        Row::info("LANGUAGE", "English (the only language so far)"),
+        Row::chips(
+            "language",
+            "LANGUAGE",
+            &["SYSTEM", "ENGLISH", "ESPAÑOL"],
+            v.language as usize,
+        ),
         Row::check("tooltips", "Tooltips", v.tooltips),
         Row::header("BROWSE"),
         Row::of("browse_font", "FONT SIZE", v.browse_font),
@@ -415,6 +429,22 @@ mod tests {
         v.iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    #[test]
+    fn language_is_a_choice_setting_and_choose_applies_it() {
+        let (parsed, notes) = Prefs::parse("language = spanish");
+        assert_eq!(parsed.view.language, Language::Spanish);
+        assert!(notes.is_empty());
+        assert!(parsed.to_text().contains("language = spanish\n"));
+        // An invalid value falls back to the default (the parser notes it).
+        let (broken, notes) = Prefs::parse("language = klingon");
+        assert_eq!(broken.view.language, Language::System);
+        assert_eq!(notes.len(), 1);
+        // The click path sets it too (option 2 = Spanish in the LANGUAGE row).
+        let mut c = Prefs::default();
+        assert!(choose(&mut c, "language", 2));
+        assert_eq!(c.view.language, Language::Spanish);
     }
 
     #[test]

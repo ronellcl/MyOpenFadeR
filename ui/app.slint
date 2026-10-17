@@ -165,114 +165,114 @@ export component App inherits Window {
 
     MenuBar {
         Menu {
-            title: "File";
+            title: @tr("File");
             Menu {
-                title: "Import";
-                MenuItem { title: "Import Track…"; activated => { LibraryState.action("import-track"); } }
-                MenuItem { title: "Import Folder…"; activated => { LibraryState.action("import-folder"); } }
-                MenuItem { title: "Import Playlist…"; activated => { LibraryState.action("import-playlist"); } }
+                title: @tr("Import");
+                MenuItem { title: @tr("Import Track…"); activated => { LibraryState.action("import-track"); } }
+                MenuItem { title: @tr("Import Folder…"); activated => { LibraryState.action("import-folder"); } }
+                MenuItem { title: @tr("Import Playlist…"); activated => { LibraryState.action("import-playlist"); } }
                 for label[i] in LibraryState.import-readers: MenuItem { title: label; activated => { LibraryState.action("import-collection:" + i); } }
             }
             MenuSeparator {}
-            MenuItem { title: "Display All Missing Files"; activated => { LibraryState.action("missing"); } }
-            MenuItem { title: "Display All Duplicated Files"; activated => { LibraryState.action("dupes"); } }
+            MenuItem { title: @tr("Display All Missing Files"); activated => { LibraryState.action("missing"); } }
+            MenuItem { title: @tr("Display All Duplicated Files"); activated => { LibraryState.action("dupes"); } }
             Menu {
-                title: "Library";
-                MenuItem { title: "Backup Library…"; activated => { LibraryState.action("backup"); } }
-                MenuItem { title: "Restore Library…"; activated => { LibraryState.action("restore"); } }
-                MenuItem { title: "Backed up device library management…"; activated => { DeviceState.manage-backups(); } }
+                title: @tr("Library");
+                MenuItem { title: @tr("Backup Library…"); activated => { LibraryState.action("backup"); } }
+                MenuItem { title: @tr("Restore Library…"); activated => { LibraryState.action("restore"); } }
+                MenuItem { title: @tr("Backed up device library management…"); activated => { DeviceState.manage-backups(); } }
             }
             Menu {
-                title: "Export Collection";
+                title: @tr("Export Collection");
                 for label[i] in LibraryState.export-writers: MenuItem { title: label; activated => { LibraryState.action("export-collection:" + i); } }
             }
             MenuSeparator {}
-            MenuItem { title: "Preferences…"; activated => { PrefsState.visible = true; } }
-            MenuItem { title: "Exit"; activated => { LibraryState.action("exit"); } }
+            MenuItem { title: @tr("Preferences…"); activated => { PrefsState.visible = true; } }
+            MenuItem { title: @tr("Exit"); activated => { LibraryState.action("exit"); } }
         }
         Menu {
-            title: "Edit";
-            MenuItem { title: LibraryState.undo-label == "" ? "Undo (Ctrl+Z)" : "Undo " + LibraryState.undo-label + " (Ctrl+Z)"; enabled: LibraryState.undo-label != ""; activated => { LibraryState.action("undo"); } }
-            MenuItem { title: LibraryState.redo-label == "" ? "Redo (Ctrl+Shift+Z)" : "Redo " + LibraryState.redo-label + " (Ctrl+Shift+Z)"; enabled: LibraryState.redo-label != ""; activated => { LibraryState.action("redo"); } }
+            title: @tr("Edit");
+            MenuItem { title: LibraryState.undo-label == "" ? @tr("Undo (Ctrl+Z)") : @tr("Undo {} (Ctrl+Z)", LibraryState.undo-label); enabled: LibraryState.undo-label != ""; activated => { LibraryState.action("undo"); } }
+            MenuItem { title: LibraryState.redo-label == "" ? @tr("Redo (Ctrl+Shift+Z)") : @tr("Redo {} (Ctrl+Shift+Z)", LibraryState.redo-label); enabled: LibraryState.redo-label != ""; activated => { LibraryState.action("redo"); } }
         }
         Menu {
             title: "Track";
-            MenuItem { title: "Import To Collection"; activated => { LibraryState.action("track-import"); } }
-            MenuItem { title: "Analyze Track"; activated => { LibraryState.action("track-analyze"); } }
-            MenuItem { title: "Analysis Lock"; activated => { LibraryState.action("track-lock"); } }
-            MenuItem { title: "Reload Tag"; activated => { LibraryState.action("track-reload-tag"); } }
-            MenuItem { title: "Show in File Manager"; activated => { LibraryState.action("track-show"); } }
+            MenuItem { title: @tr("Import To Collection"); activated => { LibraryState.action("track-import"); } }
+            MenuItem { title: @tr("Analyze Track"); activated => { LibraryState.action("track-analyze"); } }
+            MenuItem { title: @tr("Analysis Lock"); activated => { LibraryState.action("track-lock"); } }
+            MenuItem { title: @tr("Reload Tag"); activated => { LibraryState.action("track-reload-tag"); } }
+            MenuItem { title: @tr("Show in File Manager"); activated => { LibraryState.action("track-show"); } }
             MenuSeparator {}
-            MenuItem { title: "Relocate…"; activated => { LibraryState.action("track-relocate"); } }
-            MenuItem { title: "Auto Relocate"; activated => { LibraryState.action("track-auto-relocate"); } }
-            MenuItem { title: "Remove from Collection"; activated => { LibraryState.action("track-remove"); } }
+            MenuItem { title: @tr("Relocate…"); activated => { LibraryState.action("track-relocate"); } }
+            MenuItem { title: @tr("Auto Relocate"); activated => { LibraryState.action("track-auto-relocate"); } }
+            MenuItem { title: @tr("Remove from Collection"); activated => { LibraryState.action("track-remove"); } }
             MenuSeparator {}
-            MenuItem { title: "Add to Tag List"; activated => { BrowserState.tag-add(); } }
-            MenuItem { title: "Add to Playlist…"; activated => { BrowserState.panel-request(0); } }
-            MenuItem { title: "Tags…"; activated => { BrowserState.panel-request(1); } }
+            MenuItem { title: @tr("Add to Tag List"); activated => { BrowserState.tag-add(); } }
+            MenuItem { title: @tr("Add to Playlist…"); activated => { BrowserState.panel-request(0); } }
+            MenuItem { title: @tr("Tags…"); activated => { BrowserState.panel-request(1); } }
         }
         Menu {
-            title: "Playlist";
-            MenuItem { title: "Create New Playlist"; activated => { LibraryState.action("playlist-new"); } }
-            MenuItem { title: "Create New Intelligent Playlist"; activated => { LibraryState.action("playlist-new-smart"); } }
-            MenuItem { title: "Create New Folder"; activated => { LibraryState.action("playlist-new-folder"); } }
-            MenuItem { title: "Delete Playlist"; activated => { LibraryState.action("playlist-delete"); } }
+            title: @tr("Playlist");
+            MenuItem { title: @tr("Create New Playlist"); activated => { LibraryState.action("playlist-new"); } }
+            MenuItem { title: @tr("Create New Intelligent Playlist"); activated => { LibraryState.action("playlist-new-smart"); } }
+            MenuItem { title: @tr("Create New Folder"); activated => { LibraryState.action("playlist-new-folder"); } }
+            MenuItem { title: @tr("Delete Playlist"); activated => { LibraryState.action("playlist-delete"); } }
             MenuSeparator {}
             Menu {
-                title: "Sort Items";
-                MenuItem { title: "Track Title"; activated => { LibraryState.action("playlist-sort-title"); } }
-                MenuItem { title: "Artist"; activated => { LibraryState.action("playlist-sort-artist"); } }
-                MenuItem { title: "Genre"; activated => { LibraryState.action("playlist-sort-genre"); } }
-                MenuItem { title: "BPM"; activated => { LibraryState.action("playlist-sort-bpm"); } }
-                MenuItem { title: "Key"; activated => { LibraryState.action("playlist-sort-key"); } }
-                MenuItem { title: "Time"; activated => { LibraryState.action("playlist-sort-time"); } }
-                MenuItem { title: "Rating"; activated => { LibraryState.action("playlist-sort-rating"); } }
-                MenuItem { title: "Comments"; activated => { LibraryState.action("playlist-sort-comment"); } }
+                title: @tr("Sort Items");
+                MenuItem { title: @tr("Track Title"); activated => { LibraryState.action("playlist-sort-title"); } }
+                MenuItem { title: @tr("Artist"); activated => { LibraryState.action("playlist-sort-artist"); } }
+                MenuItem { title: @tr("Genre"); activated => { LibraryState.action("playlist-sort-genre"); } }
+                MenuItem { title: @tr("BPM"); activated => { LibraryState.action("playlist-sort-bpm"); } }
+                MenuItem { title: @tr("Key"); activated => { LibraryState.action("playlist-sort-key"); } }
+                MenuItem { title: @tr("Time"); activated => { LibraryState.action("playlist-sort-time"); } }
+                MenuItem { title: @tr("Rating"); activated => { LibraryState.action("playlist-sort-rating"); } }
+                MenuItem { title: @tr("Comments"); activated => { LibraryState.action("playlist-sort-comment"); } }
             }
-            MenuItem { title: "Renumber Track Order"; activated => { LibraryState.action("playlist-renumber"); } }
+            MenuItem { title: @tr("Renumber Track Order"); activated => { LibraryState.action("playlist-renumber"); } }
             MenuSeparator {}
             Menu {
-                title: "Export a playlist to a file";
+                title: @tr("Export a playlist to a file");
                 MenuItem { title: "M3U8"; activated => { LibraryState.action("playlist-export-m3u8"); } }
                 MenuItem { title: "PLS"; activated => { LibraryState.action("playlist-export-pls"); } }
-                MenuItem { title: "Text"; activated => { LibraryState.action("playlist-export-text"); } }
+                MenuItem { title: @tr("Text"); activated => { LibraryState.action("playlist-export-text"); } }
             }
-            MenuItem { title: "Export Playlist (to a device)…"; activated => { LibraryState.action("playlist-export-device"); } }
-            MenuItem { title: "Import Playlist…"; activated => { LibraryState.action("playlist-import"); } }
+            MenuItem { title: @tr("Export Playlist (to a device)…"); activated => { LibraryState.action("playlist-export-device"); } }
+            MenuItem { title: @tr("Import Playlist…"); activated => { LibraryState.action("playlist-import"); } }
         }
         Menu {
-            title: "View";
-            MenuItem { title: "Full Screen"; activated => { root.full-screen = !root.full-screen; } }
+            title: @tr("View");
+            MenuItem { title: @tr("Full Screen"); activated => { root.full-screen = !root.full-screen; } }
             MenuSeparator {}
-            if root.stage: MenuItem { title: "2Deck Horizontal"; activated => { root.set-layout(0); } }
-            if root.stage: MenuItem { title: "2Deck Vertical"; activated => { root.set-layout(1); } }
-            if root.stage: MenuItem { title: "4Deck Horizontal"; activated => { root.set-layout(2); } }
-            if root.stage: MenuItem { title: "4Deck Vertical"; activated => { root.set-layout(3); } }
-            if root.stage: MenuItem { title: "Browse"; activated => { root.set-layout(4); } }
-            if !root.stage: MenuItem { title: "1 PLAYER"; activated => { root.set-export-layout(0); } }
-            if !root.stage: MenuItem { title: "2 PLAYER"; activated => { root.set-export-layout(1); } }
-            if !root.stage: MenuItem { title: "DUAL PLAYER"; activated => { root.set-export-layout(2); } }
-            if !root.stage: MenuItem { title: "SIMPLE PLAYER"; activated => { root.set-export-layout(3); } }
-            if !root.stage: MenuItem { title: "FULL BROWSER"; activated => { root.set-export-layout(4); } }
-            MenuItem { title: LayoutState.split-open ? "Close Split Screen" : "Split Screen"; activated => { LayoutState.split-toggle(); } }
+            if root.stage: MenuItem { title: @tr("2Deck Horizontal"); activated => { root.set-layout(0); } }
+            if root.stage: MenuItem { title: @tr("2Deck Vertical"); activated => { root.set-layout(1); } }
+            if root.stage: MenuItem { title: @tr("4Deck Horizontal"); activated => { root.set-layout(2); } }
+            if root.stage: MenuItem { title: @tr("4Deck Vertical"); activated => { root.set-layout(3); } }
+            if root.stage: MenuItem { title: @tr("Browse"); activated => { root.set-layout(4); } }
+            if !root.stage: MenuItem { title: @tr("1 PLAYER"); activated => { root.set-export-layout(0); } }
+            if !root.stage: MenuItem { title: @tr("2 PLAYER"); activated => { root.set-export-layout(1); } }
+            if !root.stage: MenuItem { title: @tr("DUAL PLAYER"); activated => { root.set-export-layout(2); } }
+            if !root.stage: MenuItem { title: @tr("SIMPLE PLAYER"); activated => { root.set-export-layout(3); } }
+            if !root.stage: MenuItem { title: @tr("FULL BROWSER"); activated => { root.set-export-layout(4); } }
+            MenuItem { title: LayoutState.split-open ? @tr("Close Split Screen") : @tr("Split Screen"); activated => { LayoutState.split-toggle(); } }
             MenuSeparator {}
-            MenuItem { title: "Mixer"; activated => { PrefsState.chose("show_mixer", root.show-mixer ? 0 : 1); } }
-            MenuItem { title: "Effect Panel"; activated => { FxState.open = !FxState.open; } }
-            MenuItem { title: "Sampler"; activated => { SamplerState.open = !SamplerState.open; } }
-            MenuItem { title: "BEAT LAB"; enabled: GrooveState.enabled; activated => { GrooveState.open = !GrooveState.open; } }
+            MenuItem { title: @tr("Mixer"); activated => { PrefsState.chose("show_mixer", root.show-mixer ? 0 : 1); } }
+            MenuItem { title: @tr("Effect Panel"); activated => { FxState.open = !FxState.open; } }
+            MenuItem { title: @tr("Sampler"); activated => { SamplerState.open = !SamplerState.open; } }
+            MenuItem { title: @tr("BEAT LAB"); enabled: GrooveState.enabled; activated => { GrooveState.open = !GrooveState.open; } }
             MenuSeparator {}
-            MenuItem { title: "Related Tracks"; activated => { BrowserState.related-toggled(!BrowserState.related); } }
-            MenuItem { title: "Tags"; activated => { BrowserState.panel-request(1); } }
-            MenuItem { title: "Automix"; activated => { AutomixState.toggled(); } }
+            MenuItem { title: @tr("Related Tracks"); activated => { BrowserState.related-toggled(!BrowserState.related); } }
+            MenuItem { title: @tr("Tags"); activated => { BrowserState.panel-request(1); } }
+            MenuItem { title: @tr("Automix"); activated => { AutomixState.toggled(); } }
         }
         if PluginState.actions.length > 0: Menu {
-            title: "Plugins";
+            title: @tr("Plugins");
             for action[i] in PluginState.actions: MenuItem { title: action; activated => { PluginState.run(i); } }
         }
         Menu {
-            title: "Help";
-            MenuItem { title: "Keyboard Shortcuts"; activated => { KeysState.help-visible = !KeysState.help-visible; } }
-            MenuItem { title: "About OpenFadeR"; activated => { AboutState.visible = true; } }
+            title: @tr("Help");
+            MenuItem { title: @tr("Keyboard Shortcuts"); activated => { KeysState.help-visible = !KeysState.help-visible; } }
+            MenuItem { title: @tr("About OpenFadeR"); activated => { AboutState.visible = true; } }
         }
     }
 

@@ -82,6 +82,7 @@ mod fxrack;
 mod groove;
 #[cfg(test)]
 mod headless;
+pub mod i18n;
 mod keys;
 pub mod library;
 mod lighting;

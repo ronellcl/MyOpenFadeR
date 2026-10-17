@@ -84,6 +84,9 @@ fn watch_window(app: &App) -> Timer {
 pub fn wire(app: &App) -> Timer {
     let p = super::load();
     live::set(p.clone());
+    crate::app::i18n::sync(&p);
+    // Every real change re-applies the UI language (Preferences > View > LANGUAGE): the setting may have moved.
+    live::on_change(crate::app::i18n::sync);
     APP.with_borrow_mut(|a| *a = Some(app.as_weak()));
     if p.window_w > 0 && p.window_h > 0 {
         app.window().set_size(slint::LogicalSize::new(
