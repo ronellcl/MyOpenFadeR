@@ -79,6 +79,15 @@ fetched from `https://github.com/<owner>/<repo>/releases/latest/download/<asset>
 named and placed as the plugin's `plugin.json` says (`libmy_fx.so` beside `plugin.json`, or `lib/x.so` for `"lib/x.so"`). Without
 that asset for the user's platform nothing is installed and the page says `no prebuilt <plugin> for <os>-<arch> yet`.
 
+```
+<plugin name>-<os>-<arch>.zip      os = std::env::consts::OS (linux, windows, macos), arch = std::env::consts::ARCH (x86_64, aarch64, …)
+e.g. my-fx-linux-x86_64.zip
+```
+
+fetched from `https://github.com/<owner>/<repo>/releases/latest/download/<asset>`. The zip's **root** holds the library file(s),
+named and placed as the plugin's `plugin.json` says (`libmy_fx.so` beside `plugin.json`, or `lib/x.so` for `"lib/x.so"`). Without
+that asset for the user's platform nothing is installed and the page says `no prebuilt <plugin> for <os>-<arch> yet`.
+
 **Checksums.** Attach a `SHA256SUMS` to your release (`sha256sum my-fx-*-x86_64.zip > SHA256SUMS`; one line per asset, plus
 `OpenFadeR-Plugins-HEAD.zip` for the repository archive) and everything the app downloads from the repository — the plugin's
 own library asset and a native library's prebuilt zip — is verified against it before anything is installed. A file whose hash
@@ -711,7 +720,9 @@ libraries (with `detect` patterns, so PREFERENCES > LIBRARIES offers to connect 
 database (a key as a `secret` setting), and one for sampler packs (a zip of audio and a list file; the
 samples are extracted to the plugin's cache folder and served as a library; with `"samples": true` the first list also fills the
 sampler after File > Import). Crates for what they share sit beside them. They need building once: `extension/plugin/build.sh` builds
-the workspace in release mode and copies each library next to its `plugin.json` (`start.sh` runs it first). Their settings are on their
+the workspace in release mode and copies each library next to its `plugin.json` (`start.sh` runs it first). The workspace pins the
+plugin SDK to a tag of this repository, so the plugins repository builds on its own; a core checkout develops against its own
+`sdk/` through a patch of that pin (the plugins repository's README shows it). Their settings are on their
 cards in PREFERENCES > EXTENSIONS; keys of encrypted libraries are `secret` settings (kept in `plugins.json`, shown masked).
 
 ## Knob modes
