@@ -52,8 +52,18 @@ pub fn set_sink(sink: Sink) {
 pub fn fire_one(plugin: &Plugin, event: &str, data: &Value) -> JoinHandle<()> {
     let plugin = plugin.clone();
     let request = json!({"op": "event", "event": event, "data": data});
+    // A burst (a plugin firing events in a loop) makes no thread flood: when
+    // the gate is full the newest occurrence is dropped (a hook may miss one
+    // occurrence; the next rides the next event).
     std::thread::spawn(move || {
         let name = plugin.manifest.name.clone();
+        let Some(_slot) = super::concur::EVENTS.slot() else {
+            eprintln!(
+                "plugin event {}: dropped, too many in flight (the cap keeps a burst out)",
+                request["event"]
+            );
+            return;
+        };
         match plugin
             .call(&request, TIMEOUT)
             .and_then(|reply| action::commands(&name, &reply))

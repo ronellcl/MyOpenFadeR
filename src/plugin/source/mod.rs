@@ -127,12 +127,18 @@ impl Sources {
     /// `key` was made meanwhile. A failed request is not cached (the next read asks again), except a failed playlist
     /// list, which stays empty so that a broken plugin is not asked at every rebuild of the tree.
     fn start(&self, s: &mut State, key: &str, plugin: &Plugin, request: Value) {
+        // A burst of scans makes no thread flood: when the gate is full the newest read is refused, the cache holds
+        // nothing for `key`, and the next rebuild asks again (a failed source already behaves so).
+        let Some(slot) = super::concur::SOURCES.slot() else {
+            return;
+        };
         s.next += 1;
         let stamp = s.next;
         s.cache.insert(key.to_owned(), (stamp, None));
         let (state, notify, key) = (self.state.clone(), self.notify.clone(), key.to_owned());
         let plugin = plugin.clone();
         std::thread::spawn(move || {
+            let _slot = slot;
             let lists = request["op"] == "playlists";
             let source = request["source"].as_str().unwrap_or_default();
             let answer = plugin

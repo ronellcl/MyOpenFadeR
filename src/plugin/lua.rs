@@ -55,7 +55,7 @@ fn run(plugin: &Plugin, script: &str, request: &Value, timeout: Duration) -> Res
         },
     )
     .map_err(|e| e.to_string())?;
-    api(&lua, plugin).map_err(|e| e.to_string())?;
+    api(&lua, plugin, deadline).map_err(|e| e.to_string())?;
     let module: LuaValue = lua
         .load(&source)
         .set_name(format!("@{}", file.display()))
@@ -112,13 +112,57 @@ fn agent() -> ureq::Agent {
         .into()
 }
 
+/// Runs a child to completion under the script's wall clock. A child hung past the deadline is killed: the Lua VM hook
+/// cannot see the wait, so the bound is here. The stdout is read as the child runs (a full pipe would otherwise block
+/// the child for ever); the kill closes the pipe, so the reader cannot stay behind.
+fn run_child(
+    d: &Path,
+    program: &str,
+    args: Vec<String>,
+    deadline: Instant,
+) -> mlua::Result<(String, i32)> {
+    use std::io::Read;
+    let mut child = std::process::Command::new(program)
+        .args(args)
+        .current_dir(d)
+        .stderr(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| mlua::Error::runtime(format!("cannot start {program:?}: {e}")))?;
+    // We asked for the pipe, so it is always there.
+    let mut stdout = child.stdout.take().expect("stdout piped");
+    let text = std::thread::spawn(move || {
+        let mut out = String::new();
+        let _ = stdout.read_to_string(&mut out);
+        out
+    });
+    let status = loop {
+        if let Some(status) = child.try_wait().map_err(mlua::Error::external)? {
+            break Some(status);
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            break None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let text = text.join().unwrap_or_default();
+    match status {
+        Some(status) => Ok((text, status.code().unwrap_or(-1))),
+        None => Err(mlua::Error::runtime(format!(
+            "rk.run({program:?}) ran past the script timeout"
+        ))),
+    }
+}
+
 /// `{name = value}` header tables to pairs.
 fn headers(t: Option<Table>) -> mlua::Result<Vec<(String, String)>> {
     t.map_or(Ok(Vec::new()), |t| t.pairs::<String, String>().collect())
 }
 
-/// Installs `rk`, `print` and `package.path` (see the module doc).
-fn api(lua: &Lua, plugin: &Plugin) -> mlua::Result<()> {
+/// Installs `rk`, `print` and `package.path` (see the module doc). `deadline` bounds `rk.run` too: a child cannot be
+/// seen by the VM hook while the script waits on it.
+fn api(lua: &Lua, plugin: &Plugin, deadline: Instant) -> mlua::Result<()> {
     let (name, dir) = (plugin.manifest.name.clone(), plugin.dir.clone());
     let rk = lua.create_table()?;
     rk.set("name", name.as_str())?;
@@ -216,16 +260,7 @@ fn api(lua: &Lua, plugin: &Plugin) -> mlua::Result<()> {
     rk.set(
         "run",
         lua.create_function(move |_, (program, args): (String, Option<Vec<String>>)| {
-            let out = std::process::Command::new(&program)
-                .args(args.unwrap_or_default())
-                .current_dir(&d)
-                .stderr(std::process::Stdio::inherit())
-                .output()
-                .map_err(|e| mlua::Error::runtime(format!("cannot start {program:?}: {e}")))?;
-            Ok((
-                String::from_utf8_lossy(&out.stdout).into_owned(),
-                out.status.code().unwrap_or(-1),
-            ))
+            run_child(&d, &program, args.unwrap_or_default(), deadline)
         })?,
     )?;
 

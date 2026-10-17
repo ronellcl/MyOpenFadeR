@@ -22,6 +22,7 @@
 //! those of the first read until a restart ([`Registry::restart_needed`]).
 
 pub mod action;
+mod concur;
 pub mod config;
 pub mod device;
 pub mod effect;
@@ -374,12 +375,40 @@ pub fn discover(dirs: &[PathBuf]) -> Registry {
     r
 }
 
+/// A manifest is read permissively (unknown keys are ignored, so older plugins
+/// still load with a newer app), but a typo like `"sorce"` would silently drop
+/// a purpose. Tell the user on stderr, without failing.
+fn unknown_keys(dir: &Path, text: &str) {
+    const KNOWN: [&str; 16] = [
+        "name", "version", "description", "author", "homepage", "script", "command", "sources",
+        "actions", "events", "timer", "settings", "effects", "library", "knob_modes", "pad_modes",
+    ];
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(text) else {
+        return; // reported by the from_str above
+    };
+    let keys: Vec<&str> = value
+        .as_object()
+        .map(|o| {
+            o.keys()
+                .map(String::as_str)
+                .filter(|k| !KNOWN.contains(k))
+                .collect()
+        })
+        .unwrap_or_default();
+    if !keys.is_empty() {
+        eprintln!(
+            "plugin.json of {:?}: unknown keys ignored: {}",
+            dir.display(),
+            keys.join(", ")
+        );
+    }
+}
+
 fn read_manifest(dir: &Path) -> Result<Manifest, String> {
     let file = dir.join("plugin.json");
-    let m: Manifest = crate::paths::at(
-        serde_json::from_str(&crate::paths::at(std::fs::read_to_string(&file), &file)?),
-        &file,
-    )?;
+    let text = crate::paths::at(std::fs::read_to_string(&file), &file)?;
+    let m: Manifest = crate::paths::at(serde_json::from_str(&text), &file)?;
+    unknown_keys(dir, &text);
     if m.name.is_empty() || m.name.contains(':') {
         return Err(format!(
             "{}: `name` must be non-empty and hold no `:`",

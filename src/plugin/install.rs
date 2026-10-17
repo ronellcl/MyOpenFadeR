@@ -47,32 +47,70 @@ pub fn install(from: &Path) -> Result<String, String> {
 /// [`install`] into `root`.
 pub fn install_into(from: &Path, root: &Path) -> Result<String, String> {
     crate::paths::at(std::fs::create_dir_all(root), root)?;
+    // Leftovers of previous sessions: a `.old-<pid>` whose plugin is not run
+    // from there by this app (a fresh install starts all over anyway).
+    if let Ok(entries) = std::fs::read_dir(root) {
+        for e in entries.flatten() {
+            if e.file_name().to_str().is_some_and(|n| n.starts_with(".old-")) {
+                let _ = std::fs::remove_dir_all(e.path());
+            }
+        }
+    }
     let staging = root.join(format!(".installing-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&staging);
     let result = stage(from, &staging).and_then(|()| {
         let m = read_manifest(&staging)?;
-        let dest = root.join(folder_name(&m.name));
+        let folder = folder_name(&m.name)
+            .ok_or_else(|| format!("{:?}: not a plugin-folder name", m.name))?;
+        let dest = root.join(&folder);
+        let old = dest.with_file_name(format!(".old-{}", std::process::id()));
+        // CORE-07: the destination is set aside, not destroyed. Anything failing
+        // between here and the finisher leaves the old copy usable: it goes back
+        // in place (a Windows DLL of a loaded plugin is fine here: the rename
+        // works; it is the overwrite that the system refuses, see CORE-02).
         if dest.exists() {
-            crate::paths::at(std::fs::remove_dir_all(&dest), &dest)?;
+            crate::paths::at(std::fs::rename(&dest, &old), &dest)?;
         }
-        crate::paths::at(std::fs::rename(&staging, &dest), &dest)?;
+        // CORE-02: the rename puts the DLL aside while it stays loadable (a
+        // `.old-*` folder of a running session is purged by the next install).
+        let put_back = |e| {
+            if old.exists() {
+                let _ = std::fs::rename(&old, &dest);
+            }
+            e
+        };
+        crate::paths::at(std::fs::rename(&staging, &dest).map_err(put_back), &dest)?;
+        let _ = std::fs::remove_dir_all(&old); // happy path: no leftovers
         Ok(m.name)
     });
     let _ = std::fs::remove_dir_all(&staging);
     result
 }
 
-/// A plugin name as a folder name: path separators and other troublesome characters become `_`.
-fn folder_name(name: &str) -> String {
-    name.chars()
-        .map(|c| {
-            if c.is_alphanumeric() || "-_. ".contains(c) {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
+/// Windows' console-device names: a folder so named cannot be opened once made.
+const RESERVED: [&str; 22] = [
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
+/// The plugin's name as folder name, or `None` when it cannot make a sane
+/// folder. Without a real name (only punctuation, `..`, emptiness) or with a
+/// Windows' reserved device name, reject. Everything troublesome, separators
+/// and dots included, goes `_`: never walk out of the root with a manifest
+/// name (CORE-01).
+fn folder_name(name: &str) -> Option<String> {
+    let name = name.trim();
+    if name.is_empty() || !name.chars().any(|c| c.is_alphanumeric()) {
+        return None;
+    }
+    let out: String = name
+        .chars()
+        .map(|c| if c.is_alphanumeric() || "-_ ".contains(c) { c } else { '_' })
+        .collect();
+    if RESERVED.contains(&out.to_uppercase().as_str()) {
+        return None;
+    }
+    Some(out)
 }
 
 /// Copies the plugin's files into `to`.
@@ -252,6 +290,79 @@ mod tests {
         fs::write(src.join("plugin.json"), JSON).unwrap(); // main.lua is missing
         assert!(install_into(&src, &root).unwrap_err().contains("main.lua"));
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+        fs::remove_dir_all(t).ok();
+    }
+
+    #[test]
+    fn a_manifest_name_cannot_walk_out_of_the_extension_root() {
+        let t = temp("traverse");
+        let root = t.join("plugins");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("keep"), "kept").unwrap();
+        fs::create_dir_all(root.join("extension/plugin/installed")).unwrap();
+        fs::write(root.join("extension/plugin/installed/x"), "x").unwrap();
+        let src = t.join("p");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("plugin.json"), JSON).unwrap();
+        fs::write(
+            src.join("main.lua"),
+            "function original() end",
+        ).unwrap();
+        let install_named = |name: &str| {
+            fs::write(
+                src.join("plugin.json"),
+                JSON.replace("hello", &name),
+            ).unwrap();
+            install_into(&src, &root)
+        };
+        // Before the fix, a manifiesto `..` made the installer erase the whole
+        // extension folder on the way to its failure.
+        for bad in ["..", ".", "​", "NUL", "con", "​..."] {
+            assert!(install_named(bad).is_err(), "{bad:?} must not install");
+        }
+        assert!(
+            root.join("keep").is_file()
+                && root.join("extension/plugin/installed/x").is_file(),
+            "nothing outside the plugin name is touched by a rejected name"
+        );
+        // A Windows' name in the wild unchanged.
+        assert!(install_named("Hi-Fi_IPod_v2").is_ok());
+        fs::remove_dir_all(t).ok();
+    }
+
+    #[test]
+    fn folder_names_sanitize_reject_walk_and_devices() {
+        assert_eq!(folder_name("hello"), Some("hello".to_owned()));
+        assert_eq!(folder_name("Hello World-v2"), Some("Hello World-v2".to_owned()));
+        assert_eq!(folder_name("a/b"), Some("a_b".to_owned()));
+        assert_eq!(folder_name(".git"), Some("_git".to_owned()));
+        for bad in ["..", ".", "​", "", "NUL", "com3", "LPT1", "­..."] {
+            assert_eq!(folder_name(bad), None, "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn a_failed_update_leaves_the_old_copy_in_place() {
+        let t = temp("transactional");
+        let root = t.join("plugins");
+        let src = t.join("p");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("plugin.json"), JSON).unwrap();
+        fs::write(src.join("main.lua"), "x").unwrap();
+        install_into(&src, &root).unwrap();
+        fs::write(root.join("hello/main.lua"), "v2").unwrap();
+        // Exactly what the updater does now: set the old copy aside with a
+        // rename — allowed on Windows even when a DLL inside stays loaded,
+        // where overwriting or deleting would refuse (CORE-02).
+        let old = root.join(format!(".old-{}", std::process::id()));
+        assert!(std::fs::rename(root.join("hello"), &old).is_ok());
+        // And what a failed updater does on top: put it back (CORE-07).
+        assert!(std::fs::rename(&old, root.join("hello")).is_ok());
+        assert!(
+            fs::read_to_string(root.join("hello/main.lua"))
+                .is_ok_and(|c| c == "v2"),
+            "the previous version survives any failed update attempt"
+        );
         fs::remove_dir_all(t).ok();
     }
 }
