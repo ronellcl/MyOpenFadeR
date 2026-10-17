@@ -43,7 +43,9 @@ copy them into `~/.config/openfader/extension/skin/`, or point `OPENFADER_SKINS`
   * **BASE** (dark / light) sets the values the tokens you did not touch have, and the menu bar's colours;
   * **SAVE AS** writes `<name>.json` in your themes folder (`~/.config/openfader/extension/skin/`) with every token, applies it and
     closes the editor; **DISCARD** drops the changes. The name of a built-in or bundled theme cannot be used; saving under the name of
-    one of your own replaces it.
+    one of your own replaces it. Listing every token is deliberate: a saved theme stops depending on its base, so it keeps looking the
+    same even when the built-in palette evolves. The cost is the reverse — a later improvement of the built-in base is not inherited by
+    saved themes an application later; a theme that lists only what it changes (a hand-written one) does.
 * **DUPLICATE** copies the applied theme into your folder as `<name> copy`; **DELETE** removes the applied theme when it is one of
   yours (bundled ones are not yours to delete); **IMPORT…** adds a theme file (a file chooser: zenity or kdialog); **OPEN FOLDER**
   opens your themes folder; **RESCAN** reads the folders again.
@@ -78,6 +80,7 @@ Put `*.json` files in any of these folders (the first folder that has a name win
   "author": "me",
   "description": "Cool blues on a near-black window",
   "base": "dark",
+  "schemaVersion": 1,
   "layout": { "deck_layout": "vertical", "line_space": "small" },
   "tokens": {
     "accent": "#00b4d8",
@@ -94,17 +97,19 @@ Put `*.json` files in any of these folders (the first folder that has a name win
 | `name` | What the gallery lists and the settings file stores. Optional (default: the file name without `.json`). `Catppuccin Mocha` and `Catppuccin Latte` are the built-in themes' names and cannot be reused; a name already taken by an earlier theme is skipped. |
 | `author`, `description` | Text for the gallery card (optional). |
 | `base` | `"dark"` (default) or `"light"`: the built-in values every token you do not list keeps. It also picks the light or dark scheme of the menu bar and its menus, which Slint draws itself and which no token reaches. |
+| `schemaVersion` | `1`, the format these files write. Optional: a file without it is read as 1, and another value is noted on stderr and read as 1 too. |
 | `layout` | VIEW settings the theme sets when it is chosen (optional), see below. |
 | `tokens` | Token name to value. Anything you leave out is the base's value. Files written by the editor list every token. |
 
 A theme sets *every* token (yours, else the base's), so switching from one theme to another, or back to a built-in one, never leaves
-anything of the previous theme behind. Files from before `author`, `description` and `layout` existed load unchanged.
+anything of the previous theme behind. Files from before `author`, `description`, `layout` or `schemaVersion` existed load unchanged.
 
 ### Layout hints
 
 `layout` maps VIEW settings (their names in the settings file, the same values PREFERENCES shows) to the value the theme wants.
-They are applied once, when the theme is chosen (a click in the gallery or the SKIN row), not at every start, so the user stays free
-to change the layout afterwards. A key that is not in this table, or a value the setting does not accept, is reported on stderr and
+They are applied once, when the theme is chosen (a click in the gallery or the SKIN row), not at every start: if you change the view
+afterwards, your change is what the settings hold and it survives to the next start; the theme does not re-apply its hints there. A
+key that is not in this table, or a value the setting does not accept, is reported on stderr and
 ignored.
 
 | Key | Values |
@@ -128,17 +133,18 @@ Sizes of the regions (deck height, waveform heights, the jog, the mixer channel)
 | Type | Written as |
 |---|---|
 | color | `"#rrggbb"` or `"#rrggbbaa"` (alpha last) |
-| length | a number (logical px) or `"12px"` |
+| length | a number (logical px) or `"12px"`, `0..=512px` (a negative or larger value is brought into range with a note on stderr) |
 | string | text, e.g. a font family name |
 | int | a whole number, e.g. a font weight (`400`, `700`) or `pad-style` |
 | float | a number |
-| duration | a number of milliseconds, `"80ms"` or `"0.2s"` |
+| duration | a number of milliseconds, `"80ms"` or `"0.2s"`, `0..=5000ms` (a negative one is refused, a longer one is capped with a note) |
 
 ### Errors
 
 A token that is unknown, of the wrong type or has a bad value (`"red"` is not a colour) is reported on stderr as
 `skin <file>: token "accent": bad colour "red", use #rrggbb or #rrggbbaa` and left at the base's value; the rest of the theme still
-applies. A file that is not valid JSON, or has no JSON object at its top, holds no theme and is skipped. IMPORT and `install` refuse a
+applies. A length or duration beyond the range above is not refused: it is brought into range and noted the same way. A file that is
+not valid JSON, or has no JSON object at its top, holds no theme and is skipped. IMPORT and `install` refuse a
 file with no valid token at all.
 
 ## Tokens

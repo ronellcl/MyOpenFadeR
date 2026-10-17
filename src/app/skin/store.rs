@@ -1,6 +1,7 @@
 //! The user's skin folder (`<config dir>/extension/skin`): where themes made in the editor, duplicated or installed from a file live.
 //! Everything that writes goes through [`write_into`], which refuses the built-in names and the names of bundled or `$OPENFADER_SKINS`
-//! themes (those folders are not ours to change) and replaces the user's own theme of the same name. The `*_in` functions take the
+//! themes (those folders are not ours to change) and replaces the user's own theme of the same name, atomically (`.part` + rename).
+//! The `*_in` functions take the
 //! folder and the skins found so far, so tests never touch the real config folder; the public ones use [`user_dir`] and [`found`].
 
 use super::{BUILTIN, Skin, file, found, rescan};
@@ -97,8 +98,17 @@ pub fn write_into(dir: &Path, skins: &[Skin], skin: &Skin) -> Result<PathBuf, St
         name: name.to_owned(),
         ..skin.clone()
     };
-    std::fs::write(&path, file::serialize(&skin))
-        .map_err(|e| format!("{}: {e}", path.display()))?;
+    // The file is written through a `.part` sibling and renamed: a power cut or a full disk mid-write cannot leave a truncated
+    // JSON behind, and whatever the write or the rename answers, the scratch file is gone (the mapping install does the same).
+    let part = dir.join(format!(
+        "{}.part",
+        path.file_name().map_or(String::new(), |f| f.to_string_lossy().into_owned())
+    ));
+    let written = std::fs::write(&part, file::serialize(&skin)).and_then(|()| std::fs::rename(&part, &path));
+    if let Err(e) = written {
+        let _ = std::fs::remove_file(&part);
+        return Err(format!("{}: {e}", path.display()));
+    }
     Ok(path)
 }
 
@@ -211,6 +221,30 @@ mod tests {
         // another name whose slug is taken gets a numbered file
         let other = write_into(&dir, &skins, &themed("My-Theme!")).unwrap();
         assert_eq!(other, dir.join("my-theme-2.json"));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn a_failed_save_leaves_no_part_file_and_what_was_there() {
+        let dir = temp("part");
+        let blocked = dir.join("blocked.json");
+        std::fs::create_dir_all(&blocked).unwrap();
+        std::fs::write(blocked.join("inside"), "occupied").unwrap();
+        let skin = themed("Blocked");
+        // a theme of that name was "installed" before and its file is a directory: the write works, the rename cannot take it
+        let skins = vec![Skin {
+            path: Some(blocked.clone()),
+            ..skin.clone()
+        }];
+        assert!(
+            write_into(&dir, &skins, &skin).is_err(),
+            "a directory blocks the rename"
+        );
+        assert!(blocked.join("inside").is_file(), "what was there survives");
+        assert!(
+            !dir.join("blocked.json.part").exists(),
+            "no scratch left behind"
+        );
         std::fs::remove_dir_all(dir).ok();
     }
 

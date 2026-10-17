@@ -9,7 +9,9 @@
 //! settings the theme sets when it is chosen ([`LAYOUT_KEYS`]). A token that is unknown, of the wrong type or has a bad value is
 //! reported and left at the base's value; the rest of the skin still applies. Token values by type: colour `"#rrggbb"` /
 //! `"#rrggbbaa"`; length a number or `"12px"`; string text; int a whole number; float a number; duration a number of ms,
-//! `"80ms"` or `"0.2s"`. [`serialize`] writes the same format back (the theme editor and installer use it).
+//! `"80ms"` or `"0.2s"`. Lengths and durations are bounded (`0..=512px`, `0..=5000ms`, noted when brought into range) and
+//! `schemaVersion` is accepted: 1 is the format these files write, any other value is noted and read as 1. [`serialize`] writes
+//! the same format back (the theme editor and installer use it).
 
 use super::{Base, Skin, Ty, Value, TOKENS};
 use serde_json::Value as Json;
@@ -31,6 +33,12 @@ pub const LAYOUT_KEYS: [&str; 11] = [
     "overview",
     "show_mixer",
 ];
+
+/// The lengths a `length` token may be set to, in px (`font-*`, the `h-*` of the panels, `jog`, …: a negative or huge value leaves
+/// the UI unusable until the file is deleted, so it is brought into range with a note).
+const LENGTH_LIMIT: f64 = 512.0;
+/// The maximum a `duration` token may be set to, in ms (`t-fast` 80, `t-fade` 180 and `tooltip-delay` 600 by default).
+const DURATION_LIMIT_MS: f64 = 5000.0;
 
 /// The skins under `dirs` (earlier folders win a name clash), with one note per problem found.
 pub fn discover(dirs: &[PathBuf]) -> (Vec<Skin>, Vec<String>) {
@@ -105,10 +113,16 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
             Base::Dark
         }
     };
+    match obj.get("schemaVersion") {
+        None => {}
+        Some(v) if v.as_i64() == Some(1) => {}
+        Some(v) => notes.push(format!("schemaVersion {v} is not supported, reading as 1")),
+    }
     notes.extend(
         obj.keys()
             .filter(|k| {
-                !["name", "base", "tokens", "author", "description", "layout"].contains(&k.as_str())
+                !["name", "base", "schemaVersion", "tokens", "author", "description", "layout"]
+                    .contains(&k.as_str())
             })
             .map(|k| format!("unknown key {k:?} ignored")),
     );
@@ -156,8 +170,12 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
                     notes.push(format!("unknown token {key:?} (the names are the in-out properties of ui/theme.slint, docs/skins.md)"));
                     continue;
                 };
-                match value(ty, v) {
-                    Ok(v) => tokens.push((token, v)),
+                let mut here = Vec::new();
+                match value(ty, v, &mut here) {
+                    Ok(v) => {
+                        notes.extend(here.into_iter().map(|n| format!("token {key:?}: {n}")));
+                        tokens.push((token, v));
+                    }
                     Err(e) => notes.push(format!("token {key:?}: {e}")),
                 }
             }
@@ -178,15 +196,20 @@ pub fn parse(text: &str, stem: &str) -> Result<(Skin, Vec<String>), String> {
     Ok((skin, notes))
 }
 
-/// `j` as a value of type `ty`.
-fn value(ty: Ty, j: &Json) -> Result<Value, String> {
+/// `j` as a value of type `ty` (bounds are noted into `notes`, the value still applies).
+fn value(ty: Ty, j: &Json, notes: &mut Vec<String>) -> Result<Value, String> {
     let bad = |want: &str| format!("expected {want}, got {j}");
     Ok(match ty {
         Ty::Color => Value::Color(color(
             j.as_str().ok_or_else(|| bad("a colour like \"#1473eb\""))?,
         )?),
         Ty::Length => Value::Length(
-            number(j, "px").ok_or_else(|| bad("a length like 12 or \"12px\""))? as f32,
+            bound(
+                number(j, "px").ok_or_else(|| bad("a length like 12 or \"12px\""))?,
+                LENGTH_LIMIT,
+                "px",
+                notes,
+            ) as f32,
         ),
         Ty::Str => Value::Str(j.as_str().ok_or_else(|| bad("a string"))?.to_owned()),
         Ty::Int => Value::Int(
@@ -211,9 +234,20 @@ fn value(ty: Ty, j: &Json) -> Result<Value, String> {
             let ms = ms
                 .filter(|ms| ms.is_finite() && *ms >= 0.0)
                 .ok_or_else(|| bad("a duration like 80, \"80ms\" or \"0.2s\""))?;
-            Value::Duration(ms.round() as i64)
+            Value::Duration(
+                bound(ms, DURATION_LIMIT_MS, "ms", notes).round() as i64
+            )
         }
     })
+}
+
+/// `n` brought into `0..=limit` (rounded `n` keeps its unit in the note).
+fn bound(n: f64, limit: f64, unit: &str, notes: &mut Vec<String>) -> f64 {
+    let lim = n.clamp(0.0, limit);
+    if n != lim {
+        notes.push(format!("{n} is out of range 0..={limit}{unit}, using {lim}{unit}"));
+    }
+    lim
 }
 
 /// A JSON number, or a string holding one with an optional `unit` suffix.
@@ -259,7 +293,7 @@ pub fn from_text(ty: Ty, text: &str) -> Result<Value, String> {
     } else {
         Json::String(t.to_owned())
     };
-    value(ty, &json)
+    value(ty, &json, &mut Vec::new())
 }
 
 /// `c` as `#rrggbb`, or `#rrggbbaa` when it is not opaque.
@@ -306,7 +340,10 @@ pub fn show(v: &Value) -> String {
 /// `skin` as a file (the keys in a readable order, one token per line; what [`parse`] reads back).
 pub fn serialize(skin: &Skin) -> String {
     let q = |s: &str| Json::String(s.to_owned()).to_string();
-    let mut out = format!("{{\n  \"name\": {},\n", q(&skin.name));
+    let mut out = format!(
+        "{{\n  \"name\": {},\n  \"schemaVersion\": 1,\n",
+        q(&skin.name)
+    );
     for (key, v) in [("author", &skin.author), ("description", &skin.description)] {
         if !v.is_empty() {
             out += &format!("  \"{key}\": {},\n", q(v));
@@ -410,6 +447,55 @@ mod tests {
         assert_eq!(
             (skin.base, skin.tokens.len(), notes.len()),
             (Base::Dark, 0, 3),
+            "{notes:?}"
+        );
+    }
+
+    #[test]
+    fn lengths_and_durations_are_bounded() {
+        let (skin, notes) = parse(
+            r#"{"tokens":{"font-size":-5,"h-deck-2":10000,"jog":"-20px","t-fast":9000}}"#,
+            "x",
+        )
+        .unwrap();
+        let got = |n: &str| tokens(&skin).into_iter().find(|t| t.0 == n).map(|t| t.1);
+        assert_eq!(got("font-size"), Some(Value::Length(0.0)));
+        assert_eq!(got("h-deck-2"), Some(Value::Length(512.0)));
+        assert_eq!(got("jog"), Some(Value::Length(0.0)));
+        assert_eq!(got("t-fast"), Some(Value::Duration(5000)));
+        let all = notes.join("\n");
+        for want in [
+            r#"token "font-size": -5 is out of range 0..=512px, using 0px"#,
+            r#"token "h-deck-2": 10000 is out of range 0..=512px, using 512px"#,
+            r#"token "jog": -20 is out of range 0..=512px, using 0px"#,
+            r#"token "t-fast": 9000 is out of range 0..=5000ms, using 5000ms"#,
+        ] {
+            assert!(all.contains(want), "{want} not in {all}");
+        }
+        assert_eq!(notes.len(), 4, "{all}");
+        // a value in range stays untouched and silent
+        let (_, notes) =
+            parse(r#"{"tokens":{"font-size":12,"jog":"112px","t-fade":"0.2s"}}"#, "x").unwrap();
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn a_schema_version_of_1_is_silent_and_the_rest_notes() {
+        let (skin, notes) = parse(
+            r##"{"schemaVersion":1,"tokens":{"accent":"#112233"}}"##,
+            "x",
+        )
+        .unwrap();
+        assert_eq!(skin.tokens.len(), 1);
+        assert!(notes.is_empty(), "{notes:?}");
+        let (skin, notes) = parse(
+            r##"{"schemaVersion":2,"tokens":{"accent":"#112233"}}"##,
+            "x",
+        )
+        .unwrap();
+        assert_eq!(skin.tokens.len(), 1, "still read as 1");
+        assert!(
+            notes.iter().any(|n| n.contains("schemaVersion 2")),
             "{notes:?}"
         );
     }
@@ -549,5 +635,85 @@ mod tests {
             show(&Value::Color(Color::from_argb_u8(0x80, 255, 0, 0))),
             "#ff000080"
         );
+    }
+
+    #[test]
+    fn the_checked_out_themes_have_readable_text_contrast() {
+        // THEME-01: the pairs text makes against its surfaces, as WCAG AA has them. A theme below the thresholds is odd but
+        // allowed: the report is a stderr warning, not a failure, so artistic themes are not vetoed (the hallazgos file asks
+        // for a warning). A theme that does not list one of the pair's tokens (the small examples) holds no measurement.
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let dirs: Vec<PathBuf> =
+            [root.join("extension/skin"), root.join("../themes-repo")]
+                .into_iter()
+                .filter(|d| d.is_dir())
+                .collect();
+        if dirs.is_empty() {
+            return;
+        }
+        for dir in dirs {
+            let (skins, _) = discover(&[dir.clone()]);
+            assert!(!skins.is_empty(), "{} holds themes", dir.display());
+            for s in &skins {
+                let at = |n: &str| {
+                    s.tokens
+                        .iter()
+                        .find(|(k, _)| *k == n)
+                        .map(|(_, v)| match v {
+                            Value::Color(c) => *c,
+                            _ => unreachable!("colour tokens hold colours"),
+                        })
+                };
+                for (fg, bg, need) in [
+                    ("text", "bg", 4.5),
+                    ("text", "panel", 4.5),
+                    ("row-dim", "bg", 4.5),
+                    ("text-bright", "accent", 3.0),
+                ] {
+                    let (Some(f), Some(b)) = (at(fg), at(bg)) else {
+                        continue;
+                    };
+                    let r = contrast(f, b);
+                    if r < need {
+                        eprintln!(
+                            "theme {} in {}: {fg} over {bg} contrasts {r:.2}, AA wants {need} or more",
+                            s.name,
+                            dir.display()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// `fg` made opaque over `bg` (a token colour with alpha sits on the surface).
+    fn over(fg: Color, bg: Color) -> Color {
+        let a = f64::from(fg.alpha()) / 255.0;
+        let mix = |f: u8, b: u8| (f64::from(f) * a + f64::from(b) * (1.0 - a)).round() as u8;
+        Color::from_rgb_u8(
+            mix(fg.red(), bg.red()),
+            mix(fg.green(), bg.green()),
+            mix(fg.blue(), bg.blue()),
+        )
+    }
+
+    /// The WCAG relative luminance of an opaque colour.
+    fn luminance(c: Color) -> f64 {
+        let ch = |v: u8| {
+            let v = f64::from(v) / 255.0;
+            if v <= 0.04045 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * ch(c.red()) + 0.7152 * ch(c.green()) + 0.0722 * ch(c.blue())
+    }
+
+    /// The WCAG contrast ratio of `fg` over `bg` (1.0: invisible, 21.0: black on white).
+    fn contrast(fg: Color, bg: Color) -> f64 {
+        let (f, b) = (luminance(over(fg, bg)), luminance(bg));
+        let (hi, lo) = if f > b { (f, b) } else { (b, f) };
+        (hi + 0.05) / (lo + 0.05)
     }
 }
