@@ -61,8 +61,13 @@ know, and a `deck` outside 0..3. Controls and rows that survive stay in.
 Mapping files and MIDI LEARN share one action table, all of it listed below. "What it moves" is the MIDI message shape the action
 wants: a mapping file binds them the way the shape says, and a relative encoder that is `two_comp` sends 127 for −1 (the
 manufacturers' usual) while one without is centred on 64. Actions that need a per-row constant (pad slots, pad modes and the like)
-bind only in mapping files (the row's `arg`); MIDI LEARN offers every other action — not just the ones the shipped files use, so an
+bind only in mapping files (row's `arg`); MIDI LEARN offers every other action — not just the ones the shipped files use, so an
 action no shipped mapping binds still works from any button the user binds.
+
+On the DDJ-1000 and the DDJ-FLX10 the performance pads are a hardware state machine, and three of their pages now ship bound to
+actions the pad page is named after (BEAT JUMP → the beat jumps, BEAT LOOP → `loop-1/2/4/8/16`, KEY SHIFT → `key-down`/`key-up`).
+Those notes are only sent while the pad is in that page, so the bindings are additive and move nothing else. The actions the rest
+of the table carries without a shipped binding stay reachable from MIDI LEARN.
 
 <!-- The ACTIONS table: generated from src/app/midi/actions (test `the_mappings_doc_lists_every_action_and_light` keeps it in sync). -->
 
