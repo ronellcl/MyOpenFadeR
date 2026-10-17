@@ -25,7 +25,8 @@
 //! ```
 //!
 //! `deck` is 0..3 (deck A..D; the FX unit or MERGE side for those actions), `arg` the action's constant (default 0),
-//! `light` one of [`Led`] written as in Rust.
+//! `light` one of [`Led`] written as in Rust. The user-facing spec, with the action and light tables, is `docs/mappings.md`
+//! (a test keeps its tables in sync).
 
 use super::{Binding, Led, LedRow, Msg, actions::ACTIONS};
 use openfader::library::markup::{Edge, tags};
@@ -380,6 +381,32 @@ pub(super) fn match_len(ports: &[String], port: &str) -> Option<usize> {
 mod tests {
     use super::*;
 
+    /// `docs/mappings.md` lists every action and every light (the skins docs' test, see `app::skin`).
+    #[test]
+    fn the_mappings_doc_lists_every_action_and_light() {
+        let doc = include_str!("../../../docs/mappings.md");
+        let missing: Vec<&str> = ACTIONS
+            .iter()
+            .map(|a| a.name)
+            .filter(|n| !doc.contains(&format!("`{n}`")))
+            .collect();
+        assert!(missing.is_empty(), "docs/mappings.md lacks the actions {missing:?}");
+        // every light a mapping file may name, as the files' text spells it (`n`, `slot`, …: the row's key in the doc)
+        const LEDS: [&str; 36] = [
+            "Play", "Cue", "Sync", "Master", "Loop", "Cutter", "Vinyl", "HpCue", "Loaded",
+            "Sampler", "TempoRange", "TrackStart", "Tap", "Loop4", "Level", "Ring", "Iso",
+            "DrumCapture", "Mode(n)", "Pad(m,slot)", "PadSlot(slot)", "Fx(unit,slot)",
+            "FxEffect(unit,slot,fx,on)", "FxTapped(unit,tap)", "FxAssign(unit,ch)",
+            "FxChOn(unit,ch,slot)", "FxRelease(unit)", "FxBeat(unit)", "SamplerPad(slot)",
+            "MergePreset(side,n)", "MergeOn(side)", "Stem(part)", "FxPart(part)", "Drum(pad)",
+            "DrumBank(bank)", "DrumMode(multi)",
+        ];
+        let missing: Vec<&str> = LEDS
+            .into_iter()
+            .filter(|l| !doc.contains(&format!("`{l}`")))
+            .collect();
+        assert!(missing.is_empty(), "docs/mappings.md lacks the lights {missing:?}");
+    }
     fn file(name: &str, port: &str) -> (String, String) {
         (
             name.into(),
