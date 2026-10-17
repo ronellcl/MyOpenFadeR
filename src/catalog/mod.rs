@@ -17,6 +17,8 @@ pub mod mappings;
 pub mod plugins;
 pub mod themes;
 
+pub(crate) mod check;
+
 use crate::zip::Zip;
 use std::fmt;
 use std::io::Read;
@@ -71,6 +73,11 @@ impl Repo {
         format!("https://github.com/{self}/archive/HEAD.zip")
     }
 
+    /// [`zip_url`]'s entry name in the repository's SHA256SUMS (the name the browser saves the archive as).
+    pub fn zip_name(&self) -> String {
+        format!("{}-HEAD.zip", self.name)
+    }
+
     /// Where a plugin of this repository that needs a native library finds it for this machine: the asset of the latest
     /// release called `<plugin>-<os>-<arch>.zip` (`std::env::consts`, e.g. `my-fx-linux-x86_64.zip`), whose root holds the
     /// library files as `plugin.json` names them.
@@ -91,6 +98,13 @@ impl Repo {
         )
     }
 
+    /// The checksum list of the repository's latest release ([`check`]): one `SHA256SUMS` the repository maintains,
+    /// which its downloads verify against. A repository that has not made one yet keeps working (the list is opt-in);
+    /// a list that holds the download refuses a tampered or replaced one.
+    pub fn sha_url(&self) -> String {
+        format!("https://github.com/{self}/releases/latest/download/SHA256SUMS")
+    }
+
     /// The cached zip: `<cache>/repos/<owner>__<repo>.zip` (lower case: GitHub names are not case-sensitive).
     fn cache_file(&self) -> Result<PathBuf, String> {
         let root = crate::analysis::cache::root()
@@ -107,11 +121,15 @@ pub(crate) enum Get {
     Failed(String),
 }
 
-/// Most a download may be (a whole repository zip).
+/// Most a download may be (a whole repository zip), and most its `SHA256SUMS` list may be.
 const MAX_DOWNLOAD: u64 = 512 << 20;
+const MAX_LIST: u64 = 1 << 20;
 
-/// Downloads `url` to `to` through a `.part` file, so a failure never leaves a truncated file.
-pub(crate) fn get(url: &str, to: &Path) -> Result<(), Get> {
+/// Downloads `url` to `to` through a `.part` file, so a failure never leaves a truncated file. `checks` is `(the
+/// SHA256SUMS list to read, the download's entry name in it)`: an entry that holds the download's hash installs it, an
+/// entry that does not (or none) refuses the file, and no reachable list (repositories publish one when they start to)
+/// warns on stderr and keeps the download. The caller maps the errors to its own messages.
+pub(crate) fn get(url: &str, to: &Path, checks: Option<(&str, &str)>) -> Result<(), Get> {
     let failed = |e: &dyn fmt::Display| Get::Failed(e.to_string());
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(120)))
@@ -135,7 +153,45 @@ pub(crate) fn get(url: &str, to: &Path) -> Result<(), Get> {
     if done.is_err() {
         let _ = std::fs::remove_file(&part);
     }
-    done
+    done?;
+    match checks {
+        None => Ok(()),
+        Some((list_url, entry)) => match checked(&agent, list_url, entry, to) {
+            Ok(()) => Ok(()),
+            Err(Get::NotFound) => {
+                // no list yet: the download stands, with the warning so the opt-in is seen
+                eprintln!(
+                    "catalog: {list_url} has no SHA256SUMS yet (its releases are not checksummed); continuing without it"
+                );
+                Ok(())
+            }
+            Err(e) => {
+                let _ = std::fs::remove_file(to);
+                Err(e)
+            }
+        },
+    }
+}
+
+/// Where [`get`]'s second answer on the list itself goes: a reachable list is checked, a missing one is [`Get::NotFound`]
+/// (no list yet), anything else is a failure that refuses the download (a list that half-arrives is not trusted).
+fn checked(
+    agent: &ureq::Agent,
+    list_url: &str,
+    entry: &str,
+    file: &Path,
+) -> Result<(), Get> {
+    let resp = agent.get(list_url).call().map_err(|e| match e {
+        ureq::Error::StatusCode(404) => Get::NotFound,
+        e => Get::Failed(format!("reading the SHA256SUMS failed ({e})")),
+    })?;
+    let mut list = String::new();
+    resp.into_body()
+        .into_reader()
+        .take(MAX_LIST)
+        .read_to_string(&mut list)
+        .map_err(|e| Get::Failed(format!("reading the SHA256SUMS failed ({e})")))?;
+    check::verify(&list, entry, file).map_err(Get::Failed)
 }
 
 /// What a repository holds.
@@ -152,11 +208,13 @@ pub fn cached(repo: &Repo) -> Option<PathBuf> {
     repo.cache_file().ok().filter(|z| z.is_file())
 }
 
-/// The cached zip of `repo`, downloaded first when there is none yet or `refresh` is set.
+/// The cached zip of `repo`, downloaded first when there is none yet or `refresh` is set (verified, see [`check`]).
 pub fn fetch(repo: &Repo, refresh: bool) -> Result<PathBuf, String> {
     let zip = repo.cache_file()?;
     if refresh || !zip.is_file() {
-        get(&repo.zip_url(), &zip).map_err(|e| match e {
+        let (list, entry) = (repo.sha_url(), repo.zip_name());
+        get(&repo.zip_url(), &zip, Some((list.as_str(), entry.as_str())))
+            .map_err(|e| match e {
             Get::NotFound => format!(
                 "{repo}: no such repository on GitHub (check the name; a private repository cannot be read)"
             ),

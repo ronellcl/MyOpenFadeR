@@ -5,7 +5,7 @@
 //! zip does not hold it, it is the root of the release asset `<plugin>-<os>-<arch>.zip` of the repository's latest release
 //! ([`Repo::asset_url`]); with no such asset nothing is installed.
 
-use super::{below_top, Get, Repo};
+use super::{below_top, list, Get, Repo};
 use crate::plugin::{effect::Decls, install, Manifest};
 use crate::zip::Zip;
 use std::path::Path;
@@ -84,7 +84,14 @@ fn stage(repo: &Repo, zip: &Path, e: &Entry, work: &Path, to: &Path) -> Result<(
     }
     let asset = work.join("asset.zip");
     crate::paths::at(std::fs::create_dir_all(work), work)?;
-    super::get(&repo.asset_url(name), &asset).map_err(|g| match g {
+    let asset_name = format!("{name}-{}-{}.zip", std::env::consts::OS, std::env::consts::ARCH);
+    let list = repo.sha_url();
+    super::get(
+        &repo.asset_url(name),
+        &asset,
+        Some((list.as_str(), asset_name.as_str())),
+    )
+    .map_err(|g| match g {
         Get::NotFound => format!(
             "no prebuilt {name} for {}-{} yet",
             std::env::consts::OS,
@@ -106,12 +113,27 @@ fn stage(repo: &Repo, zip: &Path, e: &Entry, work: &Path, to: &Path) -> Result<(
 /// manual drop is and replaces an older copy; returns its name. Blocks on the network: run it on a worker thread, one install at
 /// a time.
 pub fn install(repo: &Repo, zip: &Path, e: &Entry) -> Result<String, String> {
+    warn_third_party(repo, &e.manifest.name);
     let work = std::env::temp_dir().join(format!("openfader-get-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&work);
     let plugin = work.join("plugin");
     let done = stage(repo, zip, e, &work, &plugin).and_then(|()| install::install(&plugin));
     let _ = std::fs::remove_dir_all(&work);
     done
+}
+
+/// Plugins run with the user's full rights (see CORE-03 and `docs/plugins.md`): a native library gets the app's threads, a
+/// script reads and writes files, the net and the system with nothing in between. A plugin from a repository beyond the ones
+/// shipped on first run gets the installer's word in the console log.
+fn warn_third_party(repo: &Repo, plugin: &str) {
+    let ours = list::DEFAULTS
+        .iter()
+        .any(|d| d.eq_ignore_ascii_case(&repo.to_string()));
+    if !ours {
+        eprintln!(
+            "plugin {plugin} from {repo}: installing a third-party plugin. Plugins run inside OpenFadeR with your full user rights; install only repositories and authors you trust."
+        );
+    }
 }
 
 #[cfg(test)]

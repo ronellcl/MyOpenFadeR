@@ -79,6 +79,35 @@ fetched from `https://github.com/<owner>/<repo>/releases/latest/download/<asset>
 named and placed as the plugin's `plugin.json` says (`libmy_fx.so` beside `plugin.json`, or `lib/x.so` for `"lib/x.so"`). Without
 that asset for the user's platform nothing is installed and the page says `no prebuilt <plugin> for <os>-<arch> yet`.
 
+**Checksums.** Attach a `SHA256SUMS` to your release (`sha256sum my-fx-*-x86_64.zip > SHA256SUMS`; one line per asset, plus
+`OpenFadeR-Plugins-HEAD.zip` for the repository archive) and everything the app downloads from the repository — the plugin's
+own library asset and a native library's prebuilt zip — is verified against it before anything is installed. A file whose hash
+differs, or one the list does not name, is refused with its own error (it is the server's or the zip's, so refresh and try
+again if you know the repository just updated); a repository without a `SHA256SUMS` yet is reported on stderr and keeps
+installing, so publishing one is opt-in per repository release.
+
+## Trust
+
+OpenFadeR installs and runs code other people wrote, and the app takes no share of that code's power: this is what trusting a
+plugin or a repository means.
+
+* **All of a plugin runs with your rights; nothing is sandboxed.** A native library loads in the app's process and its blocks
+  run on the audio thread; a Lua script runs inside the app; a Python script or `command` program is a normal process of yours.
+  No permission profile, no capability layer: a plugin can read and write every file you can, reach the network and the system,
+  and a badly built one can spoil the audio. The timeouts and the concurrency limits of [the protocol](#the-protocol) see that
+  a *slow* or runaway plugin slows nothing but itself — protecting from a *hostile* one is your install choice.
+* **"GitHub as the registry".** There is no central index and no review: anyone may publish a repository and you add it to
+  `repositories.json`. The three repositories shipped on first run are `OpenRsG/*`; they are curated like the app itself.
+  Adding a repository is exactly as trusting as installing a single plugin from it: only add repositories you know.
+* **What the app checks on its own.** The download of a repository archive and of every plugin's release asset is verified
+  against the repository's `SHA256SUMS` when it publishes one (see **Checksums** above), the zips are unpacked with
+  hard caps (paths out of the target, absolute paths, symlinks, entry and size bombs are refused), and every `plugin.json`
+  manifest key is known by name — unknown keys are reported, so a manifest cannot quietly mean something else.
+* **When the app tells you.** Installing a plugin from a repository that is not one of the shipped `OpenRsG/*` ones prints
+  this warning on stderr, naming the repository: `installing a third-party plugin. Plugins run inside OpenFadeR with your
+  full user rights; install only repositories and authors you trust.`
+
+
 ## plugin.json
 
 ```json
@@ -736,7 +765,7 @@ or use Lua, which starts in microseconds.
 
 ## Limits
 
-* Plugins run with your rights. Install only what you trust.
+* Plugins run with your rights — see [Trust](#trust). Install only what you trust.
 * Effects, libraries, sources, knob and pad modes are read at start-up; a change to them needs a restart (the plugin manager
   offers it). A source's lists are cached until then.
 * Tracks of a source are not in the Collection. Once a track is loaded, its downloaded file is a file like any other: edits
