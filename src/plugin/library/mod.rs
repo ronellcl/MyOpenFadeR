@@ -27,6 +27,7 @@ pub use refs::{load_ref, migrate_refs};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// One loaded library: the plugin and its entry table (valid for the rest of the process).
 #[derive(Clone)]
@@ -263,18 +264,59 @@ impl Drop for PluginLibrary {
     }
 }
 
+/// The answers of the `probe` calls, keyed by (plugin, path, file mtime): probing the same file with the same plugin
+/// again runs no library code. A change of mtime makes a new key, so a touch of the file re-probes.
+static PROBES: std::sync::LazyLock<
+    parking_lot::Mutex<
+        std::collections::HashMap<(String, PathBuf, Option<std::time::SystemTime>), Probe>,
+    >,
+> = std::sync::LazyLock::new(|| parking_lot::Mutex::new(std::collections::HashMap::new()));
+
+fn probe_bounded(l: &Loaded, path: &Path) -> Option<Probe> {
+    const TIMEOUT: Duration = Duration::from_secs(10);
+    let mtime = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
+    let key = (l.plugin.manifest.name.clone(), path.to_owned(), mtime);
+    if let Some(p) = PROBES.lock().get(&key) {
+        return Some(p.clone());
+    }
+    let (lib, path) = (l.clone(), path.to_owned());
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(lib.probe(&path));
+    });
+    match rx.recv_timeout(TIMEOUT) {
+        Ok(Ok(probe)) => {
+            PROBES.lock().insert(key, probe.clone());
+            Some(probe)
+        }
+        Ok(Err(e)) => {
+            eprintln!("plugin: {e}");
+            None
+        }
+        Err(_) => {
+            eprintln!(
+                "plugin {}: probe ran past {} s; it takes no part for now",
+                l.name(),
+                TIMEOUT.as_secs()
+            );
+            None
+        }
+    }
+}
+
 /// The library plugin that reads `path` best (the highest `probe` score above 0) with what its probe called the source;
-/// `None` when no enabled plugin claims it. A plugin whose `probe` fails is reported on stderr and does not take part.
+/// `None` when no enabled plugin claims it. A plugin whose `probe` fails or hangs is reported on stderr and does not take
+/// part.
 fn best(path: &Path) -> Option<(&'static Loaded, Probe)> {
     let mut best: Option<(&Loaded, Probe)> = None;
     for l in enabled() {
         if !l.may_read(path) {
             continue;
         }
-        match l.probe(path) {
-            Ok(p) if p.score > best.as_ref().map_or(0, |b| b.1.score) => best = Some((l, p)),
-            Ok(_) => {}
-            Err(e) => eprintln!("plugin: {e}"),
+        if let Some(p) = probe_bounded(l, path) {
+            if p.score > best.as_ref().map_or(0, |b| b.1.score) {
+                best = Some((l, p));
+            }
         }
     }
     best
