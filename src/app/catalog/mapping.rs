@@ -166,10 +166,13 @@ pub fn unmapped(mut ports: Vec<String>) {
             let zip = catalog::cached(&repo)
                 .or_else(|| online.then(|| catalog::fetch(&repo, false).ok()).flatten());
             if let Some(zip) = zip {
+                let files = catalog::mappings::read(&zip);
+                let cards = get::cards(&files).map(str::to_owned);
                 entries.extend(
-                    catalog::mappings::read(&zip)
+                    files
                         .iter()
-                        .filter_map(|f| get::entry(f).ok()),
+                        .filter(|f| f.name != get::AUDIO_CARDS)
+                        .filter_map(|f| get::entry_with_cards(f, cards.as_deref()).ok()),
                 );
             }
         }

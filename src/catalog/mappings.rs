@@ -1,11 +1,12 @@
 //! Controller mapping files of a repository: every `*.xml` up to [`super::DEPTH`] folders below the top folder whose root is
-//! `<OpenFadeRMapping`. Whether one is a valid mapping is up to the app's mapping parser; this only reads them.
+//! `<OpenFadeRMapping`, plus `audio-cards.json` beside the mappings (the controller audio interface cards their channels
+//! 3/4 hold; see `docs/mappings.md`). Whether a mapping is valid is up to the app's mapping parser; this only reads them.
 
 use super::below_top;
 use crate::zip::Zip;
 use std::path::Path;
 
-/// A candidate mapping file.
+/// A candidate mapping file (or the repository's `audio-cards.json`).
 #[derive(Clone, Debug)]
 pub struct File {
     /// The file name, with `.xml` (it is the name the file is installed under).
@@ -15,14 +16,16 @@ pub struct File {
 
 /// The biggest mapping file read.
 const MAX_FILE: u64 = 4 << 20;
+/// The repository's audio card list beside the mappings.
+const AUDIO_CARDS: &str = "audio-cards.json";
 
-/// The mapping files in `z`, in archive order.
+/// The mapping files (and the audio card list) in `z`, in archive order.
 pub fn scan(z: &mut Zip) -> Vec<File> {
     let names: Vec<String> = z
         .names()
         .filter(|n| {
             below_top(n).is_some_and(|(_, rest)| {
-                rest.ends_with(".xml") && rest.matches('/').count() <= super::DEPTH
+                rest == AUDIO_CARDS || (rest.ends_with(".xml") && rest.matches('/').count() <= super::DEPTH)
             })
         })
         .map(str::to_owned)
@@ -35,7 +38,7 @@ pub fn scan(z: &mut Zip) -> Vec<File> {
             }
             let text = String::from_utf8(z.read(&n).ok()?).ok()?;
             let name = Path::new(&n).file_name()?.to_string_lossy().into_owned();
-            text.contains("<OpenFadeRMapping")
+            (name == AUDIO_CARDS || text.contains("<OpenFadeRMapping"))
                 .then_some(File { name, text })
         })
         .collect()

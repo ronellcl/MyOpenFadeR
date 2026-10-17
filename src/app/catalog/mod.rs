@@ -175,7 +175,14 @@ fn loaded(
         .zip(reads)
         .map(|(repo, read)| {
             let read = read.map(|f| {
-                let maps: Vec<_> = f.mappings.iter().map(get::entry).collect();
+                let cards = get::cards(&f.mappings).map(str::to_owned);
+                let maps: Vec<_> = f
+                    .mappings
+                    .iter()
+                    .filter(|f| f.name != get::AUDIO_CARDS)
+                    .map(get::entry)
+                    .map(|e| e.map(|mut e| { e.cards = cards.clone(); e }))
+                    .collect();
                 Source {
                     zip: f.zip,
                     plugins: f.plugins,

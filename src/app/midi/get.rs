@@ -22,6 +22,9 @@ pub struct Entry {
     /// Its `<port>`: picked when an input port name contains it.
     pub port: String,
     pub text: String,
+    /// The repository's `audio-cards.json` beside the mappings, if it holds one: what installing this mapping installs
+    /// beside it (unless the user already keeps one, which wins).
+    pub cards: Option<String>,
 }
 
 /// What an [`Entry`]'s button does.
@@ -33,16 +36,34 @@ pub enum Action {
     Installed,
 }
 
-/// The mapping in `f`; the error says why [`mapfile::parse`] refused it.
-pub fn entry(f: &File) -> Result<Entry, String> {
+/// The mapping in `f` (the repository's `audio-cards.json` rides in `cards`); the error says why [`mapfile::parse`]
+/// refused it.
+pub fn entry_with_cards(f: &File, cards: Option<&str>) -> Result<Entry, String> {
     let (m, port) = mapfile::parse(&f.text).map_err(|e| format!("{}: {e}", f.name))?;
     Ok(Entry {
         name: f.name.clone(),
         controller: m.controller,
         port,
         text: f.text.clone(),
+        cards: cards.filter(|c| !c.trim().is_empty()).map(str::to_owned),
     })
 }
+
+/// The mapping in `f`; the error says why [`mapfile::parse`] refused it.
+pub fn entry(f: &File) -> Result<Entry, String> {
+    entry_with_cards(f, None)
+}
+
+/// The repository's `audio-cards.json` in `files`, if any (empty text: none).
+pub fn cards(files: &[File]) -> Option<&str> {
+    files
+        .iter()
+        .find(|f| f.name == AUDIO_CARDS && !f.text.trim().is_empty())
+        .map(|f| f.text.as_str())
+}
+
+/// The audio card list of a repository, installed beside its mappings.
+pub const AUDIO_CARDS: &str = "audio-cards.json";
 
 /// The mapping files the app would read now, by file name (the first folder of the search path wins): the text of each.
 pub fn installed() -> HashMap<String, String> {
@@ -89,8 +110,31 @@ fn install_in(dir: &Path, e: &Entry) -> Result<(), String> {
     mapfile::parse(&e.text).map_err(|why| format!("{}: {why}", e.name))?;
     openfader::paths::at(std::fs::create_dir_all(dir), dir)?;
     let (to, part) = (dir.join(&e.name), dir.join(format!("{}.part", e.name)));
-    openfader::paths::at(std::fs::write(&part, &e.text), &part)?;
-    openfader::paths::at(std::fs::rename(&part, &to), &to)
+    // The `.part` never half-survives a failure: whatever the write or the rename may answer, the scratch file is gone.
+    let written = std::fs::write(&part, &e.text).and_then(|()| std::fs::rename(&part, &to));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&part);
+    }
+    openfader::paths::at(written, &to)?;
+    install_cards(dir, e)
+}
+
+/// Writes the repository's `audio-cards.json` beside the mappings, unless the user already keeps one (theirs wins; the
+/// first folder of the mapping search path that has the file is the one the app reads).
+fn install_cards(dir: &Path, e: &Entry) -> Result<(), String> {
+    let Some(text) = &e.cards else {
+        return Ok(());
+    };
+    let to = dir.join(AUDIO_CARDS);
+    if to.exists() {
+        return Ok(());
+    }
+    let part = dir.join(format!("{AUDIO_CARDS}.part"));
+    let written = std::fs::write(&part, text).and_then(|()| std::fs::rename(&part, &to));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&part);
+    }
+    openfader::paths::at(written, &to)
 }
 
 thread_local! {
@@ -179,6 +223,46 @@ mod tests {
             ..e
         };
         assert!(install_in(&dir, &broken).is_err());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn a_failed_install_leaves_no_part_file_and_the_old_copy() {
+        let dir =
+            std::env::temp_dir().join(format!("rk-mapget-part-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // A directory where the mapping belongs: the rename cannot take it while it holds a file inside.
+        std::fs::create_dir(dir.join("a.xml")).unwrap();
+        std::fs::write(dir.join("a.xml/inside"), "occupied").unwrap();
+        let e = entry(&file("a.xml", "Test", "Test")).unwrap();
+        assert!(install_in(&dir, &e).is_err(), "a directory blocks the rename");
+        assert!(
+            dir.join("a.xml/inside").is_file(),
+            "what was there survives"
+        );
+        assert!(!dir.join("a.xml.part").exists(), "no scratch left behind");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn installing_a_mapping_brings_the_audio_cards_along_once() {
+        let dir = std::env::temp_dir().join(format!("rk-mapget-cards-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut e = entry(&file("a.xml", "Test", "Test")).unwrap();
+        e.cards = Some(r#"{"cards": []}"#.into());
+        install_in(&dir, &e).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.join(AUDIO_CARDS)).unwrap(),
+            r#"{"cards": []}"#
+        );
+        // The user's own list wins: a second install never overwrites it.
+        std::fs::write(dir.join(AUDIO_CARDS), r#"{"cards": ["mine"]}"#).unwrap();
+        install_in(&dir, &e).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.join(AUDIO_CARDS)).unwrap(),
+            r#"{"cards": ["mine"]}"#
+        );
         std::fs::remove_dir_all(dir).ok();
     }
 }
