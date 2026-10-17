@@ -133,6 +133,15 @@ pub(super) fn parse(text: &str) -> Result<(Mapping, String), String> {
             num(k).and_then(|n| u8::try_from(n).map_err(|_| format!("{k}={n} is not a byte")))
         };
         match (t.name.as_str(), t.edge) {
+            ("OpenFadeRMapping", Edge::Open) => {
+                if let Some(v) = t.attrs.get("schemaVersion")
+                    && v.parse::<u32>().is_ok_and(|n| n != 1)
+                {
+                    m.bad.push(format!(
+                        "schemaVersion \"{v}\" is not read here (this format speaks 1)"
+                    ));
+                }
+            }
             ("name" | "port" | "outInterval" | "ringInterval" | "stateRequest", Edge::Open) => {
                 let v = t.text.trim().to_owned();
                 match t.name.as_str() {
@@ -158,11 +167,18 @@ pub(super) fn parse(text: &str) -> Result<(Mapping, String), String> {
                     m.bad.push(format!("unknown action \"{name}\""));
                     continue;
                 };
+                let deck = opt("deck")?.unwrap_or(0);
+                if !(0..=3).contains(&deck) {
+                    m.bad.push(format!(
+                        "action \"{name}\" has deck {deck} (0..3 is A..D)"
+                    ));
+                    continue;
+                }
                 let b = Binding {
                     status: byte("status")?,
                     d1: byte("midino")?,
                     act,
-                    deck: opt("deck")?.unwrap_or(0) as i32,
+                    deck: deck as i32,
                     arg: opt("arg")?.unwrap_or(0) as i32,
                     hires: t.attrs.get("hires").is_some_and(|v| v == "true"),
                 };
@@ -175,12 +191,25 @@ pub(super) fn parse(text: &str) -> Result<(Mapping, String), String> {
                     m.bad.push(format!("unknown light \"{light}\""));
                     continue;
                 };
+                let deck = opt("deck")?.unwrap_or(0);
+                if !(0..=3).contains(&deck) {
+                    m.bad
+                        .push(format!("light \"{light}\" has deck {deck} (0..3 is A..D)"));
+                    continue;
+                }
                 m.leds.push(LedRow {
                     led,
-                    deck: opt("deck")?.unwrap_or(0) as usize,
+                    deck: deck as usize,
                     msg: (byte("status")?, byte("midino")?),
                     blink: opt("blink")?.map(|n| n as u64).filter(|&n| n > 0),
                 });
+            }
+            ("OpenFadeRMapping" | "info" | "controls" | "outputs", _) => {}
+            // An element the reader does not speak is a diagnosis, not silence: a tag misspelled (`<controll>`) would
+            // otherwise produce a map without its bindings and look installed.
+            (_, Edge::Empty | Edge::Open) => {
+                m.bad
+                    .push(format!("<{}> is not a mapping element; ignored", t.name));
             }
             _ => {}
         }
@@ -192,6 +221,39 @@ pub(super) fn parse(text: &str) -> Result<(Mapping, String), String> {
         port = m.controller.clone();
     }
     Ok((m, port))
+}
+
+/// The (status, midino) pairs the runtime reads one binding per message: when a mapping declares the same pair twice,
+/// the first bind is kept — but a `jog` always counts over a later `jog-bend` of the same key (the bend mode answers
+/// nothing while the platter is touched, so a `jog-bend` on the platter's key only ever dropped the scratch of a few
+/// controllers until the duplicates left the files; here is the rule on the runtime in the meantime and any duplicate
+/// is a note under [`Mapping::bad`]'s caller's status list).
+pub(super) fn one_per_key(
+    binds: Vec<Binding>,
+    notes: &mut Vec<String>,
+) -> HashMap<(u8, u8), Binding> {
+    use std::collections::hash_map::Entry;
+    let mut map = HashMap::new();
+    for b in binds {
+        match map.entry((b.status, b.d1)) {
+            Entry::Vacant(e) => {
+                e.insert(b);
+            }
+            Entry::Occupied(e) => {
+                if ACTIONS[e.get().act].name == "jog" && ACTIONS[b.act].name == "jog-bend" {
+                    continue; // the `jog` stands
+                }
+                notes.push(format!(
+                    "controls repeat (0x{:02X}, 0x{:02X}): {} and {}; the first wins",
+                    b.status,
+                    b.d1,
+                    ACTIONS[e.get().act].name,
+                    ACTIONS[b.act].name
+                ));
+            }
+        }
+    }
+    map
 }
 
 /// A light as [`write`] spells it: the [`Led`] variant and its fields, `Fx(0,2)`.
@@ -268,22 +330,40 @@ pub(super) fn files() -> Vec<(String, String)> {
 }
 
 /// The mapping for the connected input `ports`: the file whose `<port>` is the longest one found inside a port name
-/// (case-insensitive). `Ok(None)` when none matches (the user's midi.map still works), `Err` for a broken file.
-pub(super) fn load(ports: &[String]) -> Result<Option<Mapping>, String> {
+/// (case-insensitive). `map` is `None` when none matches (the user's midi.map still works); a file that does not parse
+/// skips itself and is reported in `errors` (the other files are not penalised for it).
+pub(super) fn load(ports: &[String]) -> Pick {
     pick(ports, files())
 }
 
-fn pick(ports: &[String], files: Vec<(String, String)>) -> Result<Option<Mapping>, String> {
+fn pick(ports: &[String], files: Vec<(String, String)>) -> Pick {
     let mut best: Option<(usize, Mapping)> = None;
+    let mut errors = Vec::new();
     for (name, text) in files {
-        let (m, port) = parse(&text).map_err(|e| format!("{name}: {e}"))?;
-        if let Some(len) = match_len(ports, &port)
-            && best.as_ref().is_none_or(|(l, _)| len > *l)
-        {
-            best = Some((len, m));
+        match parse(&text) {
+            // A file that does not parse skips itself: one hand-copied broken XML in the mappings folder must not put
+            // every controller's mappings out (the others stay).
+            Err(e) => errors.push(format!("{name}: {e}")),
+            Ok((m, port)) => {
+                if let Some(len) = match_len(ports, &port)
+                    && best.as_ref().is_none_or(|(l, _)| len > *l)
+                {
+                    best = Some((len, m));
+                }
+            }
         }
     }
-    Ok(best.map(|(_, m)| m))
+    Pick {
+        map: best.map(|(_, m)| m),
+        errors,
+    }
+}
+
+/// [`pick`]'s answer: the chosen mapping (if a file matched a port) and what the files reported.
+#[derive(Debug)]
+pub(super) struct Pick {
+    pub map: Option<Mapping>,
+    pub errors: Vec<String>,
 }
 
 /// How well a file's `<port>` fits the connected input `ports`: its length when one port name contains it (case-insensitive), `None`
@@ -316,17 +396,41 @@ mod tests {
 
     #[test]
     fn every_checked_out_mapping_reads_back_to_the_same_file() {
-        // The OpenFadeR-Map checkout in `mappings/` (start.sh fetches it); nothing to check without it.
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("mappings");
-        for e in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
-            let name = e.file_name().to_string_lossy().into_owned();
-            if !name.ends_with(".xml") {
+        // The OpenFadeR-Map checkout in `mappings/` (start.sh fetches it) or our clone beside the core.
+        let roots = [mapfile_root()];
+        for root in roots {
+            let Ok(dir) = std::fs::read_dir(&root) else {
                 continue;
+            };
+            for e in dir.flatten() {
+                let name = e.file_name().to_string_lossy().into_owned();
+                if !name.ends_with(".xml") {
+                    continue;
+                }
+                let text = std::fs::read_to_string(e.path()).unwrap();
+                let (m, port) = parse(&text).unwrap_or_else(|e| panic!("{name}: {e}"));
+                assert!(m.bad.is_empty(), "{name}: {:?}", m.bad);
+                assert_eq!(write(&m, &port), text, "{name}");
+                // No key repeated (a repeated (status, midino) makes the runtime drop one binding and all notes go to
+                // the user's status line).
+                let mut keys: Vec<u16> = m
+                    .binds
+                    .iter()
+                    .map(|b| b.status as u16 * 256 + b.d1 as u16)
+                    .collect();
+                keys.sort_unstable();
+                keys.dedup();
+                assert_eq!(keys.len(), m.binds.len(), "{name} repeats a (status, midino)");
             }
-            let text = std::fs::read_to_string(e.path()).unwrap();
-            let (m, port) = parse(&text).unwrap_or_else(|e| panic!("{name}: {e}"));
-            assert!(m.bad.is_empty(), "{name}: {:?}", m.bad);
-            assert_eq!(write(&m, &port), text, "{name}");
+        }
+    }
+
+    /// The mapping files to check, in the core checkout (`mappings/`) or our clone beside it.
+    fn mapfile_root() -> std::path::PathBuf {
+        if std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("mappings").exists() {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("mappings")
+        } else {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../maps-repo")
         }
     }
 
@@ -336,7 +440,7 @@ mod tests {
             &["Test Controller:Test Controller MIDI 1 20:0".into()],
             vec![file("Test Controller", "Test Controller")],
         )
-        .unwrap()
+        .map
         .unwrap();
         assert_eq!(m.controller, "Test Controller");
         let bind = |s, d| {
@@ -359,10 +463,10 @@ mod tests {
         let files = || vec![file("Test", "Test"), file("Test Pro", "Test Pro")];
         assert!(
             pick(&["Midi Through:Midi Through Port-0 14:0".into()], files())
-                .unwrap()
+                .map
                 .is_none()
         );
-        let pro = pick(&["Test Pro MIDI 1".into()], files()).unwrap().unwrap();
+        let pro = pick(&["Test Pro MIDI 1".into()], files()).map.unwrap();
         assert_eq!(pro.controller, "Test Pro", "not the shorter Test");
         let (m, port) = parse(
             "<OpenFadeRMapping><info><name>X</name></info><controls>\
@@ -375,5 +479,67 @@ mod tests {
             m.bad,
             ["unknown action \"nope\"", "unknown light \"Fx(0,9,9)\""]
         );
+    }
+
+    #[test]
+    fn a_broken_file_skips_itself_and_the_others_load() {
+        let files = vec![
+            (
+                "broken".into(),
+                "<OpenFadeRMapping><info><name>broken</name><port>Test</port></info>\
+                 <control status=\"0x90\" action=\"play\"/></OpenFadeRMapping>"
+                    .to_owned(),
+            ),
+            file("good", "Test"),
+        ];
+        let p = pick(&["Test Controller:Test Controller MIDI 1 20:0".into()], files);
+        assert_eq!(
+            p.map.as_ref().map(|m| m.controller.as_str()),
+            Some("good"),
+            "the broken one did not put the good one out: {p:?}"
+        );
+        assert_eq!(p.errors.len(), 1, "{p:?}");
+        assert!(p.errors[0].starts_with("broken: "), "{p:?}");
+    }
+
+    #[test]
+    fn a_repeated_platter_key_keeps_the_jog_and_a_repeat_is_reported() {
+        let (m, _) = parse(
+            "<OpenFadeRMapping><info><name>X</name></info><controls>\
+             <control status=\"0xB0\" midino=\"0x22\" action=\"jog\" deck=\"0\"/>\
+             <control status=\"0xB0\" midino=\"0x22\" action=\"jog-bend\" deck=\"0\"/>\
+             <control status=\"0x90\" midino=\"0x0B\" action=\"play\" deck=\"0\"/>\
+             <control status=\"0x90\" midino=\"0x0B\" action=\"cue\" deck=\"0\"/>\
+             </controls><outputs></outputs></OpenFadeRMapping>",
+        )
+        .unwrap();
+        let mut notes = Vec::new();
+        let map = one_per_key(m.binds, &mut notes);
+        assert_eq!(ACTIONS[map[&(0xB0, 0x22)].act].name, "jog", "scratch stands");
+        assert_eq!(ACTIONS[map[&(0x90, 0x0B)].act].name, "play", "the first wins");
+        assert_eq!(notes.len(), 1, "{notes:?} — the jog pair is not a note");
+        assert!(notes[0].contains("0x90, 0x0B"), "{notes:?}");
+    }
+
+    #[test]
+    fn unknown_elements_and_schema_and_decks_are_reported() {
+        let (m, _) = parse(
+            "<OpenFadeRMapping schemaVersion=\"2\"><info><name>X</name></info><controls>\
+             <controll status=\"0x90\" midino=\"0x0B\" action=\"play\"/>\
+             <control status=\"0x90\" midino=\"0x0B\" action=\"play\" deck=\"5\"/>\
+             </controls><outputs></outputs></OpenFadeRMapping>",
+        )
+        .unwrap();
+        assert_eq!(
+            m.bad,
+            [
+                "schemaVersion \"2\" is not read here (this format speaks 1)",
+                "<controll> is not a mapping element; ignored",
+                "action \"play\" has deck 5 (0..3 is A..D)",
+            ],
+            "{:?}",
+            m.bad
+        );
+        assert!(m.binds.is_empty(), "{:?}", m.binds);
     }
 }

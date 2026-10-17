@@ -182,8 +182,9 @@ impl Midi {
     /// bindings (the lights and the status text are the caller's).
     fn load_mapping(&self, in_names: &[String]) -> Loaded {
         let mut status = Vec::new();
-        match mapfile::load(in_names) {
-            Ok(Some(m)) => {
+        let picked = mapfile::load(in_names);
+        match picked.map {
+            Some(m) => {
                 let mut text = format!(
                     "{}: {} bindings, {} LEDs",
                     m.controller,
@@ -203,9 +204,10 @@ impl Midi {
                 }
                 eprintln!("midi: {text}");
                 status.extend(m.bad.iter().map(|b| format!("{}: {b}", m.controller)));
+                // One binding per (status, number): a file declaring a key twice is told above, and the platter's
+                // scratch keeps working when a mapping (or a hand edit) repeats `jog-bend` over the `jog` key.
                 *self.file_names.borrow_mut() = m.names;
-                *self.file_binds.borrow_mut() =
-                    m.binds.into_iter().map(|b| ((b.status, b.d1), b)).collect();
+                *self.file_binds.borrow_mut() = mapfile::one_per_key(m.binds, &mut status);
                 Loaded {
                     text,
                     status,
@@ -215,13 +217,14 @@ impl Midi {
                     controller: Some(m.controller),
                 }
             }
-            Ok(None) => Loaded {
-                text: "no controller mapping for these ports (mappings/*.xml)".to_owned(),
+            None if !picked.errors.is_empty() => Loaded {
+                text: "controller mapping failed".to_owned(),
+                status: picked.errors,
                 ..Loaded::default()
             },
-            Err(e) => Loaded {
-                text: "controller mapping failed".to_owned(),
-                status: vec![e],
+            None => Loaded {
+                text: "no controller mapping for these ports (mappings/*.xml)".to_owned(),
+                status: picked.errors,
                 ..Loaded::default()
             },
         }
