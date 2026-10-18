@@ -2,7 +2,7 @@
 
 **Fecha:** 17/10/2026 · **Rama del core:** `fixes/hallazgos` (desde `main` @ `dbbe938`) · **Rama de mapeos:** `fixes/duplicated-jog-bend` en `maps-repo/` (desde su `main`) · **Rama de plugins:** `fixes/sdk-pin` en `plugins-repo/` (desde su `main`)
 **Fuente:** cada apartado corresponde a un hallazgo de `hallazgos.md` (mismo ID). Se resolvió todo lo que no afecta el funcionamiento, según lo acordado.
-**Verificación:** suite completa del core verde — `cargo test --lib` **580/580** y `cargo test --bin openfader` **470/470** (1 ignorado, preexistente).
+**Verificación:** suite completa del core verde — `cargo test --lib` **580/580** y `cargo test --bin openfader` **473/473** (1 ignorado, preexistente).
 
 ## Resumen
 
@@ -27,14 +27,15 @@
 | THEME-03 | Formato de temas sin `schemaVersion` | ✅ Resuelto | `schemaVersion: 1` aditivo: el 1 es silencioso, otro valor avisa y se lee como 1 | `c12b87f` |
 | THEME-04 | Guardado de temas no atómico | ✅ Resuelto | `.part` + rename con limpieza en fallo (patrón de los mapeos) | `c12b87f` |
 | THEME-06 | Hints de layout sin persistencia (sorpresa) | ✅ Resuelto (documentado) | `docs/skins.md` lo explicita: la libertad del usuario manda, el tema no re-aplica | `c12b87f` |
-| MAP-05 | Acciones sin uso en los mapeos | ✅ Resuelto (documentado) | `docs/mappings.md`: la tabla completa está y se usa también por MIDI LEARN | `af0e0aa` |
+| MAP-05 | Acciones sin uso en los mapeos | ✅ Resuelto (mapeadas + documentado) | 10 de las 23 acciones atadas a los pads libres de DDJ-1000/FLX10; las 13 restantes, vía MIDI LEARN | `docs/mappings.md`, `maps-repo` (`fixes/map05-actions`) |
 | MAP-06 | Documentación de mapeos de 24 líneas | ✅ Resuelto | Especificación completa + tablas generadas de acciones/luces con test + `audio-cards.json` | `af0e0aa` |
 | X-01 | Descargas sin digest verificado | ✅ Resuelto | `SHA256SUMS` por release se verifica al bajar (opt-in; sin lista → aviso) | `5108039` |
 | CORE-03 | Plugins sin aislamiento (modelo de confianza implícito) | ✅ Resuelto (documentación + aviso) | Sección «Trust» en `docs/plugins.md` + aviso stderr al instalar de terceros | `5108039` |
 | X-02 | «GitHub como registro» sin modelo de confianza escrito | ✅ Resuelto (documentado) | Mismo apartado «Trust»: confianza por repositorio, los `OpenRsG/*` curados | `5108039` |
 | PLUG-01 | Dependencia del SDK por ruta sin pin | ✅ Resuelto | `openfader-plugin` fijado al tag `v0.1.0` del core: el repo de plugins compila solo · override local documentado | plugins `47de0ff` + core `70b233b` |
+| X-04 | Sin i18n | ✅ Resuelto (piloto) | Ajuste LANGUAGE (sistema/inglés/español): menús `@tr` con catálogos bundled + tablas en Rust para las páginas de preferencias; español de fábrica | `4b185f3` |
 
-Pendientes que requieren decisiones de producto o trabajo aparte, fuera de este documento: **THEME-05** (edición opt-in «guardar solo los tokens cambiados»: decisión de UI), **X-04 fase 2** (i18n: detección del locale del sistema + «override» de ajuste; el trabajo grande con compilación de la interfaz de usuario no ha empezado).
+Pendientes que requieren decisiones de producto o trabajo aparte, fuera de este documento: **THEME-05** (edición opt-in «guardar solo los tokens cambiados»: decisión de UI). X-04 quedó como piloto completo (menús + páginas de preferencias); traducir el resto (toasts, diálogos del navegador, texto de los paneles) sigue el mismo mecanismo sin decisiones nuevas.
 
 ---
 
@@ -135,7 +136,15 @@ En el lado del proceso (`Plugin::call`) el deadline ya existía (kill + wait) y 
 - `audio-cards.json` documentado (formato `{"headphones_3_4": ["fragmento", …]}`, primera carpeta con fichero gana, lo instala GET MAPPINGS, el del usuario vence).
 
 ### MAP-05 · acciones del core sin uso en mapeos
-**Solución** (documental, como pide un hallazgo *informativo*): la tabla completa de `docs/mappings.md` muestra que las 23 acciones sin XML (`brake`, `grid-*`, `key-down/up`, `loop-1/2/8/16`, `jump-*`, `zoom-in/out`…) **siguen al alcance del usuario por MIDI LEARN** — el hallazgo sugería mappearlas en los controladores avanzados; eso es un cambio de datos del repo de mapas y queda como invitación abierta. El motor no cambió.
+**Solución** (mapeado + documentación, como pide un hallazgo *informativo*): las 23 acciones sin XML se repartieron en dos frentes.
+
+- **10 acciones atadas a los pads libres de DDJ-1000 y FLX10** (rama `fixes/map05-actions` del repo de mapas). Con los charts MIDI oficiales de Pioneer verifiqué que esas dos controladoras dejan **enteramente libres** las páginas de pad BEAT JUMP, BEAT LOOP y KEY SHIFT en los 4 decks (canales 8/10/12/14 = status `0x97/0x99/0x9B/0x9D`), que son de *state machine de hardware* — esas notas **solo** se envían cuando el usuario pone el pad en ese modo, así que el atado es puramente aditivo y no toca nada existente:
+  - **BEAT JUMP** (`0x20-0x27`): `jump-back-4`, `jump-back-1`, `jump-fwd-1`, `jump-fwd-4` (atrás a la izquierda, adelante a la derecha, saltos mayores en los extremos);
+  - **BEAT LOOP** (`0x60-0x67`): `loop-1`, `loop-2`, `loop-4`, `loop-8`, `loop-16` en fila ascendente (`loop-4` ya se usaba en otras controladoras, se incluye aquí para que la fila lea 1‑2‑4‑8‑16);
+  - **KEY SHIFT** (`0x70-0x77`): `key-down` a la izquierda, `key-up` a la derecha.
+  El **DDJ-REV7 no se tocó**: sus pads ya están atados (`hw-pad`/`hw-pad-delete`/`hw-pad-unload`). El test `every_checked_out_mapping_reads_back_to_the_same_file` (round-trip byte a byte + sin `(status, midino)` repetido) pasa con los XML ampliados.
+- **las 13 acciones restantes** (`brake`, `fx-level`, `fx-toggle`, `grid-beat1/double/halve/edit/reset`, `help`, `pad-mode`, `split`, `zoom-in/out`) no tienen hardware dedicado claro en estas controladoras → documentadas como **«solo MIDI LEARN»**: la tabla de `docs/mappings.md` y su texto dejan claro que *toda* la tabla de acciones está al alcance de MIDI LEARN, no solo las que los XML de fábrica usan. El motor no cambió.
+- *Caveat:* los 10 atados de pads son aditivos y semánticamente exactos (cada página de pad solo emite sus notas en su modo), pero **no se verificaron en hardware físico** — queda anotado por si conviene probarlos en un DDJ-1000/FLX10 real.
 
 ### X-01 · descargas sin checksum
 **Solución** (`src/catalog/check.rs` nuevo + `mod.rs`/`plugins.rs`):
@@ -161,6 +170,16 @@ En el lado del proceso (`Plugin::call`) el deadline ya existía (kill + wait) y 
 - el CI del repo de plugins mantiene los dos checkouts, y su comentario ya refleja que el SDK viene fijado;
 - el core por su parte compila su binario con el SDK de aquí (`{ path = "sdk" }`, sin cambio) y `docs/plugins.md` cuenta el nuevo régimen (commit `70b233b`).
 
+### X-04 · sin i18n (infraestructura de idiomas, piloto completo)
+**Solución** (`4b185f3`, core `fixes/hallazgos`): la interfaz ya tiene **dos idiomas** (inglés, que son los literales del código, y **español de fábrica**) con la detección del locale del sistema por defecto y un ajuste para elegir el idioma:
+
+- **ajuste nuevo** (`language = system|english|spanish`, PREFERENCES > VIEW > LANGUAGE, filas CHIPS): `system` (por defecto) lee el locale del usuario — `GetUserDefaultLocaleName` en Windows, `LC_ALL`/`LC_MESSAGES`/`LANG` en el resto; por defecto el castellano del sistema recibe los menús en español sin tocar nada;
+- **cadenas de `.slint`** (los menús de `app.slint`, 71 literales): marcadas con `@tr(...)`; los catálogos **bundled** (`ui/translations/es/LC_MESSAGES/openfader-ui.po`) los empaqueta el build (`ui/build.rs`, `with_bundled_translations`) y `slint::select_bundled_translation` los cambia en caliente (`src/app/i18n.rs` sigue el ajuste en `prefs::wire` y con cada cambio; el nombre del dominio del catálogo es el del crate de la UI, `openfader-ui`);
+- **cadenas de Rust** (las páginas de preferencias: etiquetas, cabeceras, chips y valores de dropdown, ~290 cadenas): `src/app/i18n.rs` trae la tabla `ES` y la aplica **centralmente** en los constructores de `Row` (`src/app/prefs/rows.rs`) — las 10 páginas de preferencias quedan traducidas sin retocar cada constructor; las claves, los hints y los valores que vienen de fuera (nombres de dispositivos, rutas, los manifiestos de los plugins, ya traducidos en la fase 1) pasan intactos);
+- **lo que no está en la traducción queda en inglés** (mensaje truncado mejor que roto): son los *toasts* y textos de los paneles; añadir la palabra a la tabla o marcar su `@tr` es mecánico y no toca nada del mecanismo.
+
+**Pruebas:** `the_menus_take_the_bundled_catalogs_after_the_window` (window headless + `select_bundled_translation("es")` → Ok: el dominio y el catálogo empaquetado concuerdan), `language_is_a_choice_setting_and_choose_applies_it` (parse/write del ajuste + clic path), `t_falls_back_to_english_and_translates_the_table_when_spanish_applies`.
+
 ---
 
 ## Verificación
@@ -169,7 +188,7 @@ En el lado del proceso (`Plugin::call`) el deadline ya existía (kill + wait) y 
 # sh está en Git para Windows: los tests de plugin-fichero lo necesitan en el PATH.
 $env:PATH = 'C:\Program Files\Git\usr\bin;' + $env:PATH
 cargo test --lib 2>&1            # → test result: ok. 580 passed; 0 failed (+2 de catalog::check)
-cargo test --bin openfader 2>&1  # → test result: ok. 470 passed; 0 failed; 1 ignored (+3: skins cotas/schema/contraste, store .part, docs/mappings.md)
+cargo test --bin openfader 2>&1  # → test result: ok. 473 passed; 0 failed; 1 ignored (+6: skins cotas/schema/contraste, store .part, docs/mappings.md, los 3 de i18n/language)
 cargo test --bin openfader -- midi:: 2>&1  # → 54/54 (el round-trip de los 176 XML de maps-repo incluido)
 cargo test --bin openfader -- the_checked_out_themes 2>&1  # → 2/2 (integridad + contraste WCAG de los temas del checkout)
 ```
@@ -192,11 +211,15 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 | `af0e0aa` | MAP-06 + MAP-05 (`docs/mappings.md` completo + tablas con test) |
 | `5108039` | X-01 (SHA256SUMS), CORE-03 + X-02 (Trust + aviso de terceros), nueva dependencia `sha2` |
 | `70b233b` | repositorio de plugins: `docs/plugins.md` con el pin del SDK |
+| `4b185f3` | X-04 (i18n: ajuste LANGUAGE, `@tr` en los menús + catálogos bundled, tabla `ES` para las páginas de preferencias) |
+| `5d011c9` | THEME-05 (chip «ONLY CHANGES» en el editor de temas: guardar solo los tokens que difieren del base) |
+| `c57f5a1` | MAP-05 docs (`docs/mappings.md`: páginas de pad de DDJ-1000/FLX10 atadas + resto vía MIDI LEARN) |
 
-**OpenFadeR-Map (`maps-repo`, rama `fixes/duplicated-jog-bend`)**
-| Commit | Contenido |
-|--------|-----------|
-| `1b2fdba` | MAP-01 datos: 13 archivos, 66 líneas `jog-bend` duplicadas eliminadas |
+**OpenFadeR-Map (`maps-repo`)**
+| Rama | Commit | Contenido |
+|------|--------|-----------|
+| `fixes/duplicated-jog-bend` | `1b2fdba` | MAP-01 datos: 13 archivos, 66 líneas `jog-bend` duplicadas eliminadas |
+| `fixes/map05-actions` | `18cad36` | MAP-05 datos: DDJ-1000/FLX10 atán los pads BEAT JUMP/BEAT LOOP/KEY SHIFT a las 10 acciones sin uso |
 
 **OpenFadeR-Plugins (`plugins-repo`, rama `fixes/sdk-pin`)**
 | Commit | Contenido |
@@ -215,3 +238,4 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 - Los temas del repositorio se miden por contraste WCAG en CI: un tema publicado con texto ilegible da la cara antes.
 - Lo que descargan GET PLUGINS/THEMES/MAPPINGS se verifica contra el `SHA256SUMS` del repositorio cuando lo publica; un zip sustituido se rechaza con un error que dice qué hash se esperaba, y al instalar de un repositorio ajeno el console log desmiente el silencio.
 - El modelo de confianza (qué puede un plugin, cómo se elige un repo, qué comprueba la app) está escrito para el usuario en `docs/plugins.md`; el build de los plugins ya no pide un checkout del core.
+- **La interfaz habla español**: en un Windows/Linux con locale español, los menús de la barra y las 10 páginas de preferencias aparecen en español sin configurar nada; quien quiera inglés (o forzar el español) lo elige en PREFERENCES > VIEW > LANGUAGE. Cambiar el idioma es en caliente; nada sin traducir queda a medias (vuelve a su inglés original).
