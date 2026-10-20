@@ -166,3 +166,31 @@ haciendo de a uno, compilando en release al cerrar cada tanda.
 - **Alcance:** se calcula con el `Remote {plugin, source, id}` exacto (genérico para Deezer y
   YouTube). La acción "Descargar de una URL" guarda por nombre original, así que queda fuera
   de este indicador (match difuso).
+
+## 11. Segunda tanda (19-20/10/2026): lo que se encontró usando la app — HECHO
+
+Todo lo de esta tanda está detallado en [hallazgos_solucionados.md](hallazgos_solucionados.md)
+(segunda tanda, con identificadores propios: `WIN-`, `PLUG-`, `DATA-`, `UI-`, `PACK-`, `DEEZ-` y `DOC-`).
+
+| # | Qué se encontró | Estado |
+|---|-----------------|--------|
+| 11 | El lanzador `py` abría una **ventana de Windows Terminal** en cada llamada a un plugin | ARREGLADO — `WIN-01` (`9d908dc`) |
+| 12 | En un salto de vídeo la imagen se quedaba **pegada en el frame del sitio anterior** (3 s) | ARREGLADO — `WIN-03` + `WIN-04` (`734797e`) |
+| 13 | El yt-dlp no venía en el instalador y **no se podía actualizar** bajo Program Files | ARREGLADO — `PLUG-02` (`400ebb1`, `d6d1b9f`) |
+| 14 | El motor de Deezer **no arrancaba** desde la instalación (programa nombrado sin extensión) | ARREGLADO — `PLUG-05` + `PACK-02` (`e0f280a`, `1d9f8c9`, `d6d1b9f`) |
+| 15 | El motor de Deezer fallaba al descargar: *Invalid CSRF token*, *no dio un token*, token que rota | ARREGLADO — `DEEZ-01..03` (plugins `d1ba1de`) |
+| 16 | Las preferencias que añadió el original llegaban **en inglés**, y el texto de las filas no se traducía | ARREGLADO — `UI-02` (`5289290`) |
+| 17 | La ventana **no abría a pantalla completa** (el ítem del menú no hacía nada) | ARREGLADO — `UI-01` (`b28cf41`) |
+| 18 | El README no contaba esta versión y solo estaba en inglés | ARREGLADO — `DOC-01` (`975576a`, con `README.es.md`) |
+| 19 | **Instalador de Windows** y **release en GitHub** | HECHO — `PACK-01` (`525689b`), release `v0.2.2` |
+
+**Queda a decisión del usuario** (nada abierto por avería):
+
+- Acortar más el salto de vídeo: el motor nativo de Deezer ya está en `main` de `plugins-repo` y
+  viaja en el instalador; si el motor se considera terminado, la línea `$excluded` del script de
+  empaquetado puede desaparecer (ahora no excluye nada).
+- El salto de vídeo se puede bajar de ~460 ms a ~150 ms con dos cambios posibles, ya medidos:
+  re-codificar el vídeo descargado con keyframes cada segundo (`-g 30`, a costa de una descarga más
+  lenta) o hacer el salto en dos fases (el keyframe al instante, el frame exacto después).
+- Publicar el yt-dlp 1.2.4 y el motor de Deezer en el repositorio `MyOpenFadeR-Plugins` (el
+  `main` ya los tiene; falta decide si se abre una *release* con el binario de yt-dlp adjunto).

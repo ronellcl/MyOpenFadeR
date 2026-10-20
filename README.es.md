@@ -219,6 +219,7 @@ El comportamiento del audio, del MIDI y de las carpetas se ajusta con `OPENFADER
 - [docs/skins.md](docs/skins.md): ficheros de tema, cada token, pistas de diseño
 - [docs/mappings.md](docs/mappings.md): archivos de mapeo de controlador
 - [docs/library-format.md](docs/library-format.md): la exportación abierta en JSON / CSV y las tablas de la base de datos
+- [hallazgos_solucionados.md](hallazgos_solucionados.md): lo que se encontró y lo que se reparó, con el commit de cada arreglo
 
 El código sigue [docs/code-structure.md](docs/code-structure.md): una carpeta por sección (`library/`, `analysis/`, `audio/`, `plugin/`, `app/`, …), un `mod.rs` base y una hija por variante. Solo `app/` y la crate `ui/` usan Slint.
 

@@ -1,8 +1,8 @@
 # Hallazgos solucionados — registro de reparaciones
 
-**Fecha:** 17/10/2026 · **Rama del core:** `fixes/hallazgos` (desde `main` @ `dbbe938`) · **Rama de mapeos:** `fixes/duplicated-jog-bend` en `maps-repo/` (desde su `main`) · **Rama de plugins:** `fixes/sdk-pin` en `plugins-repo/` (desde su `main`)
-**Fuente:** cada apartado corresponde a un hallazgo de `hallazgos.md` (mismo ID). Se resolvió todo lo que no afecta el funcionamiento, según lo acordado.
-**Verificación:** suite completa del core verde — `cargo test --lib` **580/580** y `cargo test --bin openfader` **473/473** (1 ignorado, preexistente).
+**Fecha:** 17/10/2026 (primera tanda) y 20/10/2026 (segunda tanda, la de la interfaz, el vídeo, los plugins y el instalador) · **Rama del core:** `fixes/hallazgos` (desde `main` @ `dbbe938`), luego `main` con la fusión del original (`10e05f4`) y el trabajo de esta tanda sobre `main` · **Rama de mapeos:** `fixes/duplicated-jog-bend` en `maps-repo/` (desde su `main`) · **Rama de plugins:** `fixes/sdk-pin` y luego `main` en `plugins-repo/` (desde su `main`)
+**Fuente:** la primera tanda, cada apartado corresponde a un hallazgo de `hallazgos.md` (mismo ID). La segunda tanda, lo que se encontró **usando** la aplicación (la app instalada, un vídeo de YouTube, una descarga de Deezer); sus identificadores son nuevos y se explican en su propia tabla. Se resolvió todo lo que no afecta el funcionamiento, según lo acordado.
+**Verificación:** suite completa del core verde — `cargo test --lib` **580/580** y `cargo test --bin openfader` **473/473** (1 ignorado, preexistente). De la segunda tanda: `cargo test --lib` **571 ok / 11 fallos** (los 11 son los tests de plugin-fichero, que necesitan `sh` en el PATH, preexistente) y `cargo test --bin openfader` **480 ok / 1 ignorado**.
 
 ## Resumen
 
@@ -182,6 +182,86 @@ En el lado del proceso (`Plugin::call`) el deadline ya existía (kill + wait) y 
 
 ---
 
+## Segunda tanda (19-20/10/2026): la interfaz, el vídeo, los plugins y el instalador
+
+**Rama del core:** `main` (sobre el 0.2.1 del original, con la fusión `10e05f4`) · **Rama de plugins:** `main` de `plugins-repo` (`d55a2a0`) · **Motor de Deezer:** `feature/deezer-v2` de `plugins-repo`
+
+Esta tanda no viene de `hallazgos.md` (el audit del original): es lo que se encontró **usando** la aplicación —la app instalada, un vídeo de YouTube, una descarga de Deezer— y lo que se reparó. Los identificadores son nuevos: `WIN` (ventanas de consola, vídeo e instalación en Windows), `PLUG` (plugins), `DATA` (colección), `UI` (interfaz), `PACK` (empaquetado), `DEEZ` (motor nativo de Deezer) y `DOC` (documentación).
+
+| ID | Hallazgo | Estado | Núcleo de la solución | Commit |
+|----|----------|--------|------------------------|--------|
+| WIN-01 | Cada llamada a un plugin abría una **ventana de Windows Terminal** con el lanzador `py` | ✅ Resuelto | El intérprete que viaja con el programa (`python\`) es el primero; `py` queda como último recurso | `9d908dc` |
+| WIN-02 | Los ayudantes de consola (ffmpeg, ffprobe, selectores de fichero) podían heredar una consola | ✅ Resuelto | `CREATE_NO_WINDOW \| DETACHED_PROCESS` en todos ellos; el que lanza a otro de consola usa `DETACHED_PROCESS` para que el nieto no tenga ninguna | `570b72d` |
+| WIN-03 | En un salto de vídeo **la imagen se quedaba pegada en el frame del sitio anterior** (3 s) | ✅ Resuelto | Mientras el salto está en curso la imagen se pone **negra**, y sale el ffmpeg ligero (80 ms): el frame nuevo está a ~460 ms | `734797e` |
+| WIN-04 | El ffmpeg del sistema tarda **2 s en arrancar** y cada salto lo pagaba | ✅ Resuelto | El instalador lleva un build ligero y **mide su arranque y avisa** si el ffmpeg es el lento | `734797e`, `5289290` |
+| PLUG-02 | El yt-dlp no venía en el instalador y su auto-actualización era **imposible bajo Program Files** (el binario es de solo lectura) | ✅ Resuelto | El programa viaja dentro y el plugin lo **siembra** en la carpeta de datos (escritura) la primera vez | `400ebb1`, `d6d1b9f` |
+| PLUG-03 | La copia de un plugin en la carpeta de configuración **tapaba** a la del instalador (manda el `name` del manifiesto, no el nombre de la carpeta) | ✅ Resuelto | Aviso de copias ignoradas con la carpeta en uso, carpeta de origen a la vista y versiones comparadas numéricamente | `2eb82bf` |
+| PLUG-04 | Un error inesperado en el plugin lo mataba **sin responder** (la app esperaba un reply que no llegaba) | ✅ Resuelto | Todo error se responde como `{"error": …}`; el rastro limpio vive en la respuesta | plugins `d1ba1de` |
+| PLUG-05 | Un plugin cuyo programa se nombra **sin extensión** no se encontraba (la ruta de un hijo se resuelve contra la carpeta de quien llama) | ✅ Resuelto | `resolve()` prueba con `.exe` en Windows, y hay test | `e0f280a` |
+| DATA-01 | Una pista de una fuente de plugin (YouTube, Deezer) **no podía vivir** en una lista ni en una paleta | ✅ Resuelto | Migración v16 (`plugin`, `source`, `remote_id`, ruta sintética); el audio se descarga al cargarla y el navegador marca con un ✓ las descargadas | `02864d8` |
+| UI-01 | El menú «Ver > Pantalla completa» **no hacía nada** (ponía una propiedad que nadie leía) | ✅ Resuelto | Callback a Rust, y la ventana **abre a pantalla completa** por defecto (ajuste recordable) | `b28cf41` |
+| UI-02 | Las preferencias que añadió el original (rejilla de beats en negrita, marcas de hot cue grandes) llegaban **en inglés**, y el texto de las filas no se traducía | ✅ Resuelto | Cinco entradas nuevas en la tabla `ES` y el `hint` de las filas pasa por el traductor | `5289290` |
+| UI-03 | No existía el **escenario VDJ** (etapa de Virtual DJ) | ✅ Resuelto | `stage-layout: 1`: la franja de FX y la pantalla maestra bajo las mesas, una pantalla por mesa, faders de canal con su longitud | `7cdc0a4` |
+| PACK-01 | **No había instalador** de Windows | ✅ Resuelto | NSIS con el programa, los plugins, los temas, los mapeos, ffmpeg, Python, el runtime de VC++ y un desinstalador que respeta tus datos | `525689b` |
+| PACK-02 | El motor de Deezer no se empaquetaba, y la compilación **se quedaba colgada** al copiarlo (la app lo tenía abierto) | ✅ Resuelto | El motor se compila en el empaquetado y el exe recién hecho va directo al payload | `1d9f8c9`, `d6d1b9f` |
+| PACK-03 | El manifiesto del yt-dlp 1.2.3 en español se perdió al guardarlo con BOM y acentos corruptos | ✅ Resuelto | Reescrito a mano en UTF-8 sin BOM, con la misma estructura y los mismos campos | plugins `d1ba1de` |
+| DEEZ-01 | El motor de Deezer fallaba al descargar con **«Invalid CSRF token»** | ✅ Resuelto | La jarra de cookies: Deezer ata el token CSRF a la sesión (`sid`, `dzr_uniq_id`) | plugins `d1ba1de` |
+| DEEZ-02 | «Deezer no dio un token para la pista» | ✅ Resuelto | La ficha de la pista viene en `results.DATA`, no en la raíz | plugins `d1ba1de` |
+| DEEZ-03 | El token del gateway **rota** entre llamadas | ✅ Resuelto | Si el gateway lo rechaza, sesión nueva y un reintento (como hace deemix) | plugins `d1ba1de` |
+| DOC-01 | El README no decía nada de esta versión y solo estaba en inglés | ✅ Resuelto | Sección «Qué añade esta versión» y `README.es.md` completo, con selector de idioma | `975576a` |
+
+### WIN-01 · el lanzador `py` abría una ventana de Terminal en cada llamada a un plugin
+
+**Síntoma:** al buscar en YouTube, al abrir el gestor de plugins o al pulsar cualquier acción, aparecía una ventana de consola con el título `C:\WINDOWS\py.exe` sobre la aplicación.
+
+**Causa:** `python()` elegía el lanzador `py` de python.org siempre que estuviera en el PATH (lo está, en `C:\Windows`). El lanzador es un programa de consola que **arranca el intérprete real sin flags propios**: el hijo hereda la consola del lanzador, que a su vez no tenía (la app es una app de ventana) → Windows le asigna una nueva → ventana.
+
+**Solución** (`src/plugin/mod.rs`): el intérprete que **viaja con el programa** (`python\python.exe`, el que instala el instalador) es el primero; luego el del PATH; el lanzador `py` queda como último recurso (solo cuando no hay ningún `python` en el PATH, que es el caso raro de una máquina con el Store stub). Verificado: con `py` arrancado sin consola, la ventana salía; con el intérprete propio, no aparece ninguna.
+
+### WIN-03 + WIN-04 · el vídeo: el frame pegado y el ffmpeg que tarda dos segundos
+
+**Síntoma:** al saltar en un vídeo, la imagen se quedaba **pegada en el último fotograma** del sitio anterior y tardaba tres segundos en volver al sitio bueno; a veces no se ponía en negro y a veces se quedaba allí.
+
+**Causa:** dos cosas distintas. (1) `stream.rs` vaciaba la caché al reiniciar el decodificador pero **dejaba el frame viejo publicado**: la pantalla seguía con la imagen anterior hasta que llegaba la nueva. (2) Cada salto **arranca un ffmpeg nuevo**, y el build completo de gyan.dev (400 MB, con CUDA, Vulkan y libplacebo dentro) tarda **2.032 ms en arrancar**; medido con `-version`, contra los **80 ms** del build essentials (100 MB, los mismos decodificadores).
+
+**Solución:** (1) mientras el destino no está en la caché, la imagen se pone **negra** y sale cuando llega el frame correcto; (2) el instalador empaqueta el build ligero y **mide su arranque al compilar**: si tarda más de 400 ms avisa con el enlace al build ligera.
+
+**Medido en la app instalada** (con el watcher de ventanas capturando la zona del vídeo cada 60 ms): negro entre los 267 y los 367 ms, imagen correcta a los **464 ms**. Antes: ~3 s con el frame viejo pegado.
+
+### PLUG-02 · el yt-dlp sin actualizar bajo Program Files
+
+**Síntoma:** el programa de yt-dlp no venía en el instalador (lo bajaba el plugin al primer uso) y, cuando venía, `yt-dlp -U` **fallaba**: el binario estaba bajo `Program Files`, que es de solo lectura.
+
+**Solución:** el instalador lo lleva dentro (`extension\plugin\yt-dlp\bin\yt-dlp.exe`) y el plugin **lo siembra** la primera vez que corre: si la copia del plugin no es escribible, se copia a `%LOCALAPPDATA%\openfader\plugins\yt-dlp\bin` y se usa esa, que sí se actualiza a diario. Verificado con el binario marcado como solo lectura: la copia aparece en la carpeta de datos y la acción «Actualizar yt-dlp ahora» responde *"yt-dlp: 2026.08.19; contra el canal stable: está al día"*.
+
+### PLUG-05 · un plugin nombrado sin extensión no se encontraba
+
+**Síntoma:** con el motor de Deezer dentro del instalador, el plugin no arrancaba: *«deezer: cannot start: El sistema no puede encontrar la ruta especificada»*.
+
+**Causa:** el manifiesto nombra el programa `bin/deezer-engine` (sin extensión) y `resolve()` lo buscaba tal cual; al no existir, el proceso se lanzaba con ese nombre **relativo**, y la ruta de un hijo se resuelve contra **la carpeta de quien llama**, no contra la del hijo.
+
+**Solución:** `resolve()` prueba también con `.exe` en Windows (con test), y el motor se compila con su extensión en el empaquetado.
+
+### DEEZ-01..03 · el motor nativo de Deezer no llegaba a descargar
+
+Tres fallos encadenados, encontrados al probar una descarga real con el ARL del usuario:
+
+1. **«Invalid CSRF token»**: Deezer ata el token del gateway a la sesión, que viaja en cookies (`sid`, `dzr_uniq_id`, …). El cliente solo mandaba el ARL → la jarra de cookies de `http.rs` ahora guarda lo que el servidor pone y lo devuelve.
+2. **«Deezer no dio un token para la pista»**: la ficha de la pista viene anidada en `results.DATA`; el motor la leía en la raíz.
+3. **El token rota**: si el gateway lo rechaza, se abre sesión nueva y se reintenta una vez (lo que hace deemix).
+
+**Verificado:** FLAC de 20,2 MB (904 kbps) y MP3 128 de 3,46 MB, y la app instalada responde *«deezer: ARL bueno (CL): FLAC y MP3 320»*.
+
+### Lo que todo esto deja en pie
+
+- Una máquina recién estrenada **no necesita nada más**: el instalador lleva la app, los plugins, los temas, los mapeos, un ffmpeg ligero, un Python, el programa de yt-dlp y el motor de Deezer.
+- **Ni una ventana de consola** por delante de la aplicación, ni al buscar, ni al descargar, ni al elegir un fichero.
+- Un salto de vídeo **responde en medio segundo** y con un negro limpio, no con un frame mentiroso.
+- El **ARL** (la cookie de Deezer) vive solo en la carpeta de datos de la app: nunca se comite, nunca viaja en el instalador y nunca aparece en el historial de git (comprobado con el valor real sobre los cuatro repositorios, árboles e historiales).
+
+---
+
+## Verificación
 ## Verificación
 
 ```powershell
@@ -215,6 +295,23 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 | `5d011c9` | THEME-05 (chip «ONLY CHANGES» en el editor de temas: guardar solo los tokens que difieren del base) |
 | `c57f5a1` | MAP-05 docs (`docs/mappings.md`: páginas de pad de DDJ-1000/FLX10 atadas + resto vía MIDI LEARN) |
 
+**Core, segunda tanda (`main`, sobre el 0.2.1 del original)**
+| Commit | Contenido |
+|--------|-----------|
+| `570b72d` | WIN-02: los ayudantes de consola arrancan sin consola (`CREATE_NO_WINDOW \| DETACHED_PROCESS`) |
+| `02864d8` | DATA-01: las pistas de una fuente de plugin viven en la Colección (migración v16) y el navegador marca las descargadas |
+| `2eb82bf` | PLUG-03: el gestor enseña la carpeta de origen, avisa de las copias ignoradas y compara versiones por número |
+| `7cdc0a4` | UI-03: el escenario VDJ (`stage-layout`), una pantalla por mesa y el vídeo en ellas |
+| `525689b` | PACK-01: el instalador de Windows (NSIS) con todo dentro |
+| `9d908dc` | WIN-01: los plugins usan el intérprete que viaja con el programa, no el lanzador `py` |
+| `734797e` | WIN-03 + WIN-04: el salto de vídeo se pone en negro y el ffmpeg es el build ligero |
+| `e0f280a` | PLUG-05: un programa nombrado sin extensión se encuentra igual (con test) |
+| `1d9f8c9` | PACK-02: el motor de Deezer viaja en el instalador |
+| `d6d1b9f` | PACK-02: el motor recién compilado va al payload (la copia en la app puede estar en uso) |
+| `5289290` | UI-02: las preferencias nuevas del original en español + el `hint` de las filas se traduce; el README dice cómo poner un ffmpeg ligero |
+| `b28cf41` | UI-01: la ventana abre a pantalla completa (ajuste recordable) y el menú Ver la enciende y la apaga |
+| `975576a` | DOC-01: el README cuenta esta versión, en inglés y en español (`README.es.md`); versión 0.2.2 |
+
 **OpenFadeR-Map (`maps-repo`)**
 | Rama | Commit | Contenido |
 |------|--------|-----------|
@@ -239,3 +336,17 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 - Lo que descargan GET PLUGINS/THEMES/MAPPINGS se verifica contra el `SHA256SUMS` del repositorio cuando lo publica; un zip sustituido se rechaza con un error que dice qué hash se esperaba, y al instalar de un repositorio ajeno el console log desmiente el silencio.
 - El modelo de confianza (qué puede un plugin, cómo se elige un repo, qué comprueba la app) está escrito para el usuario en `docs/plugins.md`; el build de los plugins ya no pide un checkout del core.
 - **La interfaz habla español**: en un Windows/Linux con locale español, los menús de la barra y las 10 páginas de preferencias aparecen en español sin configurar nada; quien quiera inglés (o forzar el español) lo elige en PREFERENCES > VIEW > LANGUAGE. Cambiar el idioma es en caliente; nada sin traducir queda a medias (vuelve a su inglés original).
+
+### De la segunda tanda
+
+- **Ni una ventana de consola** delante de la aplicación: ni al buscar en YouTube, ni al abrir el gestor de plugins, ni al elegir un fichero.
+- Un **salto de vídeo responde en medio segundo** y con un negro limpio, en vez de quedarse tres segundos con el frame del sitio anterior.
+- Una máquina **recién estrenada no necesita nada más**: el instalador lleva la app, los plugins, los temas, los mapeos, un ffmpeg ligero, un Python, el programa de yt-dlp y el motor de Deezer.
+- El yt-dlp **se actualiza solo** aunque la app viva en `Program Files` (usa la copia que guarda en tu carpeta de usuario).
+- **Deezer descarga**: FLAC o MP3 320 con tu ARL, sin Node, sin deemix y sin Python por medio.
+- Una pista de YouTube o Deezer **puede estar en una lista o en una paleta** como cualquier otra, y el navegador marca con un ✓ las que ya están descargadas.
+- El **escenario VDJ**: la franja de FX y la pantalla maestra bajo las mesas, una pantalla por mesa y los faders de canal con su longitud.
+- La ventana **abre a pantalla completa**, y si la devuelves a modo ventana, la próxima vez también.
+- El **ARL** (la cookie de Deezer) no está en ningún repositorio: vive solo en la carpeta de datos de la app, y se comprobó con el valor real sobre los cuatro repositorios (árboles e historiales).
+- El README cuenta **qué añade esta versión**, en inglés y en español.
+
