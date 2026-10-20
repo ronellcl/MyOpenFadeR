@@ -29,7 +29,11 @@ Every screenshot on this page comes from the running app, with a library of synt
 
 ## What this version adds
 
-This branch carries a set of changes on top of the upstream 0.2.1:
+This release carries the changes of this branch on top of the upstream 0.2.1: the
+interface in Spanish, a Windows installer that needs nothing else on the machine,
+no console windows, a video engine that keeps up with the music, YouTube with
+picture, the native Deezer engine, cloud tracks in the Collection, the VDJ stage
+and a window that opens full screen.
 
 - **The interface in Spanish.** Every menu, preference page and plugin label is translated, and PREFERENCES > VIEW > LANGUAGE chooses System, English or Spanish. The preferences the upstream added last (the bold beat grid, the large hot cue markers) are translated too.
 - **A Windows installer that carries everything.** `OpenFadeR-<version>-windows-x86_64-setup.exe` installs the program for all users (it asks for administrator) with the plugins, the themes, the controller mappings, a light ffmpeg, a Python for the Python plugins and the yt-dlp program: a fresh machine needs nothing else. See [packaging/windows](packaging/windows).

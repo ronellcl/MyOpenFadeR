@@ -29,7 +29,11 @@ Todas las capturas de esta página salen de la aplicación en marcha, con una bi
 
 ## Qué añade esta versión
 
-Esta rama lleva un conjunto de cambios sobre el 0.2.1 original:
+Esta versión lleva los cambios de esta rama sobre el 0.2.1 original: la interfaz
+en español, un instalador de Windows que no necesita nada más en la máquina,
+ninguna ventana de consola, un motor de vídeo que sigue el ritmo, YouTube con
+imagen, el motor nativo de Deezer, pistas de la nube en la Colección, el
+escenario VDJ y una ventana que abre a pantalla completa.
 
 - **La interfaz en español.** Todos los menús, las páginas de preferencias y las etiquetas de los plugins están traducidos, y PREFERENCIAS > VISTA > IDIOMA elige Sistema, English o Español. Las preferencias que el original añadió últimos (la rejilla de beats en negrita, las marcas de hot cue grandes) también están traducidas.
 - **Un instalador de Windows que lo lleva todo.** `OpenFadeR-<versión>-windows-x86_64-setup.exe` instala el programa para todos los usuarios (pide administrador) con los plugins, los temas, los mapeos de controlador, un ffmpeg ligero, un Python para los plugins de Python y el programa yt-dlp: una máquina recién estrenada no necesita nada más. Ver [packaging/windows](packaging/windows).
