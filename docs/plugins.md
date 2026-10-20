@@ -186,6 +186,9 @@ on stdout (one JSON object per line, no line breaks inside).
 
 * Every request carries an `"id"` number; the reply must carry the same `id`. Replies may come in any order, and requests may
   overlap: answer them as they come or one by one, as you like.
+* A request that carries an **`"id"` of its own** (a source's track id, in `fetch`) keeps it: the number that ties the
+  reply to its request goes beside it, in **`"rid"`**. Answer with `"rid"` then (the app looks for `"rid"` first and for
+  `"id"` after it, so a plugin that answers with the documented `"id"` keeps working).
 * A line without `id` is the plugin's own message at any time: its `commands` (as an action's reply) run at once. This is how a
   plugin reacts to something it watches (a network peer, a file, a timer of its own) without waiting for a request.
 * **Exit when stdin closes** (end of file). That is how the app quits the plugin, and on macOS the only way the plugin learns

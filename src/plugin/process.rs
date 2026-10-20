@@ -247,7 +247,13 @@ pub(super) fn call(
     server.pending.lock().insert(id, tx);
     let mut request = request.clone();
     if let Some(o) = request.as_object_mut() {
-        o.insert("id".into(), id.into());
+        // The id that ties the reply to this request. A request that carries an id of its own (a source's track id,
+        // in `fetch`) keeps it: the correlation id goes beside it, in `rid`. The reply is looked for in `rid` first,
+        // then in `id` (the plugin that answers with the documented `id` still works).
+        o.insert("rid".into(), id.into());
+        if !o.contains_key("id") {
+            o.insert("id".into(), id.into());
+        }
     }
     let sent = server
         .lines
@@ -331,7 +337,13 @@ fn route(name: &str, server: &Server, line: &str) {
         Ok(v) => v,
         Err(e) => return eprintln!("plugin {name}: a line that is not JSON ({e})"),
     };
-    if let Some(id) = v.get("id").and_then(Value::as_u64) {
+    // The correlation id: `rid` (the one the request carries) or `id` (the documented name, for the plugins that
+    // answer with it).
+    let id = v
+        .get("rid")
+        .and_then(Value::as_u64)
+        .or_else(|| v.get("id").and_then(Value::as_u64));
+    if let Some(id) = id {
         if let Some(tx) = server.pending.lock().remove(&id) {
             let _ = tx.send(v);
         }

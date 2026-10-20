@@ -282,6 +282,37 @@ printf '{"file":"%s.mp3"}' "$name""#;
 }
 
 #[test]
+fn a_persistent_source_keeps_the_id_of_its_track() {
+    let d = temp("fetch-rid");
+    // A persistent fetcher: it writes down the id of the track it was asked for (the request's own `id`, which the
+    // app's correlation id must not overwrite) and answers with the correlation id it was given (`rid`).
+    let script = r#"read line
+dir=$(printf '%s' "$line" | sed 's/.*"dir":"\([^"]*\)".*/\1/')
+name=$(printf '%s' "$line" | sed 's/.*"name":"\([^"]*\)".*/\1/')
+sid=$(printf '%s' "$line" | sed 's/.*"id":"\([^"]*\)".*/\1/')
+rid=$(printf '%s' "$line" | sed 's/.*"rid":\([0-9]*\).*/\1/')
+printf '%s' "$sid" > "$dir/.sid"
+printf 'audio' > "$dir/$name.mp3"
+printf '{"file":"%s.mp3","rid":%s}' "$name" "$rid""#;
+    let reg = registry_of(&d, "keeper", json!({"persistent": true}), script);
+    let root = d.join("dl");
+    // Its own name: a persistent plugin keeps one process, and two plugins of the same name would share it.
+    let track = Remote {
+        plugin: "keeper".into(),
+        source: "yt".into(),
+        id: "abc".into(),
+    };
+    // Another test stops the persistent plugins (they share one process per name): the app answers that the same
+    // way, the next request starts a new process.
+    let file = fetch_in(&reg, &root, &track)
+        .or_else(|_| fetch_in(&reg, &root, &track))
+        .unwrap();
+    assert_eq!(file, root.join("keeper/yt/abc.mp3"));
+    let sid = std::fs::read_to_string(root.join("keeper/yt/.sid")).unwrap();
+    assert_eq!(sid, "abc", "the id of the track reached the plugin");
+}
+
+#[test]
 fn ids_make_safe_distinct_file_names() {
     assert_eq!(file_name("../a b/é"), "%2E%2E%2Fa%20b%2F%C3%A9");
     assert_eq!(file_name("dQw4w9WgXcQ"), "dQw4w9WgXcQ");
