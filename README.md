@@ -13,6 +13,10 @@
   <a href="https://github.com/OpenRsG/OpenFadeR/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/OpenRsG/OpenFadeR?style=flat"></a>
 </p>
 
+<p align="center">
+  <a href="README.md"><b>English</b></a> · <a href="README.es.md"><b>Español</b></a>
+</p>
+
 OpenFadeR is an open-source DJ application for two or four decks, written in Rust with [Slint](https://slint.dev). It analyses your tracks, separates stems, mixes with effects and a sampler, and reads MIDI controllers from a growing set of mapping files. Themes, plugins and controller mappings install from GitHub repositories with one click.
 
 <p align="center">
@@ -22,6 +26,20 @@ OpenFadeR is an open-source DJ application for two or four decks, written in Rus
 <p align="center"><a href="docs/media/demo.mp4">Watch the demo as MP4</a></p>
 
 Every screenshot on this page comes from the running app, with a library of synthetic tracks generated for these pictures. There is no copyrighted music in them.
+
+## What this version adds
+
+This branch carries a set of changes on top of the upstream 0.2.1:
+
+- **The interface in Spanish.** Every menu, preference page and plugin label is translated, and PREFERENCES > VIEW > LANGUAGE chooses System, English or Spanish. The preferences the upstream added last (the bold beat grid, the large hot cue markers) are translated too.
+- **A Windows installer that carries everything.** `OpenFadeR-<version>-windows-x86_64-setup.exe` installs the program for all users (it asks for administrator) with the plugins, the themes, the controller mappings, a light ffmpeg, a Python for the Python plugins and the yt-dlp program: a fresh machine needs nothing else. See [packaging/windows](packaging/windows).
+- **No console windows.** The plugins run the interpreter that travels with the program, not the `py` launcher, and every helper (ffmpeg, ffprobe, the file pickers) starts without a console: no Windows Terminal window pops up over the app any more.
+- **Video that keeps up.** A seek goes black and comes back with the right frame instead of freezing on the last one, and the ffmpeg that starts for it is the light build (80 ms against two seconds): a jump takes half a second instead of three.
+- **YouTube with picture.** The yt-dlp plugin downloads H.264 + AAC (the formats every player shows), the picture lands on the deck's own screen and on the master screen, and the plugin keeps itself up to date from the copy it holds in your user folder.
+- **Deezer, native.** The deezer plugin is a Rust program: it searches the catalogue and downloads the tracks (FLAC or MP3 320) with your own ARL, with no Node, no deemix and no Python in the middle. It travels with the installer.
+- **Cloud tracks in the Collection.** A track from a plugin source (YouTube, Deezer) can live in a playlist or a palette like any other: the audio downloads when a deck loads it, and the browser marks with a ✓ the ones already downloaded.
+- **The VDJ stage.** A theme can ask for the Virtual DJ layout: the FX panel and the master screen share a strip under the decks, every deck has a screen of its own, and the channel faders keep their length.
+- **The window opens full screen.** PREFERENCES > VIEW > "Full screen at start-up" (on by default). The View menu's "Pantalla completa" turns it on and off, and the choice is remembered.
 
 ## Download
 
