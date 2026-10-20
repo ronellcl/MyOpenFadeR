@@ -294,8 +294,13 @@ component Unit inherits Rectangle {
 
 /// FX panel, top to bottom: the effect-family tabs (they switch the area under them), FX1 | FX2 side by side (or the
 /// SEND / LEVER / MIC rack), and the COLOR FX row: type chips and each channel's COLOR knob. Fits `Theme.h-fx` (110 px).
+/// It sits in the strip under the decks (app.slint), where `center-w` keeps the middle free for the master screen.
 export component FxPanel inherits Rectangle {
-    background: Theme.bg;
+    /// Space the FX units leave free in the middle for the master screen (0 while VIDEO PREVIEW is off; app.slint).
+    in property <length> center-w: 0px;
+    // Panel-coloured, not Theme.bg: the 2 px layout gaps between the bands would otherwise show the dark background as
+    // full-width/height "lines" cutting through the panel.
+    background: Theme.panel;
     VerticalLayout {
         spacing: 2px;
         Rectangle {
@@ -323,8 +328,12 @@ export component FxPanel inherits Rectangle {
             height: 54px;
             spacing: 2px;
             if FxState.view < 3: Unit { n: 0; }
+            // The master picture stands in the middle of the strip, so FX1 | FX2 step aside; the rack, whose controls
+            // sit on the left, just gives up the room.
+            if FxState.view < 3: Rectangle { width: root.center-w; horizontal-stretch: 0; }
             if FxState.view < 3: Unit { n: 1; }
             if FxState.view >= 3: FxRack { rack: FxState.view - 3; }
+            if FxState.view >= 3: Rectangle { width: root.center-w; horizontal-stretch: 0; }
         }
         Rectangle {
             height: 26px;

@@ -6,6 +6,7 @@ import { DeckTimes, DeckTitle, Jacket, StemRow, SyncCluster } from "deck-header.
 import { JogWheel, LoopBlock, RingColumn, SideButtons, TempoColumn } from "deck-controls.slint";
 import { DeckDropTarget } from "dnd.slint";
 import { CueList, PadGrid, PadOptions } from "pads.slint";
+import { VideoState } from "video-state.slint";
 
 /// GRID edit block (replaces the pads while GRID is on): shift by n ms, beat 1 at the playhead, BPM ×2 / ÷2, TAP, reset, METRO.
 component GridEdit inherits GridLayout {
@@ -70,15 +71,22 @@ export component DeckPanel inherits Rectangle {
             property <length> wj: min(root.width >= 700px ? 120px : Theme.jog, self.height);
             property <length> ws: 40px;
             property <length> wt: 28px;
-            property <length> pw: self.width - (self.wl + self.wr + self.wj + self.ws + self.wt) - 5 * Theme.gap;
             property <length> gap: Theme.gap;
-            // x of each block, left to right: pads loop ring jog side tempo (odd decks mirrored).
+            /// The deck's own picture (VIDEO PREVIEW in the VDJ stage, Theme.stage-layout): black while the deck has no
+            /// video. The hot cue pads give up its width, so they stay compact.
+            property <bool> video: Theme.stage-layout == 1 && VideoState.enabled && VideoState.preview;
+            /// What the pads and the screen share: the row less every fixed block and its gaps.
+            property <length> room: self.width - (self.wl + self.wr + self.wj + self.ws + self.wt) - (self.video ? 6 : 5) * self.gap;
+            property <length> wv: self.video ? min(Theme.w-deck-video, max(0px, self.room - 150px)) : 0px;
+            property <length> pw: self.room - self.wv;
+            // x of each block, left to right: pads loop ring screen jog side tempo (odd decks mirrored).
             property <length> x-pads: root.mirror ? self.width - self.pw : 0px;
-            property <length> x-loop: root.mirror ? self.wt + self.ws + self.wj + self.wr + 4 * self.gap : self.pw + self.gap;
-            property <length> x-ring: root.mirror ? self.wt + self.ws + self.wj + 3 * self.gap : self.pw + self.wl + 2 * self.gap;
-            property <length> x-jog: root.mirror ? self.wt + self.ws + 2 * self.gap : self.pw + self.wl + self.wr + 3 * self.gap;
-            property <length> x-side: root.mirror ? self.wt + self.gap : self.pw + self.wl + self.wr + self.wj + 4 * self.gap;
-            property <length> x-tempo: root.mirror ? 0px : self.pw + self.wl + self.wr + self.wj + self.ws + 5 * self.gap;
+            property <length> x-loop: root.mirror ? self.wt + self.ws + self.wj + self.wv + self.wr + 5 * self.gap : self.pw + self.gap;
+            property <length> x-ring: root.mirror ? self.wt + self.ws + self.wj + self.wv + 4 * self.gap : self.pw + self.wl + 2 * self.gap;
+            property <length> x-video: root.mirror ? self.wt + self.ws + self.wj + 3 * self.gap : self.pw + self.wl + self.wr + 3 * self.gap;
+            property <length> x-jog: root.mirror ? self.wt + self.ws + 2 * self.gap : self.pw + self.wl + self.wr + self.wv + 4 * self.gap;
+            property <length> x-side: root.mirror ? self.wt + self.gap : self.pw + self.wl + self.wr + self.wv + self.wj + 5 * self.gap;
+            property <length> x-tempo: root.mirror ? 0px : self.pw + self.wl + self.wr + self.wv + self.wj + self.ws + 6 * self.gap;
             // Pads, or the GRID edit block, or the cue / loop list.
             Rectangle {
                 x: ctl.x-pads;
@@ -113,6 +121,22 @@ export component DeckPanel inherits Rectangle {
                     spacing: 2px;
                     Chip { text: "×"; width: 30px; horizontal-stretch: 0; tooltip: "Delete a hot cue: press its pad"; active: root.v.delete-mode; active-color: Theme.danger; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.cue-delete(root.index); } }
                     Chip { text: "MEMORY"; tooltip: "Store a memory cue at the playhead"; enabled: root.v.loaded && root.v.pad-mode == 0; clicked => { DeckState.memory-cue(root.index); } }
+                }
+            }
+            // The deck's screen: between the loop block and the jog, in the room its pads gave up.
+            if ctl.video: Rectangle {
+                x: ctl.x-video;
+                y: (ctl.height - self.height) / 2;
+                width: ctl.wv;
+                height: min((9 * ctl.wv) / 16, ctl.height - 8px);
+                background: #000000;
+                border-width: 1px;
+                border-color: Theme.line;
+                Image {
+                    width: 100%;
+                    height: 100%;
+                    source: VideoState.decks[root.index].thumb;
+                    image-fit: contain;
                 }
             }
             LoopBlock { index: root.index; x: ctl.x-loop; width: ctl.wl; height: ctl.height; }

@@ -20,6 +20,7 @@ the code say `skin`.
 | Gruvbox Dark | dark | warm retro browns with yellow, orange and aqua |
 | Tokyo Night | dark | deep indigo with neon blue, magenta and orange |
 | So Pro | dark | near-black greys, a bright blue accent, a white platter, eight coloured pads in a 4 × 2 grid, the vertical 2-deck layout |
+| VDJ | dark | graphite, cyan and orange; the Virtual DJ stage: the FX panel and the master video screen in the strip under the decks, a screen in every deck, longer channel faders |
 | Ocean, High Contrast | dark | small examples that list only a few tokens |
 
 Except the two built-ins, they are the files of the [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) repository:
@@ -31,7 +32,7 @@ copy them into `~/.config/openfader/extension/skin/`, or point `OPENFADER_SKINS`
   has a blue frame and a tick. Click a card to apply it: colours, fonts, sizes and, when the theme has `layout` hints, the layout
   change at once.
 * **CUSTOMIZE** opens the editor on the applied theme. Every token is there, in the groups SURFACES, TEXT, ACCENTS, WAVEFORM, DECKS
-  AND METERS, TYPOGRAPHY, SIZES and MOTION, with the doc line of ui/theme.slint as its hint. Every change shows in the whole app at
+  AND METERS, TYPOGRAPHY, SIZES, LAYOUT and MOTION, with the doc line of ui/theme.slint as its hint. Every change shows in the whole app at
   once (the app is the preview).
   * a colour: click its swatch for the picker (hue, saturation, value and alpha sliders, the hex code, and the theme's own colours to
     pick from), or type `#rrggbb` / `#rrggbbaa` (the `#` is optional) and press Enter;
@@ -327,8 +328,23 @@ and brightness of the key column's colours, whose hue is the key's.
 | `h-mixpoint` | length | `96px` |
 | `h-sampler` | length | `96px` |
 | `w-channel` | length | `52px` |
+| `h-video` | length | `72px` |
+| `w-deck-video` | length | `224px` |
 | `jog` | length | `112px` |
 | `ring` | length | `36px` |
+
+### Layout
+
+| Token | Type | Default |
+|---|---|---|
+| `stage-layout` | int | `0` |
+
+`stage-layout` 0 is the classic stage: the FX panel sits between the global bar and the waveforms, and the hot cue pads take the
+width they need. 1 is the VDJ stage: the FX panel and the master video screen (VIDEO PREVIEW) share a strip under the decks —
+the FX units leave the middle free for the screen — and every deck carries a screen of its own, between its loop block and its
+jog, with the hot cue pads narrowed to make the room. Raise `h-deck-2` with it (264 px in the VDJ theme) so the channel faders
+and the deck screens get their length back; the strip, the taller decks and the shorter browser trade the height between them.
+`h-video` is the strip's height while VIDEO PREVIEW is off the FX panel, and `w-deck-video` the deck screens' width.
 
 ### Motion
 

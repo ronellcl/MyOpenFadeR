@@ -1,6 +1,7 @@
 import { Chip, Fader, Icon, Knob, Meter } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DeckState } from "deck.slint";
+import { VideoState } from "video-state.slint";
 
 /// One mixer channel row. Knob positions are 0..1 in the order TRIM, HI, MID, LOW, CFX; Rust
 /// (src/app/mixer/map.rs) maps them to dB / CFX values and fills `readouts`, `level` and `peak`.
@@ -155,7 +156,7 @@ component Channel inherits Rectangle {
         // Takes what the rows above leave.
         holder := Rectangle {
             vertical-stretch: 1;
-            min-height: 30px;
+            min-height: 20px;
             Fader {
                 vertical: true;
                 x: (holder.width - 22px) / 2;
@@ -165,6 +166,21 @@ component Channel inherits Rectangle {
                 edited(v) => { MixerState.fader(root.index, v); }
             }
         }
+    }
+}
+
+/// The master screen: what the crossfader is sending out (the mixer strip's VIDEO chip), shown in the strip under the
+/// mixer column so a transition can be followed without opening the output window. The black rectangle the app sizes;
+/// the picture is letterboxed in it and stays black until a deck has one.
+export component VideoMonitor inherits Rectangle {
+    background: #000000;
+    border-width: 1px;
+    border-color: Theme.line;
+    Image {
+        source: VideoState.out;
+        width: 100%;
+        height: 100%;
+        image-fit: contain;
     }
 }
 
@@ -230,6 +246,7 @@ export component MixerBar inherits Rectangle {
             edited(v) => { MixerState.bus-knob(p, v); }
         }
         Chip { text: "SPLIT"; font-size: Theme.font-xs; min-width: 40px; horizontal-stretch: 0; active: MixerState.bus.split; tooltip: "Mono HP left / master right"; clicked => { MixerState.split-toggled(); } }
+        if VideoState.enabled: Chip { text: "VIDEO"; font-size: Theme.font-xs; min-width: 44px; horizontal-stretch: 0; active: VideoState.preview; tooltip: "Video screens: one per deck and the master under the mixer"; clicked => { VideoState.preview = !VideoState.preview; } }
         Rectangle { horizontal-stretch: 1; }
         // Only while there is something to say (a headphone-device or recording message); wraps rather than elides.
         if MixerState.bus.status != "": Text {

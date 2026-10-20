@@ -105,10 +105,12 @@ export component Knob inherits Rectangle {
     width: 34px;
     height: 34px;
     pure function pt(r: length, a: angle) -> string {
-        return "" + (root.width / 2 + r * sin(a)) / 1px + " " + (root.height / 2 - r * cos(a)) / 1px;
+        // Path commands are parsed as SVG, which has no locale: Slint writes floats with the system's decimal
+        // separator (a comma here), the parser rejects them and the arc never draws. Whole coordinates keep it valid.
+        return "" + round((root.width / 2 + r * sin(a)) / 1px) + " " + round((root.height / 2 - r * cos(a)) / 1px);
     }
     pure function arc(r: length, a0: angle, a1: angle) -> string {
-        return "M " + root.pt(r, a0) + " A " + r / 1px + " " + r / 1px + " 0 " + (abs((a1 - a0) / 1deg) > 180 ? "1" : "0") + " " + (a1 >= a0 ? "1" : "0") + " " + root.pt(r, a1);
+        return "M " + root.pt(r, a0) + " A " + round(r / 1px) + " " + round(r / 1px) + " 0 " + (abs((a1 - a0) / 1deg) > 180 ? "1" : "0") + " " + (a1 >= a0 ? "1" : "0") + " " + root.pt(r, a1);
     }
     // body
     Rectangle {

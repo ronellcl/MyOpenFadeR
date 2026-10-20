@@ -2,7 +2,7 @@ import { AutomixState, Browser, BrowserState } from "browser.slint";
 import { DeckCompact, DeckDetail, DeckDetailV, DeckPanel, DeckState, DeckView } from "deck.slint";
 import { FxPanel, FxSlot, FxState, FxUnit } from "fx.slint";
 import { FxRackState, RackView } from "fxrack.slint";
-import { Mixer, MixerBar, MixerState, ChannelView, BusView } from "mixer.slint";
+import { Mixer, MixerBar, MixerState, ChannelView, BusView, VideoMonitor } from "mixer.slint";
 import { TrackInfoState } from "trackinfo.slint";
 import { CueRowView, PadOpt, PadView, PadsState } from "pads.slint";
 import { HelpOverlay, HelpLine, KeysState } from "help.slint";
@@ -18,7 +18,8 @@ import { PaneState } from "panes.slint";
 import { Theme } from "theme.slint";
 import { LightingView, LightingState, FixtureView } from "lighting.slint";
 import { EditView, EditState } from "edit.slint";
-import { VideoDeckView, VideoItem, VideoView, VideoState, VideoWindow } from "video.slint";
+import { VideoDeckView, VideoItem, VideoState } from "video-state.slint";
+import { VideoView, VideoWindow } from "video.slint";
 import { SamplerPanel, SamplerState, SlotView } from "sampler.slint";
 import { DrumSlotView, GrooveDeckView, GroovePanel, GrooveState } from "groove.slint";
 import { ToastState, ToastView } from "toast.slint";
@@ -83,7 +84,7 @@ export component App inherits Window {
     /// Horizontal waveform strips on screen.
     property <int> waves-n: root.vert || !root.stage ? 0 : root.decks-n;
     property <length> deck-h: root.four ? 2 * Theme.h-deck-4 + Theme.gap : Theme.h-deck-2;
-    property <length> mixer-w: !root.show-mixer ? 0px : root.four ? 4 * 44px : root.width >= 1400px ? 120px : 2 * Theme.w-channel;
+    property <length> mixer-w: !root.show-mixer ? 0px : (root.four ? 4 * 44px : root.width >= 1400px ? 120px : 2 * Theme.w-channel);
     property <length> mid-w: root.show-mixer ? root.mixer-w + 2 * Theme.gap : Theme.gap;
     property <length> panel-w: (root.width - root.mid-w) / 2;
     property <length> col-r: root.panel-w + root.mid-w;
@@ -97,8 +98,8 @@ export component App inherits Window {
     property <length> mixer-x: root.vert ? root.v-dw + Theme.gap + root.decks-n / 2 * root.vw : root.panel-w + Theme.gap;
     /// The x of vertical wave slot `s` (left to right); the mixer sits after the first half.
     pure function wave-x(s: int) -> length { return root.v-dw + Theme.gap + s * root.vw + (s >= root.decks-n / 2 ? root.mixer-w : 0px); }
-    // The vertical stack, top to bottom.
-    property <length> y-fx: Theme.h-bar + Theme.gap;
+    // The vertical stack, top to bottom: the global bar, the MIX POINT panel, the waveforms, the decks with the mixer
+    // column between them, the FX / VIDEO PREVIEW strip, the mixer strip, the sampler, BEAT LAB, the browser.
     /// The MIX POINT LINK panel (global-bar button, PREFS > Controller > MIX POINT LINK > Enable); it needs a deck layout, not Browse.
     property <bool> show-mix: MixPointState.enabled && MixPointState.open && !root.browse-on && root.stage;
     changed show-mix => { MixPointState.active = root.show-mix; }
@@ -111,10 +112,25 @@ export component App inherits Window {
     }
     /// FX panel height; themes written before the panel's tabs set 62 px, too small for its three rows.
     property <length> h-fx: max(Theme.h-fx, 110px);
-    property <length> y-mix: root.y-fx + (root.show-fx ? root.h-fx + Theme.gap : 0px);
+    /// The "VDJ" theme's stage: the FX panel and the master screen share a strip under the decks, and every deck carries a
+    /// screen of its own (deck-panel.slint).
+    property <bool> vdj: Theme.stage-layout == 1;
+    /// The FX panel above the waveforms: always in the classic stage, and in the VDJ one only while the browser has the
+    /// stage (Browse), where there are no decks to put it under. Otherwise it goes in the strip under the decks.
+    property <bool> fx-top: root.show-fx && (!root.vdj || !root.decks-on);
+    property <length> y-mix: Theme.h-bar + Theme.gap + (root.fx-top ? root.h-fx + Theme.gap : 0px);
     property <length> y-wave: root.y-mix + (root.show-mix ? Theme.h-mixpoint + Theme.gap : 0px);
     property <length> y-deck: root.y-wave + (root.vert ? 0px : root.waves-h + Theme.gap);
-    property <length> y-strip: root.y-deck + (root.browse-on ? 0px : root.deck-h + Theme.gap);
+    /// VIDEO PREVIEW (the mixer strip's chip): the master screen under the mixer column, plus a screen in each deck
+    /// (deck-panel.slint). Dropped while the chip is off, so nothing of it is drawn and Rust decodes nothing
+    /// (src/app/video/tick.rs) until it is on.
+    property <length> h-video: root.decks-on && root.show-mixer && VideoState.enabled && VideoState.preview ? Theme.h-video : 0px;
+    /// The strip under the decks: the FX panel (the VDJ layout) and the master screen share it, the FX units leaving the
+    /// middle free.
+    property <length> h-band: max(root.show-fx && !root.fx-top ? root.h-fx : 0px, root.h-video);
+    property <length> y-band: root.y-deck + root.deck-h + Theme.gap;
+    property <length> screen-w: (16 * root.h-band) / 9;
+    property <length> y-strip: root.y-deck + (root.browse-on ? 0px : root.deck-h + Theme.gap + (root.h-band > 0px ? root.h-band + Theme.gap : 0px));
     property <length> y-sampler: root.y-strip + (root.browse-on || !root.show-mixer ? 0px : Theme.h-toolbar + Theme.gap);
     /// The BEAT LAB panel (global-bar button, PREFS > Extensions > BEAT LAB): under the sampler, over the browser.
     property <bool> show-groove: GrooveState.enabled && GrooveState.open && !root.browse-on && root.stage;
@@ -260,6 +276,7 @@ export component App inherits Window {
             MenuItem { title: @tr("Effect Panel"); activated => { FxState.open = !FxState.open; } }
             MenuItem { title: @tr("Sampler"); activated => { SamplerState.open = !SamplerState.open; } }
             MenuItem { title: @tr("BEAT LAB"); enabled: GrooveState.enabled; activated => { GrooveState.open = !GrooveState.open; } }
+            MenuItem { title: @tr("Video Preview"); enabled: VideoState.enabled; activated => { VideoState.preview = !VideoState.preview; } }
             MenuSeparator {}
             MenuItem { title: @tr("Related Tracks"); activated => { BrowserState.related-toggled(!BrowserState.related); } }
             MenuItem { title: @tr("Tags"); activated => { BrowserState.panel-request(1); } }
@@ -296,7 +313,23 @@ export component App inherits Window {
             if (KeysState.key-released(e.text, e.modifiers.shift, e.modifiers.control)) { accept } else { reject }
         }
 
-        if root.show-fx: FxPanel { x: 0; y: root.y-fx; width: root.width; height: root.h-fx; }
+        // The FX panel: above the waveforms in the classic stage, in the strip under the decks in the VDJ one, where its
+        // units leave the middle free for the master screen.
+        if root.fx-top: FxPanel { x: 0; y: Theme.h-bar + Theme.gap; width: root.width; height: root.h-fx; }
+        if root.show-fx && !root.fx-top: FxPanel {
+            x: 0;
+            y: root.y-band + root.bx;
+            width: root.width;
+            height: root.h-fx;
+            center-w: root.h-video > 0px ? root.screen-w + 2 * Theme.gap : 0px;
+        }
+        // The master screen: what the crossfader sends out, under the mixer column (mixer.slint).
+        if root.h-video > 0px: VideoMonitor {
+            x: (root.width - root.screen-w) / 2;
+            y: root.y-band + root.bx;
+            width: root.screen-w;
+            height: root.h-band;
+        }
         if root.show-mix: MixPointPanel { x: 0; y: root.y-mix; width: root.width; height: Theme.h-mixpoint; }
         for i in root.waves-n: DeckDetail {
             index: PrefsState.wave-order[i];

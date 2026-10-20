@@ -28,6 +28,7 @@ use slint::{
 use slot::Slot;
 use std::{
     cell::{Cell, RefCell},
+    path::PathBuf,
     rc::Rc,
     time::Duration,
 };
@@ -43,6 +44,9 @@ struct Video {
     /// The mixed picture and what it was mixed from (frame addresses, weights): remixed only when one changes.
     out: RefCell<Image>,
     mixed_from: Cell<[(usize, u32); DECKS]>,
+    /// Each deck's load counter and file at the last look: a video track landing in a deck turns VIDEO PREVIEW on by
+    /// itself ([`tick`]), and the chip turns it off again until the next video load.
+    auto: RefCell<[(u32, Option<PathBuf>); DECKS]>,
     /// Result of the last action (overlay image, library read), shown until the next one.
     note: RefCell<String>,
     _timer: Timer,
@@ -75,6 +79,7 @@ pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> impl Sized {
             window: RefCell::default(),
             out: RefCell::new(Image::default()),
             mixed_from: Cell::new([(0, 0); DECKS]),
+            auto: RefCell::default(),
             note: RefCell::default(),
             _timer: timer,
         }
@@ -105,6 +110,7 @@ impl Video {
         st.set_enabled(on);
         if !on {
             st.set_visible(false);
+            st.set_preview(false);
             if self.window_open() {
                 self.toggle_window();
             }

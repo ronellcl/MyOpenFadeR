@@ -32,6 +32,8 @@ pub(super) enum Source {
 pub(super) struct Slot {
     /// `Deck::track` load counter this slot was set up for (0 = none).
     pub serial: u32,
+    /// The file this slot was set up for: a source track gets it when its download ends, with the serial unchanged.
+    file: Option<PathBuf>,
     pub title: String,
     pub src: Source,
     pub frame: Option<Arc<Frame>>,
@@ -56,27 +58,27 @@ pub(super) fn picture(rgb: &[u8]) -> Image {
 impl Slot {
     /// Follows the deck's loads: a new track resets the slot, a video one starts probing.
     pub fn follow(&mut self, deck: &Deck) {
-        match deck.serial() {
-            Some(serial) if serial != self.serial => {
-                let (title, file) = deck
-                    .with_track(|t| (t.title.clone(), t.file.clone()))
-                    .unwrap_or_default();
-                *self = Slot {
-                    serial,
-                    title,
-                    ..Slot::default()
-                };
-                if let Some(path) = file.filter(|p| video::is_video(p)) {
-                    let (tx, rx) = channel();
-                    let p = path.clone();
-                    std::thread::spawn(move || {
-                        let _ = tx.send(probe::probe(&p));
-                    });
-                    self.src = Source::Probing(rx, path);
-                }
+        let serial = deck.serial().unwrap_or(0);
+        let (title, file) = deck
+            .with_track(|t| (t.title.clone(), t.file.clone()))
+            .unwrap_or_default();
+        // The file is compared too: a track from a plugin source arrives without one and gets it when its download ends,
+        // and the deck keeps the same load counter for that (a downloaded video would otherwise stay "audio only").
+        if serial != self.serial || file != self.file {
+            *self = Slot {
+                serial,
+                title,
+                file: file.clone(),
+                ..Slot::default()
+            };
+            if let Some(path) = file.filter(|p| video::is_video(p)) {
+                let (tx, rx) = channel();
+                let p = path.clone();
+                std::thread::spawn(move || {
+                    let _ = tx.send(probe::probe(&p));
+                });
+                self.src = Source::Probing(rx, path);
             }
-            None if self.serial != 0 => *self = Slot::default(),
-            _ => {}
         }
         let Source::Probing(rx, path) = &self.src else {
             return;

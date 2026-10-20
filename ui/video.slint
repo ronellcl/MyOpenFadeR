@@ -3,59 +3,7 @@ import { Chip, Fader, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { DeckState } from "deck.slint";
 import { MixerState } from "mixer.slint";
-
-/// One deck's row in the VIDEO view: its own picture (not weighted), its track and how much of it is on the output.
-export struct VideoDeckView {
-    title: string,
-    info: string,
-    thumb: image,
-    has-video: bool,
-    /// Share of the master picture, 0..1.
-    weight: float,
-    /// Playhead, 0..1 of the track; a click on the bar seeks.
-    pos: float,
-}
-
-/// A video track of the library.
-export struct VideoItem {
-    title: string,
-    info: string,
-}
-
-/// VIDEO mode (src/app/video.rs, src/video/). Rust owns the pictures; the overlay and transition values are edited here and read by Rust.
-export global VideoState {
-    /// The VIDEO view is up (set by the mode selector).
-    in-out property <bool> visible;
-    /// EXTENSIONS > Video: the global bar's VIDEO button is offered only while on (set from Rust).
-    in-out property <bool> enabled;
-    /// The master picture: the decks' frames mixed by the crossfader.
-    in property <image> out;
-    in property <[VideoDeckView]> decks;
-    in property <[VideoItem]> list;
-    in property <string> status;
-    /// The separate output window is open.
-    in property <bool> window-open;
-    /// Crossfader transition: 0 FADE, 1 CUT.
-    in-out property <int> transition: 0;
-    /// A deck's picture dims with its channel fader.
-    in-out property <bool> follow-fader: true;
-    /// Overlay: 0 TEXT, 1 IMAGE; shown on the output while `overlay-on`.
-    in-out property <int> overlay-mode: 0;
-    in-out property <bool> overlay-on;
-    in-out property <string> text: "";
-    in-out property <string> image-path: "";
-    in property <image> overlay-image;
-    in-out property <float> opacity: 1.0;
-    in-out property <float> size: 0.4;
-    /// The view opened: Rust refreshes `list`.
-    callback opened();
-    /// (list row, deck index)
-    callback load(int, int);
-    callback image-chosen(string);
-    callback clear-overlay();
-    callback window-toggled();
-    callback full-screen();
-}
+import { VideoDeckView, VideoItem, VideoState } from "video-state.slint";
 
 /// The picture with the overlay on top, kept 16:9 inside whatever room it gets. The frame itself is already letterboxed to 16:9.
 component VideoOutput inherits Rectangle {

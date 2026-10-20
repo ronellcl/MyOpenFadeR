@@ -6,6 +6,7 @@ use super::{
 };
 use crate::app::deck::active;
 use mix::Transition;
+use openfader::video;
 use slint::{ComponentHandle, Image, Model};
 
 /// Per-deck picture weights from the crossfader and, with FOLLOW FADER, the channel faders.
@@ -61,7 +62,14 @@ impl Video {
         let window_open = self.window_open();
         st.set_window_open(window_open);
         let mut slots = self.slots.borrow_mut();
-        if !st.get_visible() && !window_open {
+        // A video file landing in a deck brings the picture up by itself: the master screen (and, in the VDJ stage, each
+        // deck's own) appears without hunting for the chip, which then turns it off until the next video load.
+        let mut preview = st.get_preview();
+        if !preview && st.get_enabled() && self.video_landed(active()) {
+            st.set_preview(true);
+            preview = true;
+        }
+        if !st.get_visible() && !window_open && !preview {
             slots.iter_mut().for_each(|s| *s = Slot::default());
             return;
         }
@@ -95,12 +103,37 @@ impl Video {
             win.set_alpha(st.get_opacity());
             win.set_size(st.get_size());
         }
-        if !st.get_visible() {
+        if !st.get_visible() && !preview {
             return;
         }
+        // The master picture feeds the master screen under the mixer column; the deck rows feed the decks' own screens
+        // (deck-panel.slint, the VDJ stage) and the VIDEO view.
         st.set_out(out);
         self.show_rows(&mut slots[..n], &w);
-        st.set_status(status(&slots[..n], &self.note.borrow()).into());
+        if st.get_visible() {
+            st.set_status(status(&slots[..n], &self.note.borrow()).into());
+        }
+    }
+
+    /// Whether a deck has a video track it did not have at the last look: the load that turns VIDEO PREVIEW on by
+    /// itself. Each deck's load counter is remembered, so a video loaded while the chip is off brings the picture back,
+    /// and turning the chip off afterwards stays off.
+    fn video_landed(&self, n: usize) -> bool {
+        let mut seen = self.auto.borrow_mut();
+        let mut landed = false;
+        for (i, last) in seen.iter_mut().enumerate().take(n) {
+            // The file is part of it: a source track lands without one and gets it when its download ends.
+            let now = (
+                self.decks[i].serial().unwrap_or(0),
+                self.decks[i].with_track(|t| t.file.clone()).flatten(),
+            );
+            if *last == now {
+                continue;
+            }
+            landed |= now.1.as_deref().is_some_and(video::is_video);
+            *last = now;
+        }
+        landed
     }
 
     /// Re-blends `out` when a frame or a weight changed since the last mix.
