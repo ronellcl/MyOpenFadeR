@@ -299,6 +299,10 @@ msgid "Keyboard Shortcuts"
 msgstr "Atajos de teclado"
 
 msgctxt "App"
+msgid "Welcome"
+msgstr "Bienvenida"
+
+msgctxt "App"
 msgid "About OpenFadeR"
 msgstr "Acerca de OpenFadeR"
 

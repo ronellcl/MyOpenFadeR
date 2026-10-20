@@ -51,6 +51,8 @@ To install it for your user on Linux instead (the `openfader` command and an app
 
 BPM, beat grid, downbeat, key, a three-band waveform, phrases (intro, up, chorus, down) and automatic cues are computed in the background and cached. The pictures above show them: coloured phrase bars over the enlarged waveforms, hot cues A to H under each deck, and a key colour in the track list. Decks sync tempo and beats, key sync follows the key, and key lock keeps the pitch while you push the tempo.
 
+For clearer waveforms, open PREFERENCES > VIEW > WAVEFORM. Set BEAT GRID to BOLD for outlined lines drawn over the audio, with wider downbeats that do not rely on colour alone. Set HOT CUE MARKERS to LARGE for double-size flags and letters on the decks and browser previews (when preview cue markers are enabled). Both settings apply immediately and are saved; NORMAL keeps the original sizes.
+
 ### Two decks or four
 
 <p align="center"><img src="docs/media/four-decks.png" alt="Four decks playing in sync with four stacked waveform lanes" width="100%"></p>
@@ -73,7 +75,7 @@ Sixteen slots in two banks, loaded from a deck or from a file. Slots play as a s
 
 <p align="center"><img src="docs/media/stems.png" alt="Stem buttons on two decks with vocal and drums muted on deck A" width="100%"></p>
 
-Enable STEMS in PREFERENCES > EXTENSIONS and each loaded track is separated into vocal, instrument, bass and drums (a 3-stem mode exists too) by an ONNX model that runs on the CPU or the GPU. A deck's stem button is filled while its stem plays at full level; a click turns that stem off, another brings it back. The pads and a controller can mute or solo, and the mixer's knobs can act on stems. The waveform follows what you hear.
+Enable STEMS in PREFERENCES > EXTENSIONS and each loaded track is separated into vocal, instrument, bass and drums (a 3-stem mode exists too) by an ONNX model that runs on the CPU or the GPU. Switching STEMS on downloads that model once (316 MB), with a progress card at the bottom right. A deck's stem button is filled while its stem plays at full level; a click turns that stem off, another brings it back. The pads and a controller can mute or solo, and the mixer's knobs can act on stems. The waveform follows what you hear.
 
 ### BEAT LAB
 
@@ -97,7 +99,7 @@ EDIT shows the whole track with its beat grid. Select with snap to beat or bar, 
 
 <p align="center"><img src="docs/media/lighting.png" alt="LIGHTING mode with fixtures lit by the phrase of the playing track" width="100%"></p>
 
-LIGHTING patches fixtures (RGB pars, RGBW pars, moving heads, strobes) and drives them from the phrase that is playing, so a chorus looks different from a breakdown. Pick a palette and a scene, or let AUTO choose. DMX goes out over Art-Net or sACN, or nowhere: the stage view works without any hardware. It is off by default: turn it on in PREFERENCES > EXTENSIONS to add LIGHTING to the mode menu.
+LIGHTING patches fixtures (RGB pars, RGBW pars, moving heads, strobes) and drives them from the phrase that is playing, so a chorus looks different from a breakdown. Pick a palette and a scene, or let AUTO choose. DMX goes out over Art-Net or sACN, or nowhere: the stage view works without any hardware. It is disabled by default: turn it on in PREFERENCES > EXTENSIONS to add LIGHTING to the mode menu.
 
 ### Export and video
 
@@ -105,7 +107,7 @@ EXPORT mode shows cues and memory points for the two decks next to a DEVICES pan
 
 <p align="center"><img src="docs/media/export.png" alt="EXPORT mode with cue editing for two decks and a devices panel" width="100%"></p>
 
-VIDEO (beta) plays video tracks on an output window and crossfades between the two decks' pictures. Like LIGHTING, it shows in the mode menu once enabled in PREFERENCES > EXTENSIONS.
+VIDEO (beta) plays video tracks on an output window and crossfades between the two decks' pictures. It is disabled by default: like LIGHTING, it shows in the mode menu once turned on in PREFERENCES > EXTENSIONS.
 
 ### Your library is yours
 
@@ -130,6 +132,10 @@ Three companion repositories feed the app, and PREFERENCES lists them from the f
 | [OpenFadeR-Map](https://github.com/OpenRsG/OpenFadeR-Map) | MIDI controller mappings (more than 170 files) | PREFERENCES > CONTROLLER > GET MAPPINGS |
 
 INSTALL installs one. Add any repository by its GitHub path (`user/name`) and the app finds the plugins, themes or mappings in it too, so sharing a theme is publishing a GitHub repository.
+
+Plugins start switched off. At the first start a welcome window offers the suggested ones (the plugins that read and write other DJ software's libraries, devices and effects) and STEMS; ACCEPT switches them on, SKIP leaves them off. Help > Welcome opens it again.
+
+At each start the app asks GitHub for the newest release; when it is newer than the running version a window offers to open its download page. Offline, nothing is shown.
 
 Plug in a controller that has no mapping yet and the app offers the matching file from the mapping repository: one click on INSTALL and the controller works. Mapping files cover the default layer of each controller; MIDI learn and LED feedback are built in, and hot-plug detection picks controllers up while the app runs. The format is described in [docs/mappings.md](docs/mappings.md).
 
@@ -188,7 +194,7 @@ Audio, MIDI and folder behaviour can be set with `OPENFADER_OUTPUT_DEVICE`, `OPE
 - [docs/mappings.md](docs/mappings.md): controller mapping files
 - [docs/library-format.md](docs/library-format.md): the open JSON / CSV export and the library database tables
 
-The code follows `.omp/rules/code-structure.md`: one folder per section (`library/`, `analysis/`, `audio/`, `plugin/`, `app/`, …), a base `mod.rs` and one child per variant. Only `app/` and the `ui/` crate use Slint.
+The code follows [docs/code-structure.md](docs/code-structure.md): one folder per section (`library/`, `analysis/`, `audio/`, `plugin/`, `app/`, …), a base `mod.rs` and one child per variant. Only `app/` and the `ui/` crate use Slint.
 
 ## Contributing
 

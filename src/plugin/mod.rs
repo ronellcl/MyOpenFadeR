@@ -6,7 +6,8 @@
 //! A plugin brings any mix of:
 //! - sources, actions and event hooks, served by its `script` or `command`: a `*.lua` script runs inside the app ([`lua`]),
 //!   anything else is a child process started per request, one JSON object on stdin, one on stdout ([`Plugin::call`];
-//!   protocol in `docs/plugins.md`). Children: [`source`] (track lists, search and download as a
+//!   protocol in `docs/plugins.md`). With `persistent`, the Lua state or the process stays for every request instead
+//!   ([`process`], which also makes sure no plugin process outlives the app). Children: [`source`] (track lists, search and download as a
 //!   [`crate::library::Library`] decorator), [`action`] (menu commands and the app commands they answer with), [`event`]
 //!   (fire-and-forget notifications).
 //! - effects, each for one [`effect::Slot`] of the mixer (Beat FX, COLOR FX, mic, send, lever, channel fader), declared in
@@ -30,6 +31,7 @@ pub mod event;
 pub mod install;
 pub mod library;
 mod lua;
+pub mod process;
 pub mod source;
 
 use parking_lot::RwLock;
@@ -55,6 +57,10 @@ pub struct Manifest {
     /// Web page of the plugin, shown in the plugin manager.
     #[serde(default)]
     pub homepage: String,
+    /// The software the plugin makes the app compatible with (its name, e.g. a DJ program's). The welcome window
+    /// offers to switch on every plugin found with one; empty: not suggested.
+    #[serde(default)]
+    pub suggest: String,
     /// Script serving sources, actions and events, relative to the plugin folder: `*.lua` runs inside the app ([`lua`]),
     /// `*.py` with `python3`, anything else as a program. Shorthand for `command`, which wins when both are given.
     #[serde(default)]
@@ -63,6 +69,10 @@ pub struct Manifest {
     /// argument that names an existing file in the plugin folder is made absolute. Empty: no process.
     #[serde(default)]
     pub command: Vec<String>,
+    /// One Lua state or one process serves every request instead of a fresh one each ([`process`]): no start-up cost, and
+    /// the plugin keeps its state between requests.
+    #[serde(default)]
+    pub persistent: bool,
     #[serde(default)]
     pub sources: Vec<SourceDecl>,
     #[serde(default)]
@@ -352,6 +362,9 @@ pub fn current() -> Arc<Registry> {
 pub fn reload() -> Arc<Registry> {
     let mut r = read_all();
     (r.effects, r.libraries) = (FIRST.effects.clone(), FIRST.libraries.clone());
+    let on: Vec<&str> = r.plugins.iter().map(|p| p.manifest.name.as_str()).collect();
+    process::retain(&on);
+    lua::retain(&on);
     let r = Arc::new(r);
     *NOW.write() = r.clone();
     r
@@ -519,7 +532,7 @@ fn read_manifest(dir: &Path) -> Result<Manifest, String> {
 impl Plugin {
     /// Sends `request` (`{"op": …}`, given the plugin's `settings`, see [`config`]) to the plugin and returns its reply: a
     /// Lua `script` runs here ([`lua`]), else a fresh run of its process (`command`, or the `script` with `python3` /
-    /// as a program). The process gets the plugin folder as working directory; whatever it prints to stderr is passed on to
+    /// as a program); a `persistent` plugin keeps its Lua state or its process ([`process`]). The process gets the plugin folder as working directory; whatever it prints to stderr is passed on to
     /// ours. A reply with an `"error"` string, a non-zero exit, output that is not one JSON object, or no reply within
     /// `timeout` (the process is killed, the script stopped) is an `Err`.
     pub fn call(&self, request: &Value, timeout: Duration) -> Result<Value, String> {
@@ -529,7 +542,9 @@ impl Plugin {
             o.insert("settings".into(), config::get().values(&self.manifest));
         }
         let command: Vec<String> = match (&self.manifest.command[..], &self.manifest.script) {
-            ([], Some(s)) if s.ends_with(".lua") => return lua::call(self, s, &request, timeout),
+            ([], Some(s)) if s.ends_with(".lua") => {
+                return lua::call(self, s, &request, timeout, self.manifest.persistent);
+            }
             ([], Some(s)) if s.ends_with(".py") => vec![python().into(), s.clone()],
             ([], Some(s)) => vec![s.clone()],
             (c, _) => c.to_vec(),
@@ -543,17 +558,12 @@ impl Plugin {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
-        // A `.py` plugin runs `python.exe`, a console child: on Windows that would open a visible terminal for every
-        // request. `DETACHED_PROCESS` is the one that really silences it (Windows 11 hands `CREATE_NO_WINDOW` children
-        // to Windows Terminal anyway); the piped stdin/stdout still carry the JSON.
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x080_0000 | 0x0000_0008); // CREATE_NO_WINDOW | DETACHED_PROCESS
+        if self.manifest.persistent {
+            let key = format!("{:?} {command:?} {}", self.dir, self.manifest.version);
+            return process::call(self, key, cmd, &request, timeout);
         }
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| format!("{name}: cannot start {program:?}: {e}"))?;
+        let mut child =
+            process::spawn(cmd).map_err(|e| format!("{name}: cannot start {program:?}: {e}"))?;
         let body = request.to_string();
         let mut stdin = child.stdin.take().expect("piped");
         // A writer thread: a reply larger than the pipe buffer must not deadlock against our write.
@@ -565,12 +575,11 @@ impl Plugin {
         });
         let deadline = Instant::now() + timeout;
         let status = loop {
-            if let Some(s) = child.try_wait().map_err(|e| format!("{name}: {e}"))? {
-                break s;
+            if !child.running() {
+                break child.end().map_err(|e| format!("{name}: {e}"))?;
             }
             if Instant::now() >= deadline {
-                let _ = child.kill();
-                let _ = child.wait();
+                let _ = child.end();
                 return Err(format!("{name}: no reply within {} s", timeout.as_secs()));
             }
             std::thread::sleep(Duration::from_millis(10));
@@ -607,12 +616,26 @@ impl Plugin {
     }
 }
 
-/// The Python interpreter for `*.py` scripts: `python` on Windows, where `python3` is often missing.
+/// The Python interpreter for `*.py` scripts. On Windows the `py` launcher when there is one: the python.org installer
+/// (also what winget runs) puts it in the Windows folder but leaves `python.exe` off PATH by default, and a bare `python`
+/// then starts the Microsoft Store stub. Else `python` (`python3` is often missing there).
 fn python() -> &'static str {
-    if cfg!(windows) {
-        "python"
+    if !cfg!(windows) {
+        return "python3";
+    }
+    static PY: LazyLock<bool> = LazyLock::new(|| {
+        let windir = std::env::var_os("WINDIR").map(PathBuf::from);
+        std::env::var_os("PATH")
+            .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+            .unwrap_or_default()
+            .into_iter()
+            .chain(windir)
+            .any(|d| d.join("py.exe").is_file())
+    });
+    if *PY {
+        "py"
     } else {
-        "python3"
+        "python"
     }
 }
 
