@@ -419,11 +419,12 @@ pub fn discover(dirs: &[PathBuf]) -> Registry {
 /// still load with a newer app), but a typo like `"sorce"` would silently drop
 /// a purpose. Tell the user on stderr, without failing.
 fn unknown_keys(dir: &Path, text: &str) {
-    const KNOWN: [&str; 17] = [
+    const KNOWN: [&str; 18] = [
         "name", "version", "description", "author", "homepage", "script", "command", "sources",
         "actions", "events", "timer", "settings", "effects", "library", "knob_modes", "pad_modes",
-        "persistent",
-    ];    let Ok(value) = serde_json::from_str::<serde_json::Value>(text) else {
+        "persistent", "suggest",
+    ];
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(text) else {
         return; // reported by the from_str above
     };
     let keys: Vec<&str> = value
