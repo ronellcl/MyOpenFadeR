@@ -172,6 +172,21 @@ pub fn run(
     })?;
     let _analyzer = analyze::wire(&app, lib.clone()); // dropping it cancels the worker: lives until the window closes
     connect::wire(&app); // live sync of the connected libraries; after the browser, which it asks to reload
+    // The window opens full screen when the setting says so (PREFERENCES > VIEW), and the View menu's item (Pantalla
+    // completa) turns it on and off, remembering the choice for the next start.
+    {
+        let weak = app.as_weak();
+        app.on_toggle_full_screen(move || {
+            let Some(app) = weak.upgrade() else { return };
+            let window = app.window();
+            let want = !window.is_fullscreen();
+            window.set_fullscreen(want);
+            prefs::update(|p| p.view.full_screen = want);
+        });
+    }
+    if prefs::get().view.full_screen {
+        app.window().set_fullscreen(true);
+    }
     app.run()?;
     openfader::plugin::event::fire("app_quit", serde_json::json!({}));
     openfader::plugin::process::stop_all(); // closes their stdin, kills what has not exited within a second

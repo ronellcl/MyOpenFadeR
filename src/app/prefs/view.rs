@@ -103,6 +103,9 @@ choice!(
 section!(
     /// The VIEW settings; every field is stored under its own name.
     View {
+        /// The window opens full screen, without the title bar. The View menu's item (Pantalla completa) turns it on
+        /// and off, and the choice is remembered.
+        full_screen: bool = true;
         /// Tooltips: hover texts of the buttons.
         tooltips: bool = true;
         /// Browse > FontSize / bold, Line Space; read by the browser lists via `Theme`.
@@ -237,6 +240,11 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
     };
     vec![
         Row::header("DISPLAY TYPE"),
+        Row::check(
+            "full_screen",
+            "Full screen at start-up",
+            v.full_screen,
+        ),
         Row::chips(
             "language",
             "LANGUAGE",

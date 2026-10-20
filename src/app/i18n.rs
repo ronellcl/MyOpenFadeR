@@ -404,6 +404,7 @@ const ES: &[(&str, &str)] = &[
     ("BEAT GRID", "REJILLA DE BEATS"),
     ("HOT CUE MARKERS", "MARCAS DE HOT CUES"),
     ("BOLD", "NEGRITA"),
+    ("Full screen at start-up", "Abrir en pantalla completa"),
     (
         "Bold: thicker lines, wider downbeats",
         "Negrita: líneas más gruesas y beats fuertes más anchos",

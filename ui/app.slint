@@ -152,9 +152,11 @@ export component App inherits Window {
     /// Track rows the browser has room for (0.5 px of slack for the rounding): at least `PaneState.min-rows`, however far the border is dragged.
     out property <int> browser-rows: Math.floor((root.height - root.y-browser - root.bx - Theme.h-status - PaneState.browser-h(0) + 0.5px) / Theme.h-row);
 
+    /// The window goes full screen and out of it (the View menu's item); Rust remembers the choice.
+    callback toggle-full-screen();
+
     /// Ctrl+F (src/app/keys.rs).
-    public function focus-search() { browser.focus-search(); }
-    /// MIDI browse encoder (src/app/midi): move the track selection by `d` rows.
+    public function focus-search() { browser.focus-search(); }    /// MIDI browse encoder (src/app/midi): move the track selection by `d` rows.
     public function browse(d: int) { browser.select-delta(d); }
     /// MIDI BACK / browse push / sort buttons (see Browser).
     public function browse-back() { browser.browse-back(); }
@@ -262,7 +264,7 @@ export component App inherits Window {
         }
         Menu {
             title: @tr("View");
-            MenuItem { title: @tr("Full Screen"); activated => { root.full-screen = !root.full-screen; } }
+            MenuItem { title: @tr("Full Screen"); activated => { root.toggle-full-screen(); } }
             MenuSeparator {}
             if root.stage: MenuItem { title: @tr("2Deck Horizontal"); activated => { root.set-layout(0); } }
             if root.stage: MenuItem { title: @tr("2Deck Vertical"); activated => { root.set-layout(1); } }
