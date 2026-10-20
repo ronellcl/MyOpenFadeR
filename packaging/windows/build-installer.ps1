@@ -129,7 +129,13 @@ $built = Join-Path $root "plugins-repo\target\deezer\release\deezer-engine.exe"
 if (-not (Test-Path $built)) { throw "$built is missing" }
 # Windows runs a program with its extension: the manifest asks for `bin/deezer-engine`, the file is the .exe.
 New-Item -ItemType Directory -Force (Join-Path $crate "bin") | Out-Null
-Copy-Item $built (Join-Path $crate "bin\deezer-engine.exe") -Force
+try {
+    Copy-Item $built (Join-Path $crate "bin\deezer-engine.exe") -Force
+} catch {
+    # The app may be running the engine from that folder (a persistent plugin holds its program open): the payload
+    # gets the fresh build all the same.
+    Write-Warning "the deezer engine of plugins-repo is in use: it was not replaced there (the installer ships the new one)"
+}
 
 # --- ffmpeg and ffprobe ---------------------------------------------------------------------------------------------
 
@@ -192,6 +198,11 @@ $deezerStaged = Join-Path $plugins "deezer"
 if (Test-Path (Join-Path $deezerStaged "main.py")) { Remove-Item (Join-Path $deezerStaged "main.py") }
 $engineNoExt = Join-Path $deezerStaged "bin\deezer-engine"
 if (Test-Path $engineNoExt) { Remove-Item $engineNoExt -Force -ErrorAction SilentlyContinue }
+# The engine that was just built goes into the payload, whatever the copy in the repository holds.
+if (Test-Path $built) {
+    New-Item -ItemType Directory -Force (Join-Path $deezerStaged "bin") | Out-Null
+    Copy-Item $built (Join-Path $deezerStaged "bin\deezer-engine.exe") -Force
+}
 
 $size = (Get-ChildItem $stage -Recurse -File | Measure-Object -Property Length -Sum).Sum
 Write-Host ("payload: {0} plugins, {1:N1} MB in {2}" -f $count, ($size / 1MB), $stage)
