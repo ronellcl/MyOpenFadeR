@@ -510,12 +510,21 @@ impl Plugin {
         let (program, args) = command
             .split_first()
             .ok_or_else(|| format!("{name}: no command"))?;
-        let mut child = Command::new(self.resolve(program))
-            .args(args.iter().map(|a| self.resolve(a)))
+        let mut cmd = Command::new(self.resolve(program));
+        cmd.args(args.iter().map(|a| self.resolve(a)))
             .current_dir(&self.dir)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::inherit());
+        // A `.py` plugin runs `python.exe`, a console child: on Windows that would open a visible terminal for every
+        // request. `DETACHED_PROCESS` is the one that really silences it (Windows 11 hands `CREATE_NO_WINDOW` children
+        // to Windows Terminal anyway); the piped stdin/stdout still carry the JSON.
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x080_0000 | 0x0000_0008); // CREATE_NO_WINDOW | DETACHED_PROCESS
+        }
+        let mut child = cmd
             .spawn()
             .map_err(|e| format!("{name}: cannot start {program:?}: {e}"))?;
         let body = request.to_string();

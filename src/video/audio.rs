@@ -7,12 +7,14 @@ use std::process::{Command, Stdio};
 pub const RATE: u32 = 44_100;
 
 pub fn extract(path: &Path) -> Result<Pcm, String> {
-    let out = Command::new("ffmpeg")
-        .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i"])
+    let mut cmd = Command::new("ffmpeg");
+    cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i"])
         .arg(path)
         .args(["-vn", "-f", "f32le", "-ac", "2", "-ar", &RATE.to_string(), "-"])
         .stdin(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    super::no_window(&mut cmd);
+    let out = cmd
         .output()
         .map_err(|e| format!("ffmpeg: {e}"))?;
     if !out.status.success() || out.stdout.len() < 8 {

@@ -20,6 +20,23 @@ pub mod probe;
 pub mod stream;
 
 use std::path::Path;
+use std::process::Command;
+
+/// A console program (`ffmpeg` / `ffprobe`) launched from the window would flash a terminal on Windows: every video
+/// load would open one for each child. The child keeps its pipes and its output; only the console is dropped.
+///
+/// `CREATE_NO_WINDOW` alone is not enough on Windows 11 when Windows Terminal is the system's default terminal: the
+/// child still gets a `conhost`, and a terminal window pops up for it. `DETACHED_PROCESS` gives it no console at all
+/// (checked: no `conhost` child), which is what keeps the terminal quiet; the flag is kept too for older Windows.
+pub fn no_window(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x080_0000 | 0x0000_0008); // CREATE_NO_WINDOW | DETACHED_PROCESS
+    }
+    #[cfg(not(windows))]
+    let _ = cmd;
+}
 
 /// Output picture size: every frame is scaled to fit (letterboxed, never distorted) into this.
 pub const WIDTH: usize = 640;

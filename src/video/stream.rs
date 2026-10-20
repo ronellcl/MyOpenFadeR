@@ -92,13 +92,15 @@ impl Feed {
     fn spawn(path: &Path, from: i64, fps: f64) -> Result<Feed, String> {
         let ss = ((from as f64 - 0.5).max(0.0)) / fps; // half a frame early: the frame at `from` itself must not be cut off
         let vf = format!("fps={fps},scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black");
-        let mut child = Command::new("ffmpeg")
-            .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-ss", &format!("{ss:.4}"), "-i"])
+        let mut cmd = Command::new("ffmpeg");
+        cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-ss", &format!("{ss:.4}"), "-i"])
             .arg(path)
             .args(["-an", "-sn", "-vf", &vf, "-pix_fmt", "rgb24", "-f", "rawvideo", "-"])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::null());
+        super::no_window(&mut cmd);
+        let mut child = cmd
             .spawn()
             .map_err(|e| format!("ffmpeg: {e} (install ffmpeg: video needs the ffmpeg and ffprobe programs)"))?;
         let out = child.stdout.take().ok_or("ffmpeg: no stdout")?;

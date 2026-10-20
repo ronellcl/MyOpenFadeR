@@ -20,9 +20,11 @@ impl Info {
 const MAX_FPS: f64 = 60.0;
 
 pub fn probe(path: &Path) -> Result<Info, String> {
-    let out = Command::new("ffprobe")
-        .args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate,r_frame_rate,duration:format=duration", "-of", "default=nw=1"])
-        .arg(path)
+    let mut cmd = Command::new("ffprobe");
+    cmd.args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate,r_frame_rate,duration:format=duration", "-of", "default=nw=1"])
+        .arg(path);
+    super::no_window(&mut cmd);
+    let out = cmd
         .output()
         .map_err(|e| format!("ffprobe: {e} (install ffmpeg: video needs the ffmpeg and ffprobe programs)"))?;
     if !out.status.success() {

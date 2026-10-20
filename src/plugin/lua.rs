@@ -122,11 +122,19 @@ fn run_child(
     deadline: Instant,
 ) -> mlua::Result<(String, i32)> {
     use std::io::Read;
-    let mut child = std::process::Command::new(program)
-        .args(args)
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(args)
         .current_dir(d)
         .stderr(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped());
+    // A console child of `rk.run` would open a visible terminal on Windows: `DETACHED_PROCESS` gives it no console at
+    // all (`CREATE_NO_WINDOW` alone is not enough when Windows Terminal is the system's default terminal).
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x080_0000 | 0x0000_0008); // CREATE_NO_WINDOW | DETACHED_PROCESS
+    }
+    let mut child = cmd
         .spawn()
         .map_err(|e| mlua::Error::runtime(format!("cannot start {program:?}: {e}")))?;
     // We asked for the pipe, so it is always there.

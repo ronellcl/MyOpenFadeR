@@ -153,8 +153,8 @@ fn downloaded(formats: &[String]) -> Option<String> {
         .map(|p| p.display().to_string())
 }
 
-/// Windows: one script for the four picks (`$env:OF_PICK`), the start folder comes in `$env:OF_START` so nothing needs quoting.
-/// The dialogs are children of a topmost form, or they open behind the window.
+/// Windows: one script for the four picks (`$env:OF_PICK`), the start folder comes in `$env:OF_START` so nothing needs
+/// quoting. The dialogs are children of a topmost form, or they open behind the window.
 const POWERSHELL: &str = r#"
 Add-Type -AssemblyName System.Windows.Forms
 $f = New-Object System.Windows.Forms.Form; $f.TopMost = $true
@@ -246,6 +246,14 @@ pub fn browse(pick: Pick, start: &str) -> Option<String> {
                 Pick::Save => cmd.args(["--save", "--confirm-overwrite"]),
             };
         }
+    }
+    // The chooser is a console program (`powershell` on Windows). It keeps a console (hidden) because PowerShell
+    // cannot show its dialogs without one; `DETACHED_PROCESS` (used for the other helpers, see `video::no_window`)
+    // makes `ShowDialog` return at once and the picker never appears.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x080_0000); // CREATE_NO_WINDOW
     }
     let out = cmd.output().ok().filter(|o| o.status.success())?;
     let text = String::from_utf8_lossy(&out.stdout)

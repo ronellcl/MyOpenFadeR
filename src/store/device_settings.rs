@@ -260,7 +260,15 @@ impl Behaviour {
         std::fs::read_to_string("/proc/sys/kernel/hostname")
             .ok()
             .or_else(|| {
-                let out = std::process::Command::new("hostname").output().ok()?;
+                let mut cmd = std::process::Command::new("hostname");
+                cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+                // Windows would otherwise flash a terminal for it (see `video::no_window`).
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    cmd.creation_flags(0x080_0000 | 0x0000_0008); // CREATE_NO_WINDOW | DETACHED_PROCESS
+                }
+                let out = cmd.output().ok()?;
                 out.status
                     .success()
                     .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
