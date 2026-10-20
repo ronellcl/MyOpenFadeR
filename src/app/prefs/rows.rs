@@ -109,9 +109,10 @@ impl Row {
     /// Short grey text after the row's controls; on a text row, the field's placeholder (the value stays).
     pub fn hint(mut self, hint: &str) -> Row {
         if self.kind == Kind::Text {
-            self.options = vec![hint.into()];
+            self.options = vec![t(hint).into()];
         } else {
-            self.hint = hint.into();
+            // The hint is the line under the row: a fixed string, and it is translated like the label.
+            self.hint = t(hint).into();
         }
         self
     }

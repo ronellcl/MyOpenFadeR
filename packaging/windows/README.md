@@ -12,15 +12,13 @@
 | `python\` | `-PythonDir`: an unpacked `python-<version>-embed-amd64.zip`, the interpreter of the `.py` plugins |
 | `extension\plugin\<plugin>\` | every `plugins-repo` folder with a `plugin.json`, without sources or build folders |
 | `extension\plugin\yt-dlp\bin\yt-dlp.exe` | `plugins-repo\yt-dlp\bin`: the yt-dlp program, so the plugin works without downloading anything |
+| `extension\plugin\deezer\bin\deezer-engine.exe` | built from `plugins-repo\deezer`: the Deezer engine, a native program |
 | `extension\skin\*.json`, `mappings\*.xml` | `themes-repo` and `maps-repo` |
 | `LICENSE`, `README.md` | the repository root |
 
 That is the layout `src/paths.rs` searches next to the executable, plus `tools\` and `python\`, which go first in the
 PATH of the program and of the processes it starts (`src/main.rs`). The installer therefore does not touch the system
 PATH, and ffmpeg is found inside the yt-dlp plugin too.
-
-The plugins that are still in development are left out: they live in a branch, not in `main` (`deezer`, whose engine
-is being written in Rust). The list is the `$excluded` of `build-installer.ps1`.
 
 ## The add-ons that travel inside
 
@@ -29,6 +27,10 @@ is being written in Rust). The list is the `$excluded` of `build-installer.ps1`.
 `%LOCALAPPDATA%\openfader\plugins\yt-dlp\bin` (writable) and uses that copy from then on: the daily update works.
 `-WithoutYtdlp` leaves it out (the plugin then downloads it on first use).
 
+**Deezer.** The engine is a native program (2.4 MB) that speaks the plugin protocol: it searches the catalogue and
+downloads the tracks (with the user's own ARL), decrypting the audio on the way to the file. It needs neither Node,
+nor deemix, nor Python: the installer has no `deemix` dependency at all. The script builds it with cargo
+(`plugins-repo\deezer`) and puts it in the plugin's `bin` folder, where the manifest looks for it.
 
 
 ## Building it

@@ -120,6 +120,17 @@ Copy-Item (Join-Path $root "README.md") $stage
 
 # --- the add-ons that travel inside the installer ---------------------------------------------------------------
 
+# The Deezer engine: a native program (no Node, no deemix, no Python). The plugin runs it from its own `bin` folder.
+$crate = Join-Path $root "plugins-repo\deezer"
+Write-Host "cargo build --release (deezer-engine)"
+& cargo build --release --manifest-path (Join-Path $crate "Cargo.toml") --target-dir (Join-Path $root "plugins-repo\target\deezer")
+if ($LASTEXITCODE -ne 0) { throw "the deezer engine did not build" }
+$built = Join-Path $root "plugins-repo\target\deezer\release\deezer-engine.exe"
+if (-not (Test-Path $built)) { throw "$built is missing" }
+# Windows runs a program with its extension: the manifest asks for `bin/deezer-engine`, the file is the .exe.
+New-Item -ItemType Directory -Force (Join-Path $crate "bin") | Out-Null
+Copy-Item $built (Join-Path $crate "bin\deezer-engine.exe") -Force
+
 # --- ffmpeg and ffprobe ---------------------------------------------------------------------------------------------
 
 $tools = Join-Path $stage "tools"
@@ -158,15 +169,12 @@ Get-ChildItem (Join-Path $root "maps-repo\*.xml"), (Join-Path $root "maps-repo\a
 $plugins = Join-Path $stage "extension\plugin"
 $skipDirs = @("target", "src", "tests", "__pycache__", ".git")
 $skipFiles = @("Cargo.toml", "Cargo.lock", "update.stamp", ".gitignore")
-# Plugins that are still in development: they live in a branch, not in `main`, so they are not in the installer.
-$excluded = @("deezer")
 # The yt-dlp program travels with the installer: the plugin copies it to the user's data folder the first time it
 # runs (a copy under Program Files is read-only and could not update itself).
 if ($WithoutYtdlp) { $skipDirs += "bin" }
 $count = 0
 Get-ChildItem (Join-Path $root "plugins-repo") -Directory |
     Where-Object { Test-Path (Join-Path $_.FullName "plugin.json") } |
-    Where-Object { $_.Name -notin $excluded } |
     ForEach-Object {
         Copy-Folder $_.FullName (Join-Path $plugins $_.Name) $skipDirs $skipFiles
         $count++

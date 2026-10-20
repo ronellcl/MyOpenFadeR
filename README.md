@@ -43,6 +43,14 @@ The first run clones the plugins, themes and mappings next to the code, builds e
 
 `start.sh` without a path opens the Collection as you left it; every connected library and folder syncs at start and whenever it changes, and `$XDG_MUSIC_DIR` (else `~/Music/OpenFadeR`) is always connected. To build only the core: `cargo build --release`.
 
+On Windows the video of a deck is decoded by an `ffmpeg` child process, and a seek starts it again: the full build of [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) (400 MB) takes two seconds to start and every jump waits for it, while the essentials build (100 MB) takes 80 ms. Put it in `target\release\tools\` and the program finds it first (that folder goes first in its PATH):
+
+```powershell
+Expand-Archive ffmpeg-release-essentials.zip -DestinationPath C:\Tools\ffmpeg
+New-Item -ItemType Directory -Force target\release\tools
+Copy-Item C:\Tools\ffmpeg\ffmpeg-*-essentials\bin\ffmpeg.exe, C:\Tools\ffmpeg\ffmpeg-*-essentials\bin\ffprobe.exe target\release\tools
+```
+
 To install it for your user on Linux instead (the `openfader` command and an application menu entry, with the plugins, themes and mappings bundled): `./install.sh`. It also sets the default plugin, theme and mapping repositories of PREFERENCES (GET PLUGINS / GET THEMES / GET MAPPINGS), which the app uses anyway until you edit the list. Run it again to update; `./install.sh --uninstall` removes it.
 
 ## A tour

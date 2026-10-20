@@ -399,6 +399,19 @@ const ES: &[(&str, &str)] = &[
     ("20 S SILENCE", "20 S DE SILENCIO"),
     ("VINYL SPEED: RELEASE/START", "VELOCIDAD VINYL: RELEASE/START"),
     ("VINYL SPEED: TOUCH/BRAKE", "VELOCIDAD VINYL: TOUCH/BRAKE"),
+    // The preferences the upstream added in 66d2698 (the bold beat grid and the large hot cue markers): they came
+    // in English, and their options are the names of the enum, in upper case.
+    ("BEAT GRID", "REJILLA DE BEATS"),
+    ("HOT CUE MARKERS", "MARCAS DE HOT CUES"),
+    ("BOLD", "NEGRITA"),
+    (
+        "Bold: thicker lines, wider downbeats",
+        "Negrita: líneas más gruesas y beats fuertes más anchos",
+    ),
+    (
+        "Large: double-size flags and letters",
+        "Grande: banderas y letras al doble de tamaño",
+    ),
 ];
 
 #[cfg(test)]
