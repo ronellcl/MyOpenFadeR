@@ -13,7 +13,32 @@ fn own_folder() -> Option<PathBuf> {
     Some(dir)
 }
 
+/// The tools shipped beside the program first in `PATH`: `tools/` (ffmpeg and ffprobe) and `python/` (the interpreter of
+/// the Python plugins). The program and the processes it starts (the video decoder, a plugin calling yt-dlp) find them by
+/// name without the installer changing the system `PATH`.
+fn bundled_tools_first_in_path() {
+    let Some(dir) = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(std::path::Path::to_path_buf))
+    else {
+        return;
+    };
+    let mut dirs = vec![dir.join("tools"), dir.join("python"), dir];
+    dirs.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    if let Ok(path) = std::env::join_paths(dirs) {
+        // SAFETY: the first thing main does, before any thread exists to read the environment.
+        unsafe { std::env::set_var("PATH", path) };
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Draw the menu bar in-window instead of handing it to the OS: the native Windows menu (muda) runs a modal Win32
+    // tracking loop that blocks winit, so while it is open Slint's timers and redraws stall (the playhead and the
+    // waveforms freeze although audio keeps playing). Set before any Slint call and before threads are spawned.
+    unsafe { std::env::set_var("SLINT_NO_MUDA", "1") };
+    bundled_tools_first_in_path();
     openfader::audio::device::quiet_alsa();
     // A path given (or the old Database setting) is a library to connect; the own music folder always is one.
     let legacy = std::env::args_os()

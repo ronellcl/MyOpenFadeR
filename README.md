@@ -27,6 +27,8 @@ Every screenshot on this page comes from the running app, with a library of synt
 
 Get the archive for your system from the [releases page](https://github.com/OpenRsG/OpenFadeR/releases): Linux (x86_64), Windows (x86_64) or macOS (Apple silicon). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `OpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
 
+On Windows there is also an installer, `OpenFadeR-<version>-windows-x86_64-setup.exe`: it installs the program for all users (it asks for administrator) with the plugins, themes, controller mappings, ffmpeg and a Python for the Python plugins, adds Start menu and desktop shortcuts and appears in Add/Remove Programs. Uninstalling leaves your settings, library and downloaded add-ons in your user folder unless you say otherwise. Neither it nor the app is signed, so Windows SmartScreen asks the first time. See [packaging/windows](packaging/windows) to build it.
+
 ## Build from source
 
 You need `git` and a [Rust toolchain](https://rustup.rs).
