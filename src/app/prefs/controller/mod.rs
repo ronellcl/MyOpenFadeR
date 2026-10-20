@@ -94,6 +94,9 @@ section!(
         jog_cue_return: bool = false;
         /// Deck > Continuous Playing.
         continuous_play: bool = false;
+        /// Deck > Prefetch: the track that comes next in the browser's list is downloaded in the background, so the
+        /// deck has it when the DJ asks for it (a track of a plugin source, the only ones with something to fetch).
+        prefetch_next: bool = true;
         /// Deck > BEAT/BPM SYNC, HOT CUE gate, AUTO BEAT LOOP length in beats.
         sync_type: SyncType = SyncType::Beat;
         sync_half_double: bool = true;

@@ -254,6 +254,34 @@ fn a_finished_download_is_reused_but_an_unfinished_one_is_not() {
 }
 
 #[test]
+fn two_fetches_of_the_same_track_share_one_download() {
+    let d = temp("fetch-twice");
+    // A fetcher that takes a moment: the second fetch finds the first one running.
+    let slow = r#"read line
+dir=$(printf '%s' "$line" | sed 's/.*"dir":"\([^"]*\)".*/\1/')
+name=$(printf '%s' "$line" | sed 's/.*"name":"\([^"]*\)".*/\1/')
+echo run >> "$dir/.runs"
+sleep 1
+printf 'audio' > "$dir/$name.mp3"
+printf '{"file":"%s.mp3"}' "$name""#;
+    let reg = registry_of(&d, "p", json!({}), slow);
+    let root = d.join("dl");
+    let (a, b) = std::thread::scope(|s| {
+        let a = s.spawn(|| fetch_in(&reg, &root, &remote("same")));
+        let b = s.spawn(|| fetch_in(&reg, &root, &remote("same")));
+        (a.join().unwrap(), b.join().unwrap())
+    });
+    assert_eq!(a.unwrap(), root.join("p/yt/same.mp3"));
+    assert_eq!(b.unwrap(), root.join("p/yt/same.mp3"));
+    let runs = std::fs::read_to_string(root.join("p/yt/.runs")).unwrap();
+    assert_eq!(
+        runs.lines().count(),
+        1,
+        "the second fetch started a second download"
+    );
+}
+
+#[test]
 fn ids_make_safe_distinct_file_names() {
     assert_eq!(file_name("../a b/é"), "%2E%2E%2Fa%20b%2F%C3%A9");
     assert_eq!(file_name("dQw4w9WgXcQ"), "dQw4w9WgXcQ");

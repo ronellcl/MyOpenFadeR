@@ -58,6 +58,26 @@ pub fn set_next_track(f: impl Fn(&Track) -> Option<Track> + 'static) {
     NEXT.with(|n| *n.borrow_mut() = Some(Box::new(f)));
 }
 
+/// Downloads the track after `t` in the list, in the background.
+///
+/// The download is the slowest part of a load, so the track the deck will want in a few bars is fetched while the
+/// DJ mixes: when the deck asks for it, the file is already there. The prefetch setting decides (PREFERENCES >
+/// CONTROLLER > DECK); only a track of a plugin source has something to fetch, the others are already in the disk.
+fn prefetch_next(t: &Track) {
+    if !prefs::with(|p| p.controller.prefetch_next) {
+        return;
+    }
+    let Some(next) = NEXT.with(|n| n.borrow().as_ref().and_then(|next| next(t))) else {
+        return; // the list does not say (or the browser is not on this thread)
+    };
+    let Some(remote) = next.remote.filter(|_| next.file.is_none()) else {
+        return; // it is already in the disk
+    };
+    std::thread::spawn(move || {
+        let _ = source::fetch(&remote);
+    });
+}
+
 impl Deck {
     pub fn load(&self, t: &Track, lib: &dyn Library) {
         if self.eject_locked() {
@@ -109,6 +129,9 @@ impl Deck {
                 rx,
                 track: t.clone(),
             });
+        } else {
+            // The deck has its audio: the bandwidth is free for the track that comes next.
+            prefetch_next(t);
         }
     }
 

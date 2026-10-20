@@ -72,6 +72,11 @@ pub(super) fn rows(p: &Prefs) -> Vec<Row> {
             "Continuous Playing: load the next track of the list when one ends",
             c.continuous_play,
         ),
+        Row::check(
+            "prefetch_next",
+            "Prefetch: download the next track of the list in the background",
+            c.prefetch_next,
+        ),
         Row::of("sync_type", "SYNC TYPE", c.sync_type),
         Row::check(
             "sync_half_double",

@@ -253,6 +253,7 @@ const ES: &[(&str, &str)] = &[
     ("Needle Lock: no needle search while a track is playing", "Bloqueo de aguja: no se busca con la aguja mientras suena una pista"),
     ("HOT CUE: during pause, GATE playback is applied", "HOT CUE: en pausa se aplica la reproducción GATE"),
     ("Continuous Playing: load the next track of the list when one ends", "Reproducción continua: carga la siguiente pista de la lista cuando una termina"),
+    ("Prefetch: download the next track of the list in the background", "Precarga: descarga en segundo plano la siguiente pista de la lista"),
     ("Allow BEAT/BPM SYNC with double/half BPM", "Permitir BEAT/BPM SYNC con el BPM doble/mitad"),
     ("Automatically changes the BEAT/BPM SYNC setting", "Cambia el ajuste BEAT/BPM SYNC automáticamente"),
     ("SYNC TYPE", "TIPO DE SYNC"),
