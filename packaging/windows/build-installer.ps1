@@ -186,6 +186,13 @@ if (-not $WithoutYtdlp) {
     if (-not (Test-Path $ytdlp)) { throw "plugins-repo\yt-dlp\bin\yt-dlp.exe is missing: download it from https://github.com/yt-dlp/yt-dlp/releases" }
 }
 
+# The Deezer plugin runs the native engine; the Python version it replaces is not needed in the payload, and the copy
+# of the engine without its extension cannot run on Windows.
+$deezerStaged = Join-Path $plugins "deezer"
+if (Test-Path (Join-Path $deezerStaged "main.py")) { Remove-Item (Join-Path $deezerStaged "main.py") }
+$engineNoExt = Join-Path $deezerStaged "bin\deezer-engine"
+if (Test-Path $engineNoExt) { Remove-Item $engineNoExt -Force -ErrorAction SilentlyContinue }
+
 $size = (Get-ChildItem $stage -Recurse -File | Measure-Object -Property Length -Sum).Sum
 Write-Host ("payload: {0} plugins, {1:N1} MB in {2}" -f $count, ($size / 1MB), $stage)
 
