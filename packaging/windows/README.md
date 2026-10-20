@@ -11,6 +11,7 @@
 | `tools\ffmpeg.exe`, `tools\ffprobe.exe` | `-FfmpegBin`: video, mp3 export and the yt-dlp plugin |
 | `python\` | `-PythonDir`: an unpacked `python-<version>-embed-amd64.zip`, the interpreter of the `.py` plugins |
 | `extension\plugin\<plugin>\` | every `plugins-repo` folder with a `plugin.json`, without sources or build folders |
+| `extension\plugin\yt-dlp\bin\yt-dlp.exe` | `plugins-repo\yt-dlp\bin`: the yt-dlp program, so the plugin works without downloading anything |
 | `extension\skin\*.json`, `mappings\*.xml` | `themes-repo` and `maps-repo` |
 | `LICENSE`, `README.md` | the repository root |
 
@@ -18,9 +19,17 @@ That is the layout `src/paths.rs` searches next to the executable, plus `tools\`
 PATH of the program and of the processes it starts (`src/main.rs`). The installer therefore does not touch the system
 PATH, and ffmpeg is found inside the yt-dlp plugin too.
 
-The yt-dlp binary is **not** shipped: the plugin downloads it into `%LOCALAPPDATA%\openfader\plugins\yt-dlp\bin` on
-first use, where it can update itself (a copy under `Program Files` could not). `-WithYtdlp` includes the one in
-`plugins-repo\yt-dlp\bin` anyway.
+The plugins that are still in development are left out: they live in a branch, not in `main` (`deezer`, whose engine
+is being written in Rust). The list is the `$excluded` of `build-installer.ps1`.
+
+## The add-ons that travel inside
+
+**yt-dlp.** The program is in `extension\plugin\yt-dlp\bin`. The copy under `Program Files` is read-only, and
+`yt-dlp -U` could not update it, so the plugin copies it the first time it runs into
+`%LOCALAPPDATA%\openfader\plugins\yt-dlp\bin` (writable) and uses that copy from then on: the daily update works.
+`-WithoutYtdlp` leaves it out (the plugin then downloads it on first use).
+
+
 
 ## Building it
 

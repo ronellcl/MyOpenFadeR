@@ -12,6 +12,12 @@ The payload is the release layout of .github/bundle.py plus what makes a fresh m
   extension\skin\*.json, mappings\*.xml                      (themes and controller mappings)
   LICENSE, README.md
 
+Two add-ons travel inside the installer, so a fresh machine needs nothing else:
+
+  extension\plugin\yt-dlp\bin\yt-dlp.exe   the yt-dlp program (the plugin copies it to the user's data
+                                           folder the first time it runs, where it can update itself)
+  extension\plugin\deezer\deezer-engine.exe  the Deezer engine, a native program (no Node, no deemix, no Python)
+
 `tools\` and `python\` come first in the PATH of the program (src/main.rs), so nothing is added to the system PATH.
 
 .PARAMETER Version
@@ -34,9 +40,9 @@ makensis.exe of NSIS 3 (https://nsis.sourceforge.io). Default: the one on the PA
 Per-user build (%LOCALAPPDATA%, no UAC). The default is per-machine (Program Files, asks for administrator).
 It is also how build-installer.ps1 self-tests: it installs that variant silently and starts the app from it.
 
-.PARAMETER WithYtdlp
-Ships plugins-repo\yt-dlp\bin\yt-dlp.exe too. Off by default: the plugin downloads it into the user's data folder on
-first use, where it can update itself (a copy under Program Files cannot).
+.PARAMETER WithoutYtdlp
+Leaves the yt-dlp program out. Off by default: the installer ships it, so the plugin works without downloading
+anything; the plugin copies it to the user's data folder (a copy under Program Files cannot update itself).
 
 .PARAMETER SkipBuild
 Uses target\release\openfader.exe as it is instead of running cargo build --release.
@@ -51,7 +57,7 @@ param(
     [string]$PythonDir,
     [string]$Makensis,
     [switch]$PerUser,
-    [switch]$WithYtdlp,
+    [switch]$WithoutYtdlp,
     [switch]$SkipBuild
 )
 
@@ -112,6 +118,8 @@ foreach ($dll in "vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll") {
 Copy-Item (Join-Path $root "LICENSE") $stage
 Copy-Item (Join-Path $root "README.md") $stage
 
+# --- the add-ons that travel inside the installer ---------------------------------------------------------------
+
 # --- ffmpeg and ffprobe ---------------------------------------------------------------------------------------------
 
 $tools = Join-Path $stage "tools"
@@ -139,14 +147,25 @@ Get-ChildItem (Join-Path $root "maps-repo\*.xml"), (Join-Path $root "maps-repo\a
 $plugins = Join-Path $stage "extension\plugin"
 $skipDirs = @("target", "src", "tests", "__pycache__", ".git")
 $skipFiles = @("Cargo.toml", "Cargo.lock", "update.stamp", ".gitignore")
-if (-not $WithYtdlp) { $skipDirs += "bin" }
+# Plugins that are still in development: they live in a branch, not in `main`, so they are not in the installer.
+$excluded = @("deezer")
+# The yt-dlp program travels with the installer: the plugin copies it to the user's data folder the first time it
+# runs (a copy under Program Files is read-only and could not update itself).
+if ($WithoutYtdlp) { $skipDirs += "bin" }
 $count = 0
 Get-ChildItem (Join-Path $root "plugins-repo") -Directory |
     Where-Object { Test-Path (Join-Path $_.FullName "plugin.json") } |
+    Where-Object { $_.Name -notin $excluded } |
     ForEach-Object {
         Copy-Folder $_.FullName (Join-Path $plugins $_.Name) $skipDirs $skipFiles
         $count++
     }
+
+# The yt-dlp program has to be there: the plugin would download it on the first use otherwise.
+if (-not $WithoutYtdlp) {
+    $ytdlp = Join-Path $plugins "yt-dlp\bin\yt-dlp.exe"
+    if (-not (Test-Path $ytdlp)) { throw "plugins-repo\yt-dlp\bin\yt-dlp.exe is missing: download it from https://github.com/yt-dlp/yt-dlp/releases" }
+}
 
 $size = (Get-ChildItem $stage -Recurse -File | Measure-Object -Property Length -Sum).Sum
 Write-Host ("payload: {0} plugins, {1:N1} MB in {2}" -f $count, ($size / 1MB), $stage)
