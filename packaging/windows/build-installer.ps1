@@ -130,6 +130,17 @@ foreach ($tool in "ffmpeg.exe", "ffprobe.exe") {
 $ffmpegReadme = Join-Path (Split-Path $FfmpegBin -Parent) "README.txt"
 if (Test-Path $ffmpegReadme) { Copy-Item $ffmpegReadme (Join-Path $tools "ffmpeg-README.txt") }
 
+# A video seek starts ffmpeg again, so a build that takes a second to start makes every seek wait that long: the
+# full build of gyan.dev (400 MB) needs 1.2 s, the essentials build (100 MB) 40 ms. Warn before shipping the slow one.
+$started = Measure-Command { & (Join-Path $FfmpegBin "ffmpeg.exe") -version 2>&1 | Out-Null }
+$startMs = [math]::Round($started.TotalMilliseconds)
+if ($startMs -gt 400) {
+    Write-Warning ("the ffmpeg of {0} takes {1} ms to start: every video seek will wait that long. " +
+        "The essentials build (https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip) starts in 40 ms." -f $FfmpegBin, $startMs)
+} else {
+    Write-Host ("ffmpeg starts in {0} ms: video seeks will be quick" -f $startMs)
+}
+
 # --- Python for the .py plugins -------------------------------------------------------------------------------------
 
 Copy-Folder $PythonDir (Join-Path $stage "python") @() @()

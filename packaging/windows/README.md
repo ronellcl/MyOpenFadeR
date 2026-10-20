@@ -8,7 +8,7 @@
 | In the payload | Where it comes from |
 |---|---|
 | `openfader.exe`, its DLLs, the Visual C++ runtime | `target\release` (`cargo build --release`) and `%WINDIR%\System32` |
-| `tools\ffmpeg.exe`, `tools\ffprobe.exe` | `-FfmpegBin`: video, mp3 export and the yt-dlp plugin |
+| `tools\ffmpeg.exe`, `tools\ffprobe.exe` | `-FfmpegBin`: video, mp3 export and the yt-dlp plugin. **Use a light build**: a video seek starts ffmpeg again, and the full build of gyan.dev (400 MB) takes 1.2 s to start against the 40 ms of the essentials build (https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip). The script measures it and warns. |
 | `python\` | `-PythonDir`: an unpacked `python-<version>-embed-amd64.zip`, the interpreter of the `.py` plugins |
 | `extension\plugin\<plugin>\` | every `plugins-repo` folder with a `plugin.json`, without sources or build folders |
 | `extension\plugin\yt-dlp\bin\yt-dlp.exe` | `plugins-repo\yt-dlp\bin`: the yt-dlp program, so the plugin works without downloading anything |

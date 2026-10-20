@@ -173,13 +173,22 @@ fn run(sh: &Shared, path: &Path, info: Info) -> Result<(), String> {
         } else if feed.is_some() && want >= cache.end() && want < cache.end() + AHEAD {
             read_one(&mut feed, &mut cache, &mut eof);
             continue;
-        } else if restarted.elapsed() >= MIN_RESTART {
-            // A seek (or the first frame): restart a little before the target.
-            let from = (target - BACKFILL).max(0);
-            drop(feed.take());
-            feed = Some(Feed::spawn(path, from, info.fps)?);
-            (cache, eof, restarted) = (Cache { first: from, frames: VecDeque::new() }, false, Instant::now());
-            continue;
+        } else {
+            // A seek (or the first frame): the picture on screen is of the old place, so it goes black until the new
+            // one is decoded. Without this the deck keeps showing the last frame of the previous position, which
+            // looks like the video being stuck.
+            if published != Some(None) {
+                *sh.frame.lock() = None;
+                published = Some(None);
+            }
+            if restarted.elapsed() >= MIN_RESTART {
+                // Restart a little before the target.
+                let from = (target - BACKFILL).max(0);
+                drop(feed.take());
+                feed = Some(Feed::spawn(path, from, info.fps)?);
+                (cache, eof, restarted) = (Cache { first: from, frames: VecDeque::new() }, false, Instant::now());
+                continue;
+            }
         }
         thread::park_timeout(IDLE);
     }
