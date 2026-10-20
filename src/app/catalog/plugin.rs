@@ -27,11 +27,32 @@ fn installed_version(name: &str) -> Option<String> {
         .map(|p| p.manifest.version.clone())
 }
 
-/// 0 INSTALL, 1 UPDATE (another version than the installed one), 2 INSTALLED.
+/// Whether version `a` is newer than `b`: dotted numbers, compared piece by piece (so 1.10 beats 1.9).
+fn newer(a: &str, b: &str) -> bool {
+    let parse = |s: &str| -> Vec<u64> {
+        s.split('.')
+            .map(|p| {
+                p.trim()
+                    .trim_start_matches('v')
+                    .parse::<u64>()
+                    .unwrap_or(0)
+            })
+            .collect()
+    };
+    let (mut x, mut y) = (parse(a), parse(b));
+    let n = x.len().max(y.len());
+    x.resize(n, 0);
+    y.resize(n, 0);
+    x > y
+}
+
+/// 0 INSTALL, 1 UPDATE (the repository has a newer version), 2 INSTALLED, 3 NEWER (the installed one is newer: no
+/// downgrade — a plugin installed from a development checkout must not be replaced by an older published copy).
 fn action(e: &Entry) -> i32 {
     match installed_version(&e.manifest.name) {
         None => 0,
-        Some(v) if v != e.manifest.version => 1,
+        Some(v) if newer(&e.manifest.version, &v) => 1,
+        Some(v) if newer(&v, &e.manifest.version) => 3,
         Some(_) => 2,
     }
 }
@@ -61,7 +82,7 @@ fn jobs() -> Vec<(Job, bool)> {
     STATE.with_borrow(|st| {
         all(st)
             .into_iter()
-            .map(|(repo, src, e)| ((repo.clone(), src.zip.clone(), e.clone()), action(e) != 2))
+            .map(|(repo, src, e)| ((repo.clone(), src.zip.clone(), e.clone()), matches!(action(e), 0 | 1)))
             .collect()
     })
 }
@@ -116,4 +137,19 @@ fn run(jobs: Vec<Job>) {
             plugins::say(&app, &text);
         });
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::newer;
+
+    #[test]
+    fn newer_compares_dotted_versions_by_number() {
+        assert!(newer("1.2.1", "1.1.0"));
+        assert!(newer("1.10", "1.9"));
+        assert!(newer("2.0", "1.99.99"));
+        assert!(!newer("1.1.0", "1.2.1"));
+        assert!(!newer("1.2.1", "1.2.1"));
+        assert!(!newer("1.2", "1.2.0")); // the same value, spelled differently
+    }
 }

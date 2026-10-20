@@ -198,6 +198,18 @@ pub struct Plugin {
     pub manifest: Manifest,
 }
 
+/// A plugin folder not used because another one earlier in the search path already had its name ([`Registry::plugins`]
+/// keeps the first). The plugin manager shows these on the card of the copy in use, so two copies of a plugin are told
+/// apart instead of one silently shadowing the other.
+#[derive(Clone, Debug)]
+pub struct Shadowed {
+    pub name: String,
+    /// The folder left unused.
+    pub dir: PathBuf,
+    /// The folder that won ([`Registry::get`] has it).
+    pub used: PathBuf,
+}
+
 /// Every plugin found, the effects their libraries add, and what went wrong on the way (bad manifests, duplicate
 /// names, libraries that would not load).
 #[derive(Default)]
@@ -209,6 +221,8 @@ pub struct Registry {
     pub effects: Vec<effect::Effect>,
     /// The loaded library plugins ([`library::load`]).
     pub libraries: Vec<library::Loaded>,
+    /// Plugin folders whose name was taken already ([`Shadowed`]).
+    pub shadowed: Vec<Shadowed>,
     pub errors: Vec<String>,
 }
 
@@ -319,6 +333,7 @@ static NOW: LazyLock<RwLock<Arc<Registry>>> = LazyLock::new(|| {
         disabled: f.disabled.clone(),
         effects: f.effects.clone(),
         libraries: f.libraries.clone(),
+        shadowed: f.shadowed.clone(),
         errors: f.errors.clone(),
     }))
 });
@@ -362,12 +377,24 @@ pub fn discover(dirs: &[PathBuf]) -> Registry {
         };
         for dir in candidates {
             match read_manifest(&dir) {
-                Ok(m) if r.get(&m.name).is_some() => r.errors.push(format!(
-                    "{}: a plugin named {:?} is already loaded",
-                    dir.display(),
-                    m.name
-                )),
-                Ok(manifest) => r.plugins.push(Plugin { dir, manifest }),
+                Ok(m) => {
+                    if let Some(loaded) = r.get(&m.name) {
+                        let used = loaded.dir.clone();
+                        r.errors.push(format!(
+                            "{}: {:?} is already loaded from {} (this copy is ignored)",
+                            dir.display(),
+                            m.name,
+                            used.display()
+                        ));
+                        r.shadowed.push(Shadowed {
+                            name: m.name,
+                            dir,
+                            used,
+                        });
+                    } else {
+                        r.plugins.push(Plugin { dir, manifest: m });
+                    }
+                }
                 Err(e) => r.errors.push(e),
             }
         }

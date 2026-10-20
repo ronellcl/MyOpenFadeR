@@ -118,13 +118,14 @@ fn listed() -> Vec<(Plugin, bool)> {
 /// Fills `PluginState` from [`current`] (keeps the open cards open).
 pub(super) fn refresh(app: &App) {
     let s = app.global::<PluginState>();
+    let now = current();
     let open: Vec<SharedString> = s
         .get_plugins()
         .iter()
         .filter(|v| v.open)
         .map(|v| v.name)
         .collect();
-    let restart = current().restart_needed();
+    let restart = now.restart_needed();
     let views: Vec<PluginView> = listed()
         .iter()
         .map(|(p, on)| {
@@ -138,6 +139,14 @@ pub(super) fn refresh(app: &App) {
                 kind: kind(p).into(),
                 provides: provides(p).into(),
                 folder: p.dir.to_string_lossy().as_ref().into(),
+                // Copies of this name the app left unused: shown on the card, so two yt-dlps are told apart.
+                shadowed: ModelRc::new(VecModel::from(
+                    now.shadowed
+                        .iter()
+                        .filter(|x| x.name == m.name)
+                        .map(|x| SharedString::from(x.dir.to_string_lossy().as_ref()))
+                        .collect::<Vec<_>>(),
+                )),
                 enabled: *on,
                 removable: install::removable(p),
                 restart: restart.contains(&m.name),

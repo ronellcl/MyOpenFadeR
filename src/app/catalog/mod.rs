@@ -128,7 +128,7 @@ pub(in crate::app) fn show(app: &App) {
             .collect();
         s.set_repos(ModelRc::new(VecModel::from(repos)));
         let plugins = plugin::views(st);
-        s.set_plugins_todo(plugins.iter().filter(|p| p.action != 2).count() as i32);
+        s.set_plugins_todo(plugins.iter().filter(|p| matches!(p.action, 0 | 1)).count() as i32);
         s.set_plugins(ModelRc::new(VecModel::from(plugins)));
         s.set_themes(ModelRc::new(VecModel::from(theme::views(st))));
         mapping::show(&s, st);

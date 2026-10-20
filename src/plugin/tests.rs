@@ -57,6 +57,11 @@ fn discovery_takes_plugin_folders_and_folders_of_them_first_name_wins() {
     assert_eq!(names, ["one", "two"]);
     assert_eq!(r.get("one").unwrap().dir, a.join("one"));
     assert_eq!(r.errors.len(), 2, "{:?}", r.errors); // the bad manifest and the duplicate
+    // The copy left out is kept, with the folder in use, so the manager can show both.
+    assert_eq!(r.shadowed.len(), 1, "{:?}", r.shadowed);
+    assert_eq!(r.shadowed[0].name, "one");
+    assert_eq!(r.shadowed[0].used, a.join("one"));
+    assert_ne!(r.shadowed[0].dir, a.join("one"));
 }
 
 #[test]

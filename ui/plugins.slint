@@ -26,7 +26,10 @@ export struct PluginView {
     kind: string,
     /// "2 sources · 1 action · 7 beat effects".
     provides: string,
+    /// The folder the app loads it from.
     folder: string,
+    /// Other folders with the same plugin name, left unused (the first one found wins); shown so two copies are told apart.
+    shadowed: [string],
     enabled: bool,
     /// Installed by the user (bundled plugins can only be switched off).
     removable: bool,
@@ -152,6 +155,11 @@ component Card inherits Rectangle {
                     if root.v.version != "": Text { text: root.v.version; color: Theme.text-faint; font-size: Theme.font-sm; vertical-alignment: center; }
                     Badge { text: root.v.kind; tone: root.v.kind == "LUA" ? Theme.accent-hi : root.v.kind == "PYTHON" ? Theme.cue : root.v.kind == "JSON" ? Theme.play : Theme.text-dim; y: 2px; }
                     if !root.v.removable: Badge { text: "BUNDLED"; tone: Theme.text-dim; y: 2px; }
+                    if root.v.shadowed.length > 0: Badge {
+                        text: root.v.shadowed.length == 1 ? "1 COPY IGNORED" : root.v.shadowed.length + " COPIES IGNORED";
+                        tone: Theme.danger;
+                        y: 2px;
+                    }
                     if root.v.restart: Badge { text: "RESTART"; tone: Theme.cue; y: 2px; }
                 }
                 Text {
@@ -162,6 +170,15 @@ component Card inherits Rectangle {
                     wrap: word-wrap;
                 }
                 Text { text: root.v.provides; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; }
+                // Always visible: with a copy ignored, which folder is in use is the first thing to know.
+                Text { text: root.v.folder; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; overflow: elide; }
+                for s in root.v.shadowed: Text {
+                    text: "ignored copy: " + s;
+                    color: Theme.danger;
+                    font-family: Theme.font;
+                    font-size: Theme.font-xs;
+                    overflow: elide;
+                }
             }
             Chip {
                 text: root.v.open ? "LESS" : root.v.settings.length > 0 ? "SETTINGS" : "MORE";
@@ -176,7 +193,6 @@ component Card inherits Rectangle {
             spacing: Theme.space-sm;
             padding-left: 26px;
             if root.v.author != "": Text { text: "by " + root.v.author; color: Theme.text-dim; font-size: Theme.font-sm; }
-            Text { text: root.v.folder; color: Theme.text-faint; font-size: Theme.font-xs; overflow: elide; }
             for s[k] in root.v.settings: VerticalLayout {
                 spacing: 2px;
                 HorizontalLayout {
@@ -250,7 +266,8 @@ export component PluginManager inherits VerticalLayout {
 }
 
 /// One row of GET PLUGINS: name, version, NATIVE, repository and a one-line description, and the one button (INSTALL, UPDATE when
-/// the repository has another version than the installed one, INSTALLED). Fixed height, so the list only builds the rows on screen.
+/// the repository has a newer version than the installed one, INSTALLED, NEWER when the installed one is newer). Fixed height,
+/// so the list only builds the rows on screen.
 component GetRow inherits Rectangle {
     in property <GetPlugin> v;
     in property <int> index;
@@ -269,7 +286,7 @@ component GetRow inherits Rectangle {
                 spacing: Theme.space-md;
                 alignment: start;
                 Text { text: root.v.name; color: Theme.text-bright; font-family: Theme.font; font-size: Theme.font-sm; font-weight: Theme.weight-bold; vertical-alignment: center; }
-                if root.v.version != "": Text { text: root.v.action == 1 ? root.v.installed + " → " + root.v.version : root.v.version; color: Theme.text-faint; font-size: Theme.font-xs; vertical-alignment: center; }
+                if root.v.version != "": Text { text: root.v.action == 1 ? root.v.installed + " → " + root.v.version : root.v.action == 3 ? root.v.installed + " (newer)" : root.v.version; color: Theme.text-faint; font-size: Theme.font-xs; vertical-alignment: center; }
                 if root.v.native: Badge { text: "NATIVE"; tone: Theme.text-dim; }
                 Text { text: root.v.repo; color: Theme.text-faint; font-family: Theme.font; font-size: Theme.font-xs; vertical-alignment: center; }
             }
@@ -280,11 +297,11 @@ component GetRow inherits Rectangle {
             horizontal-stretch: 0;
             alignment: center;
             Chip {
-                text: root.v.action == 0 ? "INSTALL" : root.v.action == 1 ? "UPDATE" : "INSTALLED";
-                active: root.v.action != 2;
-                enabled: root.v.action != 2 && !CatalogState.busy;
+                text: root.v.action == 0 ? "INSTALL" : root.v.action == 1 ? "UPDATE" : root.v.action == 3 ? "NEWER" : "INSTALLED";
+                active: root.v.action != 2 && root.v.action != 3;
+                enabled: root.v.action != 2 && root.v.action != 3 && !CatalogState.busy;
                 font-size: Theme.font-xs;
-                tooltip: root.v.native ? "Downloads the prebuilt library for this computer when the repository has one" : root.v.description;
+                tooltip: root.v.action == 3 ? "The installed version is newer than the repository's: nothing to install" : root.v.native ? "Downloads the prebuilt library for this computer when the repository has one" : root.v.description;
                 clicked => { CatalogState.install-plugin(root.index); }
             }
         }
