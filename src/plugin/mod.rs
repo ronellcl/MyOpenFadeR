@@ -609,13 +609,22 @@ impl Plugin {
     }
 
     /// `arg` as a path in the plugin folder if such a file exists there, else unchanged (`python3`, `--flag`).
+    /// The program's path: inside the plugin folder when it is there, else as it is.
+    ///
+    /// On Windows a program may be named without its extension (a manifest can say `bin/deezer-engine`): the `.exe`
+    /// is tried too, because the path of a child is resolved against the caller's folder, not the child's own.
     fn resolve(&self, arg: &str) -> std::ffi::OsString {
         let p = self.dir.join(arg);
         if Path::new(arg).is_relative() && p.exists() {
-            p.into_os_string()
-        } else {
-            arg.into()
+            return p.into_os_string();
         }
+        if cfg!(windows) && Path::new(arg).is_relative() {
+            let exe = self.dir.join(format!("{arg}.exe"));
+            if exe.exists() {
+                return exe.into_os_string();
+            }
+        }
+        arg.into()
     }
 }
 

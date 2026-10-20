@@ -3,8 +3,7 @@ use serde_json::json;
 use std::fs;
 
 /// A fresh empty folder under the system temp dir.
-pub(super) fn temp(name: &str) -> PathBuf {
-    let d = std::env::temp_dir().join(format!("rk-plugin-{name}-{}", std::process::id()));
+pub(super) fn temp(name: &str) -> PathBuf {    let d = std::env::temp_dir().join(format!("rk-plugin-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&d);
     fs::create_dir_all(&d).unwrap();
     d
@@ -211,4 +210,23 @@ done"#;
     process::stop_all();
     #[cfg(unix)]
     assert_ne!(unsafe { libc::kill(a["pid"].as_i64().unwrap() as i32, 0) }, 0, "still running after stop_all");
+}
+
+/// A program the manifest names without its extension (`bin/deezer-engine`) is the one in the folder with it: the
+/// path of a child is resolved against the caller's folder, so the name alone would not find it.
+#[test]
+fn a_program_named_without_its_extension_is_found_with_it() {
+    let d = temp("resolve");
+    let p = plugin(&d, "one", "");
+    fs::create_dir_all(p.join("bin")).unwrap();
+    fs::write(p.join("bin").join("engine.exe"), "x").unwrap();
+    let r = discover(&[d]);
+    let one = r.get("one").unwrap();
+    let got = one.resolve("bin/engine").to_string_lossy().into_owned();
+    if cfg!(windows) {
+        // The paths are compared as paths: the manifest may name the program with slashes.
+        assert_eq!(Path::new(&got), one.dir.join("bin").join("engine.exe"));
+    } else {
+        assert_eq!(got, "bin/engine");
+    }
 }
