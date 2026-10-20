@@ -419,11 +419,11 @@ pub fn discover(dirs: &[PathBuf]) -> Registry {
 /// still load with a newer app), but a typo like `"sorce"` would silently drop
 /// a purpose. Tell the user on stderr, without failing.
 fn unknown_keys(dir: &Path, text: &str) {
-    const KNOWN: [&str; 16] = [
+    const KNOWN: [&str; 17] = [
         "name", "version", "description", "author", "homepage", "script", "command", "sources",
         "actions", "events", "timer", "settings", "effects", "library", "knob_modes", "pad_modes",
-    ];
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(text) else {
+        "persistent",
+    ];    let Ok(value) = serde_json::from_str::<serde_json::Value>(text) else {
         return; // reported by the from_str above
     };
     let keys: Vec<&str> = value
@@ -545,7 +545,9 @@ impl Plugin {
             ([], Some(s)) if s.ends_with(".lua") => {
                 return lua::call(self, s, &request, timeout, self.manifest.persistent);
             }
-            ([], Some(s)) if s.ends_with(".py") => vec![python().into(), s.clone()],
+            ([], Some(s)) if s.ends_with(".py") => {
+                vec![python().to_string_lossy().into_owned(), s.clone()]
+            }
             ([], Some(s)) => vec![s.clone()],
             (c, _) => c.to_vec(),
         };
@@ -616,27 +618,44 @@ impl Plugin {
     }
 }
 
-/// The Python interpreter for `*.py` scripts. On Windows the `py` launcher when there is one: the python.org installer
-/// (also what winget runs) puts it in the Windows folder but leaves `python.exe` off PATH by default, and a bare `python`
-/// then starts the Microsoft Store stub. Else `python` (`python3` is often missing there).
-fn python() -> &'static str {
+/// The Python interpreter for `*.py` scripts.
+///
+/// The one that travels with the program (`python\` next to it, the folder the installer ships) comes first: the
+/// same version everywhere and no launcher in the middle. Then the one of the `PATH`: the program puts its own
+/// `python\` first, so that is the bundled one when it exists. The `py` launcher of the python.org installer is the
+/// last resort (it sits in the Windows folder but leaves `python.exe` off `PATH`, and a bare `python` there starts
+/// the Microsoft Store stub), and it is a console program that starts the real interpreter with a console of its
+/// own: a Windows Terminal window would pop up for every call to a plugin.
+fn python() -> std::ffi::OsString {
     if !cfg!(windows) {
-        return "python3";
+        return "python3".into();
     }
-    static PY: LazyLock<bool> = LazyLock::new(|| {
-        let windir = std::env::var_os("WINDIR").map(PathBuf::from);
-        std::env::var_os("PATH")
-            .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
-            .unwrap_or_default()
-            .into_iter()
-            .chain(windir)
-            .any(|d| d.join("py.exe").is_file())
-    });
-    if *PY {
-        "py"
+    if let Some(exe) = std::env::current_exe().ok().and_then(|e| {
+        e.parent()
+            .map(|dir| dir.join("python").join("python.exe"))
+    }) {
+        if exe.is_file() {
+            return exe.into_os_string();
+        }
+    }
+    if on_path("python.exe") || on_path("python") {
+        return "python".into();
+    }
+    if on_path("py.exe") {
+        "py".into()
     } else {
-        "python"
+        "python".into()
     }
+}
+
+/// Whether a program of that name is in the `PATH` (the Windows folder counts: the `py` launcher lives there).
+fn on_path(name: &str) -> bool {
+    std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+        .unwrap_or_default()
+        .into_iter()
+        .chain(std::env::var_os("WINDIR").map(PathBuf::from).into_iter())
+        .any(|d| d.join(name).is_file())
 }
 
 #[cfg(test)]
