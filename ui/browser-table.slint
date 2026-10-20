@@ -58,7 +58,8 @@ component Cell inherits Text {
 }
 
 /// The track list: sortable header, 22 px rows (alternating tone, selection, hover), rating stars, Camelot-coloured key and
-/// master-deck hints. Rows are the `BrowserState.tracks` models (src/app/browser/table.rs: cells 0..7 text, 8 key hue, 9 hints).
+/// master-deck hints. Rows are the `BrowserState.tracks` models (src/app/browser/table.rs: cells 0..7 text, 8 key hue, 9 hints,
+/// 11 downloaded).
 export component TrackTable inherits Rectangle {
     in property <int> sorted-col: -1;
     in property <bool> sorted-asc;
@@ -166,6 +167,8 @@ export component TrackTable inherits Rectangle {
                     property <bool> on-deck: cells[0].text != "" && (DeckState.decks[0].title == cells[0].text || DeckState.decks[1].title == cells[0].text || DeckState.decks[2].title == cells[0].text || DeckState.decks[3].title == cells[0].text);
                     background: current ? Theme.select : (row-ta.has-hover ? Theme.hover-row : (Math.mod(i, 2) == 0 ? Theme.bg-deep : Theme.row-alt));
                     Cell { x: 0; width: root.w-lead - Theme.space-md; text: "\{i + 1}"; right: true; color: Theme.text-faint; }
+                    // A plugin track whose audio is already downloaded (cells[11], src/app/browser/table.rs).
+                    if cells[11].text == "1": Text { x: 1px; height: parent.height; text: "✓"; vertical-alignment: center; color: Theme.play; font-size: Theme.font-sm; }
                     if root.w-preview > 0px: Image { x: root.x-preview + 1px; y: (parent.height - self.height) / 2; width: root.w-strip; height: 20px; source: BrowserState.previews[i]; image-fit: fill; }
                     Cell { x: root.x-title; width: root.w-title - Theme.space-md; text: cells[0].text; color: on-deck ? Theme.row-loaded : cells[10].text == "1" ? Theme.text-dim : Theme.text-bright; }
                     Cell { x: root.x-artist; width: root.w-artist - Theme.space-md; text: cells[1].text; color: on-deck ? Theme.row-loaded : Theme.row-dim; }

@@ -319,7 +319,13 @@ impl View {
 
     /// `t` goes to the end of playlist `id` (ADD TO, a drop on the tree row).
     pub(in crate::app::browser) fn add_track_to(&mut self, app: &App, id: i64, t: &Track) {
-        let key = store::key(t);
+        // A cloud track joins the Collection first, so it gets a row id and the playlist stores it like any other track's
+        // (its audio downloads when a deck loads it, src/app/deck/load.rs).
+        let t = match self.in_collection(t.clone()) {
+            Ok(t) => t,
+            Err(e) => return self.say(app, format!("store: {e}")),
+        };
+        let key = store::key(&t);
         let name = self.node(id).map(|n| n.name.clone()).unwrap_or_default();
         let add = || -> Result<String, String> {
             if self.store.entries(id)?.contains(&key) {

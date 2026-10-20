@@ -287,6 +287,15 @@ impl View {
             .clone())
     }
 
+    /// `t` with a Collection row id: a cloud track is added to the Collection first (its audio downloads when a deck
+    /// loads it, src/app/deck/load.rs), so a playlist or palette can hold it like any other track's `t<id>`.
+    pub(in crate::app::browser) fn in_collection(&self, mut t: Track) -> Result<Track, String> {
+        if t.id.is_none() && t.remote.is_some() {
+            t.id = Some(self.store.collection_upsert(&t, None)?);
+        }
+        Ok(t)
+    }
+
     /// The table row of the chosen track, as an index into `list`.
     fn cursor(&self, app: &App) -> Option<usize> {
         let row = usize::try_from(app.global::<BrowserState>().get_current_row()).ok()?;

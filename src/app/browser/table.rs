@@ -12,14 +12,16 @@ use slint::{ComponentHandle, Model, ModelRc, SharedString, StandardListViewItem,
 
 /// Table column indices, in the order of the model rows read by `TrackTable` in ui/browser-table.slint.
 /// Columns 0..=7 are sortable text; `KEY_HUE` (Camelot number 1..12, "0" none), `HINTS` ("k" key compatible with the
-/// master deck, "b" BPM within ±6 %) and `PLAYED` ("1" the track played: its title is dimmed) are not shown as text.
+/// master deck, "b" BPM within ±6 %), `PLAYED` ("1" the track played: its title is dimmed) and `DOWNLOADED` ("1" a
+/// plugin track whose audio is already in the download cache: the row shows a ✓) are not shown as text.
 pub const BPM: usize = 4;
 pub const TIME: usize = 5;
 pub const RATING: usize = 6;
 pub const KEY_HUE: usize = 8;
 pub const HINTS: usize = 9;
 pub const PLAYED: usize = 10;
-pub const COLUMNS: usize = 11;
+pub const DOWNLOADED: usize = 11;
+pub const COLUMNS: usize = 12;
 pub const KEY: usize = 3;
 
 /// BPM hint window: ± this fraction of the playing deck's BPM.
@@ -41,6 +43,8 @@ pub struct Facts {
     pub bpm: f64,
     pub key: String,
     pub wheel: Option<Key>,
+    /// A plugin track whose audio is already in the download cache (only ever true for a `remote` track).
+    pub downloaded: bool,
 }
 
 impl Facts {
@@ -51,6 +55,10 @@ impl Facts {
             bpm: bpm_x100 as f64 / 100.0,
             wheel: camelot(&key),
             key,
+            downloaded: t
+                .remote
+                .as_ref()
+                .is_some_and(openfader::plugin::source::is_downloaded),
         }
     }
 }
@@ -138,6 +146,7 @@ fn shown_cell(t: &Track, f: &Facts, col: usize, r: &Reference, look: &Look) -> S
         KEY_HUE => f.wheel.map_or(0, |k| k.0).to_string().as_str().into(),
         HINTS => hints(f, r, look.level).into(),
         PLAYED => SharedString::new(), // filled in by [`row`]
+        DOWNLOADED => SharedString::new(), // filled in by [`row`]
         // A track whose file is gone is marked "[!]" (File > Display All Missing Files lists them).
         0 if t
             .file
@@ -164,6 +173,7 @@ pub fn row(
 ) -> ModelRc<StandardListViewItem> {
     let cells: [StandardListViewItem; COLUMNS] = std::array::from_fn(|c| match c {
         PLAYED if played => "1".into(),
+        DOWNLOADED if f.downloaded => "1".into(),
         c => shown_cell(t, f, c, r, look).into(),
     });
     ModelRc::new(VecModel::from(Vec::from(cells)))

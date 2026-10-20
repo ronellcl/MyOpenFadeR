@@ -172,6 +172,11 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE collection_hwm (n INTEGER NOT NULL);
      INSERT INTO collection_hwm SELECT COALESCE(MAX(id), 0) FROM collection;
      CREATE TRIGGER collection_hwm_d AFTER DELETE ON collection BEGIN UPDATE collection_hwm SET n = MAX(n, OLD.id); END;",
+    // v16: plugin ("cloud") tracks in the Collection: `plugin`/`source`/`remote_id` name the track at its plugin
+    // source (the audio downloads when a deck loads it, src/app/deck/load.rs), and `path` holds a synthetic identity.
+    "ALTER TABLE collection ADD COLUMN plugin TEXT;
+     ALTER TABLE collection ADD COLUMN source TEXT;
+     ALTER TABLE collection ADD COLUMN remote_id TEXT;",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as

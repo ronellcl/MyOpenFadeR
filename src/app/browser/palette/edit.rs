@@ -106,7 +106,11 @@ impl Palette {
                 Err(e) => return v.say(app, format!("store: {e}")),
             },
         };
-        let key = store::key(t);
+        let t = match v.in_collection(t.clone()) {
+            Ok(t) => t,
+            Err(e) => return v.say(app, format!("store: {e}")),
+        };
+        let key = store::key(&t);
         let name = v
             .nodes
             .iter()

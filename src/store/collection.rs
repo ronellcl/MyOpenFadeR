@@ -15,20 +15,38 @@ use super::{
     Sql, Store, R, column, date_secs, exec, exec_count, file_name, file_stamp, id_key, in_tx, key,
     legacy_key, query_all, query_opt, rekey, scalar,
 };
-use crate::{analysis::key::key_id, library::Track};
+use crate::{
+    analysis::key::key_id,
+    library::{Remote, Track},
+};
 use openfader_plugin::library::{owned_ref, split_ref};
 use rusqlite::{params, params_from_iter, types::ToSql, Connection, Row};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{atomic::Ordering, Arc};
 
-const COLS: &str = "path, title, artist, album, tkey, genre, bpm_x100, length_s, analysis_ref, artwork, comment, date_added, bitrate, sample_rate, label";
+const COLS: &str = "path, title, artist, album, tkey, genre, bpm_x100, length_s, analysis_ref, artwork, comment, date_added, bitrate, sample_rate, label, plugin, source, remote_id";
+
+/// The synthetic, unique `collection.path` of a cloud track: a control character keeps it apart from any real path.
+fn remote_path(r: &Remote) -> String {
+    format!("\u{1}remote:{}:{}:{}", r.plugin, r.source, r.id)
+}
 
 fn from_row(r: &Row) -> rusqlite::Result<Track> {
     let opt = |i| r.get::<_, Option<String>>(i).map(|s| s.map(PathBuf::from));
+    // `plugin`, `source` and `remote_id` are set together, for a cloud track the Collection holds instead of a file.
+    let remote = match (
+        r.get::<_, Option<String>>(16)?,
+        r.get::<_, Option<String>>(17)?,
+        r.get::<_, Option<String>>(18)?,
+    ) {
+        (Some(plugin), Some(source), Some(id)) => Some(Remote { plugin, source, id }),
+        _ => None,
+    };
+    let path: String = r.get(1)?;
     Ok(Track {
         id: Some(r.get(0)?),
-        file: Some(PathBuf::from(r.get::<_, String>(1)?)),
+        file: remote.is_none().then(|| PathBuf::from(path)),
         title: r.get(2)?,
         artist: r.get(3)?,
         album: r.get(4)?,
@@ -44,7 +62,7 @@ fn from_row(r: &Row) -> rusqlite::Result<Track> {
         date_added: r.get(12)?,
         bitrate: r.get(13)?,
         sample_rate: r.get(14)?,
-        remote: None,
+        remote,
     })
 }
 
@@ -126,15 +144,16 @@ impl Store {
         names.get(&legacy_key(name, size)).copied().flatten()
     }
 
-    /// Adds (or, with `replace`, overwrites by file path) `tracks` that have a file; they stop being "removed". Fills `size`,
-    /// `mtime` (from the file), `key_id` (from the track's key in any notation) and `added_at` (from `date_added`, else now), and
-    /// gives the edits stored under the legacy key of a new row's file (`<name>|<size>`) to the row. Several new rows with one
-    /// legacy key each get a copy of the per-track edits (rating, cues, tags, ...). A row already there only has its size and
-    /// mtime refreshed (and everything else with `replace`). Returns how many rows were added or changed.
+    /// Adds (or, with `replace`, overwrites by file path) `tracks` that have a file or a plugin source; they stop being
+    /// "removed". Fills `size`, `mtime` (from the file), `key_id` (from the track's key in any notation) and `added_at`
+    /// (from `date_added`, else now), and gives the edits stored under the legacy key of a new row's file (`<name>|<size>`)
+    /// to the row. Several new rows with one legacy key each get a copy of the per-track edits (rating, cues, tags, ...). A
+    /// row already there only has its size and mtime refreshed (and everything else with `replace`). Returns how many rows
+    /// were added or changed.
     pub fn collection_put(&self, tracks: &[Track], replace: bool) -> R<usize> {
         let items: Vec<(Option<i64>, &Track)> = tracks
             .iter()
-            .filter(|t| t.file.is_some())
+            .filter(|t| t.file.is_some() || t.remote.is_some())
             .map(|t| (None, t))
             .collect();
         self.put_rows(&items, replace).map(|(n, _)| n)
@@ -154,22 +173,32 @@ impl Store {
     fn put_rows(&self, items: &[(Option<i64>, &Track)], replace: bool) -> R<(usize, Vec<i64>)> {
         let now = chrono::Utc::now().timestamp();
         let insert = format!(
-            "INSERT INTO collection(id, {COLS}, size, mtime, key_id, added_at) VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM collection), 0), (SELECT n FROM collection_hwm)) + 1), ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,COALESCE(?19, ?20))"
+            "INSERT INTO collection(id, {COLS}, size, mtime, key_id, added_at) VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM collection), 0), (SELECT n FROM collection_hwm)) + 1), ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,COALESCE(?22, ?23))"
         );
-        let update = "UPDATE collection SET path=?1, title=?2, artist=?3, album=?4, tkey=?5, genre=?6, bpm_x100=?7, length_s=?8, analysis_ref=?9, artwork=?10, comment=?11, date_added=?12, bitrate=?13, sample_rate=?14, label=?15, size=?16, mtime=?17, key_id=?18, added_at=COALESCE(?19, added_at) WHERE id=?20";
+        let update = "UPDATE collection SET path=?1, title=?2, artist=?3, album=?4, tkey=?5, genre=?6, bpm_x100=?7, length_s=?8, analysis_ref=?9, artwork=?10, comment=?11, date_added=?12, bitrate=?13, sample_rate=?14, label=?15, plugin=?16, source=?17, remote_id=?18, size=?19, mtime=?20, key_id=?21, added_at=COALESCE(?22, added_at) WHERE id=?23";
         in_tx(&mut self.db(), true, |tx| {
             let mut ids = Vec::with_capacity(items.len());
             let (mut fresh, mut n) = (Vec::new(), 0);
             for &(id, t) in items {
-                let file = t.file.as_deref().ok_or("this track has no file")?;
-                let path = file.to_string_lossy();
-                let (size, mtime) = file_stamp(file);
+                // A cloud track has no file: its plugin source is its identity (`remote_path`) and the deck fetches the
+                // audio when it loads it (src/app/deck/load.rs).
+                let file = t.file.as_deref();
+                let Some(path) = file
+                    .map(|f| f.to_string_lossy().into_owned())
+                    .or_else(|| t.remote.as_ref().map(remote_path))
+                else {
+                    return Err("this track has no file".into());
+                };
+                let (size, mtime) = file.map_or((0, 0), file_stamp);
                 let artwork = t.artwork.as_deref().map(Path::to_string_lossy);
                 let (key_id, added) = (key_id(&t.key), date_secs(&t.date_added));
-                let row: [&dyn ToSql; 19] = [
+                let plugin = t.remote.as_ref().map(|r| r.plugin.as_str());
+                let source = t.remote.as_ref().map(|r| r.source.as_str());
+                let remote_id = t.remote.as_ref().map(|r| r.id.as_str());
+                let row: [&dyn ToSql; 22] = [
                     &path, &t.title, &t.artist, &t.album, &t.key, &t.genre, &t.bpm_x100, &t.length_s,
                     &t.analysis_ref, &artwork, &t.comment, &t.date_added, &t.bitrate, &t.sample_rate, &t.label,
-                    &size, &mtime, &key_id, &added,
+                    &plugin, &source, &remote_id, &size, &mtime, &key_id, &added,
                 ];
                 let with = |last| bind(&row, last);
                 let found = match id {
@@ -188,7 +217,9 @@ impl Store {
                             return Err(format!("no collection row {id}"));
                         }
                         if late {
-                            fresh.push((id, legacy_key(&file_name(file), size as u64)));
+                            if let Some(f) = file {
+                                fresh.push((id, legacy_key(&file_name(f), size as u64)));
+                            }
                         }
                         n += 1;
                         id
@@ -196,7 +227,9 @@ impl Store {
                     Some(id) => {
                         // Already there: only the file's own facts move.
                         if unseen(tx, id)? {
-                            fresh.push((id, legacy_key(&file_name(file), size as u64)));
+                            if let Some(f) = file {
+                                fresh.push((id, legacy_key(&file_name(f), size as u64)));
+                            }
                         }
                         exec(
                             tx,
@@ -208,7 +241,9 @@ impl Store {
                     None => {
                         exec(tx, &insert, with(&now))?;
                         let id = tx.last_insert_rowid();
-                        fresh.push((id, legacy_key(&file_name(file), size as u64)));
+                        if let Some(f) = file {
+                            fresh.push((id, legacy_key(&file_name(f), size as u64)));
+                        }
                         n += 1;
                         id
                     }
@@ -415,7 +450,7 @@ impl Store {
 
 /// `row` plus one more parameter, as the statement's parameter list.
 fn bind<'a>(
-    row: &[&'a dyn ToSql; 19],
+    row: &[&'a dyn ToSql; 22],
     last: &'a dyn ToSql,
 ) -> rusqlite::ParamsFromIter<Vec<&'a dyn ToSql>> {
     params_from_iter(row.iter().copied().chain([last]).collect::<Vec<_>>())

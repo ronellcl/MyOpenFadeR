@@ -36,6 +36,14 @@ pub(super) fn downloaded(dir: &Path, name: &str) -> Option<PathBuf> {
         })
 }
 
+/// Whether `r`'s audio is already in the download cache, i.e. [`fetch`] would reuse it instead of asking the plugin.
+/// Never blocks and never writes: it only looks the finished file up (a cheap `read_dir` on the source's folder).
+pub fn is_downloaded(r: &Remote) -> bool {
+    crate::paths::data_dir()
+        .map(|base| base.join("plugins").join(&r.plugin).join(&r.source))
+        .is_some_and(|dir| downloaded(&dir, &file_name(&r.id)).is_some())
+}
+
 /// The audio file of a plugin track: the earlier download if there is one, else what the plugin's `fetch` request
 /// writes into `<data dir>/plugins/<plugin>/<source>/`. Blocks until the download is done: call it from a worker.
 pub fn fetch(r: &Remote) -> Result<PathBuf, String> {
