@@ -19,23 +19,36 @@ From top to bottom:
 | Library (read-only) | the opened library's own playlists | — |
 | **Favorites** | the folders the user pinned | Preferences > View > Layout > Media Browser |
 | **Downloaded** | what the plugin sources downloaded (YouTube, Deezer) | Preferences > View > Layout > Media Browser |
-| **Devices** | every mounted volume | Preferences > View > Layout > Media Browser |
+| **Devices** | every mounted volume and the local disk (the system volume) | Preferences > View > Layout > Media Browser |
 | Explorer | a folder of music (off by default) | Preferences > View > Layout > Media Browser |
 
 ## 2. Devices and their folders
 
-The "Devices" section lists **every mounted volume**, not only the ones with a DJ library: a USB stick full of
+The "Devices" section lists **every volume of the machine**, not only the ones with a DJ library: a USB stick full of
 music is the case that matters. A volume shows its label, its file system and its free space.
 
-Choosing a volume opens its window (the DEVICES panel) and reads its top-level folders: the ones that hold audio,
-under the same rule as the folder library (`src/library/folder.rs`). Each folder opens as a source of its own, with
-its tracks and its subfolders (the subfolders are its "playlists"), and its tracks can be imported into the
-Collection with the strip's button.
+Choosing a volume opens its window (the DEVICES panel) and reads its top-level folders: **all of them**, in
+alphabetical order (the folders the OS keeps for itself, `$RECYCLE.BIN` and `System Volume Information`, are left
+out). Each folder opens as a source of its own, with its tracks and its subfolders (the subfolders are its
+"playlists"), and its tracks can be imported into the Collection with the strip's button.
 
-The tree walks a volume **once**, when the volume is read, and keeps the answer: the poll that watches the mounts
-(once a second) never walks the music again.
+Only the **first level** of a volume is read: a disk of terabytes is listed, not scanned, and the folders open on
+demand.
 
 `OPENFADER_DEVICE_ROOTS=<dir>[:<dir>…]` makes any folder count as a mounted stick (for tests and demos).
+
+### 2.1 How the volumes are found (Windows)
+
+`GetDriveTypeW` answers `DRIVE_REMOVABLE` for a stick or a card and `DRIVE_FIXED` for a disk: **a USB hard disk or
+SSD answers `DRIVE_FIXED` too**, so the scan takes both kinds and leaves out the volume Windows was started from
+(`SystemDrive`), which is the system disk.
+
+### 2.2 The local disk (the system volume)
+
+The volume Windows runs from is not a device (it cannot be ejected and no plugin works with it), but it is worth
+browsing: it is listed in the same section as **C: (OS)** (the drive letter and the volume label) and its
+top-level folders open like the ones of any other volume, read-only. On Linux and macOS there is none: the Explorer
+source browses the home folder there.
 
 ## 3. The folders the user pins (FAVORITES)
 
@@ -107,4 +120,5 @@ two rows.
 | The table's cells (FORMAT, ORIGIN) | `src/app/browser/table.rs` |
 | The index of the pinned folders (the table) | `src/store/index.rs` |
 | The volumes and their folders | `src/device/mod.rs` |
+| The volumes of each system | `src/device/windows.rs`, `src/device/linux.rs`, `src/device/macos.rs` |
 | The tree and the table | `ui/browser-tree.slint`, `ui/browser-table.slint` |

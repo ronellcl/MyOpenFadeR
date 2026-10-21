@@ -351,11 +351,19 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 - El README cuenta **qué añade esta versión**, en inglés y en español.
 ### De la tercera tanda (el browser)
 
-- **La secci��n "Downloaded"**: lo que los plugins de nube descargan se ve como una fuente m��s del �rbol, con sus ficheros reales (se cargan, se importan y se buscan).
-- **"Not in the Collection"**: cada fuente abierta dice qu�� ficheros suyos no tiene a��n la Colecci��n, y un bot��n los a��ade todos de golpe.
+- **La sección "Downloaded"**: lo que los plugins de nube descargan se ve como una fuente más del árbol, con sus ficheros reales (se cargan, se importan y se buscan).
+- **"Not in the Collection"**: cada fuente abierta dice qué ficheros suyos no tiene aún la Colección, y un botón los añade todos de golpe.
 - **Un USB sin biblioteca de DJ** aparece en "Devices" y lista sus carpetas de primer nivel; cada carpeta se abre como fuente.
-- **Las carpetas fijadas (FAV)**: el bot��n FAV fija la carpeta elegida, la secci��n "Favorites" las lista y un pin sobrevive a que el USB cambie de letra.
-- **El filtro de medio (ALL / AUDIO / VIDEO)** y la columna **FORMATO** (nota musical o pel��cula) dicen de qu�� es cada pista.
-- **Una sola b��squeda**: la caja del buscador mira la Colecci��n, el �ndice de las carpetas fijadas y las fuentes le��das, y cada resultado dice de d��nde sali�� (columna ORIGIN). Las b��squedas en l��nea de YouTube y Deezer no se disparan desde el filtro.
-- **Las pistas de nube ya no se loguean dos veces**: entran en la Colecci��n antes de sonar, as�� que el historial, el color de "reproducida" y las listas las nombran igual.
-- **Las descargas de YouTube dicen el t�tulo, no el id**: el plugin graba las etiquetas en el fichero que descarga (t�tulo, artista, �lbum) y la app las lee; para lo ya descargado, el plugin responde con el t�tulo de cada id (operaci��n info).- **El �rbol pliega sus ramas**: un clic en una lista con listas debajo las pliega (y las despliega otra vez); el teclado solo mueve la selecci��n. Las secciones (Favorites, Downloaded, Devices, Explorer) se muestran u ocultan desde el bot��n SECTIONS del browser, no solo desde Preferencias.
+- **Las carpetas fijadas (FAV)**: el botón FAV fija la carpeta elegida, la sección "Favorites" las lista y un pin sobrevive a que el USB cambie de letra.
+- **El filtro de medio (ALL / AUDIO / VIDEO)** y la columna **FORMATO** (nota musical o película) dicen de qué es cada pista.
+- **Una sola búsqueda**: la caja del buscador mira la Colección, el índice de las carpetas fijadas y las fuentes leídas, y cada resultado dice de dónde salió (columna ORIGIN). Las búsquedas en línea de YouTube y Deezer no se disparan desde el filtro.
+- **Las pistas de nube ya no se loguean dos veces**: entran en la Colección antes de sonar, así que el historial, el color de "reproducida" y las listas las nombran igual.
+- **Las descargas de YouTube dicen el título, no el id**: el plugin graba las etiquetas en el fichero que descarga (título, artista, álbum) y la app las lee; para lo ya descargado, el plugin responde con el título de cada id (operación info).
+- **El árbol pliega sus ramas**: un clic en una lista con listas debajo las pliega (y las despliega otra vez); el teclado solo mueve la selección. Las secciones (Favorites, Downloaded, Devices, Explorer) se muestran u ocultan desde el botón SECTIONS del browser, no solo desde Preferencias.
+
+### De la cuarta tanda (los volúmenes)
+
+- **Un disco duro USB ya aparece en "Devices"**: Windows responde `DRIVE_FIXED` a un disco externo (solo responde `DRIVE_REMOVABLE` a un pendrive o una tarjeta), así que el escaneo ahora acepta los dos tipos y deja fuera el volumen del sistema.
+- **El disco local se puede recorrer**: el volumen donde está Windows (C:) se lista en la misma sección como **C: (OS)**, y sus carpetas de primer nivel se abren como fuentes de solo lectura, para navegar entre las carpetas del disco.
+- **Listar un volumen no lo barre entero**: antes se recorría el árbol entero del disco buscando audio (1,8 TB = minutos); ahora solo se lee el primer nivel (instantáneo) y las carpetas se abren bajo demanda.
+- **Se ven todas las carpetas del volumen**, no solo las que tienen audio: se puede navegar por el disco entero, no solo por su música.

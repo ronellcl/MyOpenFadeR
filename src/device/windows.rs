@@ -1,18 +1,19 @@
-//! Finding the removable drives on Windows: every drive letter of `GetLogicalDrives` whose `GetDriveTypeW` is `DRIVE_REMOVABLE`
-//! (a USB stick, an SD card in a reader) and that holds a medium. `GetVolumeInformationW` gives the label, the file system
-//! (`FAT32`, `exFAT`, `NTFS`, lower-cased here, which is how [`Support::of`] reads them), the read-only flag and the volume serial
-//! that [`Device::id`] uses (the `XXXX-XXXX` Explorer shows). [`Device::source`] is the drive letter (`E:`), which the
-//! eject child opens as `\\.\E:`.
-// ponytail: a USB hard disk or SSD reports DRIVE_FIXED, so it is not listed; asking the storage bus type (IOCTL_STORAGE_QUERY_PROPERTY)
-// would add it.
+//! Finding the drives on Windows: every drive letter of `GetLogicalDrives` whose `GetDriveTypeW` is `DRIVE_REMOVABLE`
+//! (a USB stick, an SD card in a reader) or `DRIVE_FIXED` (a USB hard disk or SSD answers this too), except the volume
+//! Windows was started from (the system disk is not a device), and that holds a medium. `GetVolumeInformationW` gives the
+//! label, the file system (`FAT32`, `exFAT`, `NTFS`, lower-cased here, which is how [`Support::of`] reads them), the
+//! read-only flag and the volume serial that [`Device::id`] uses (the `XXXX-XXXX` Explorer shows). [`Device::source`] is
+//! the drive letter (`E:`), which the eject child opens as `\\.\E:`.
 
-use super::{Device, Kind, Support};
+use super::{Device, Kind, Local, Support};
 use windows_sys::Win32::Storage::FileSystem::{
     GetDriveTypeW, GetLogicalDrives, GetVolumeInformationW,
 };
 
 /// `GetDriveTypeW`'s answer for removable media.
 const DRIVE_REMOVABLE: u32 = 2;
+/// `GetDriveTypeW`'s answer for a fixed disk: a USB hard disk or SSD answers this too.
+const DRIVE_FIXED: u32 = 3;
 /// `GetVolumeInformationW` flag: the volume is read-only.
 const FILE_READ_ONLY_VOLUME: u32 = 0x0008_0000;
 
@@ -47,17 +48,46 @@ fn volume(root: &str) -> Option<(String, String, u32, u32)> {
     (ok != 0).then(|| (text(&label), text(&fs).to_lowercase(), flags, serial))
 }
 
-/// The removable drives with a medium in them.
+/// The volume Windows was started from (the system disk): it is browsed (its top-level folders), not a device: it
+/// cannot be ejected and no plugin works with it.
+pub(super) fn local_disks() -> Vec<Local> {
+    let system = std::env::var("SystemDrive").unwrap_or_default().to_uppercase();
+    let Some(letter) = system.chars().next() else {
+        return Vec::new();
+    };
+    let root = format!("{letter}:\\");
+    let Some((label, fs, _, _)) = volume(&root) else {
+        return Vec::new();
+    };
+    vec![Local {
+        label: if label.is_empty() {
+            format!("{letter}:")
+        } else {
+            format!("{letter}: ({label})")
+        },
+        mount: root.into(),
+        fs,
+    }]
+}
+
+/// The drives with a medium in them: the removable ones (a USB stick, an SD card in a reader) and the fixed ones (a USB
+/// hard disk or SSD reports DRIVE_FIXED too), except the volume Windows was started from (the system disk).
 pub(super) fn mounted() -> Vec<Device> {
     // SAFETY: no arguments.
     let letters = unsafe { GetLogicalDrives() };
+    // The volume Windows runs from is the system disk: it is not a device.
+    let system = std::env::var("SystemDrive").unwrap_or_default().to_uppercase();
     (0..26u8)
         .filter(|i| letters >> i & 1 == 1)
         .filter_map(|i| {
             let letter = (b'A' + i) as char;
             let root = format!("{letter}:\\");
             // SAFETY: the wide string is NUL-terminated and lives through the call.
-            if unsafe { GetDriveTypeW(wide(&root).as_ptr()) } != DRIVE_REMOVABLE {
+            let kind = unsafe { GetDriveTypeW(wide(&root).as_ptr()) };
+            if kind != DRIVE_REMOVABLE && kind != DRIVE_FIXED {
+                return None;
+            }
+            if format!("{letter}:").to_uppercase() == system {
                 return None;
             }
             let (label, fs, flags, serial) = volume(&root)?;

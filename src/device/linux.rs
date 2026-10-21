@@ -3,7 +3,7 @@
 //! (`/sys/block/<disk>/removable`) or on USB (its sysfs path runs through a `usb` bus: USB SSDs report not removable), so a
 //! stick mounted by hand shows up too.
 
-use super::{Device, Kind, Support};
+use super::{Device, Kind, Local, Support};
 use std::path::Path;
 
 /// One line of `/proc/self/mountinfo` that matters here.
@@ -124,6 +124,11 @@ fn devices_in(mountinfo: &str, sys: &dyn Sys) -> Vec<Device> {
     }
     out.sort_by(|a, b| a.mount.cmp(&b.mount));
     out
+}
+
+/// The local volumes to browse: none on Linux (the Explorer source browses the home folder there).
+pub(super) fn local_disks() -> Vec<Local> {
+    Vec::new()
 }
 
 /// The removable devices mounted now.

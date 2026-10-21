@@ -4,7 +4,7 @@
 //! (`/dev/disk4s1`), [`Device::id`] the mount path (the volume UUID would need DiskArbitration). An SD card cannot be told from a
 //! stick here, so every device is [`Kind::Usb`].
 
-use super::{Device, Kind, Support};
+use super::{Device, Kind, Local, Support};
 use std::ffi::CStr;
 
 fn text(c: &[libc::c_char]) -> String {
@@ -29,6 +29,11 @@ fn mounts() -> Vec<libc::statfs> {
         v.set_len(got.clamp(0, n) as usize);
     }
     v
+}
+
+/// The local volumes to browse: none on macOS (the Explorer source browses the home folder there).
+pub(super) fn local_disks() -> Vec<Local> {
+    Vec::new()
 }
 
 /// The removable volumes mounted now.

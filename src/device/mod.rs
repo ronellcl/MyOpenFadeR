@@ -342,26 +342,46 @@ pub fn open_library(d: &Device) -> Result<Box<dyn Library + Send>, String> {
     Ok(Box::new(plugin::library::open_with(plugin, &d.mount)?))
 }
 
-/// The top-level folders of the device that hold audio: what its tree lists under it. The whole tree is walked once
-/// (a big stick takes a while), so the caller keeps the answer instead of asking again.
-pub fn top_folders(d: &Device) -> Vec<PathBuf> {
-    let mut out = Vec::new();
-    let Ok(entries) = std::fs::read_dir(&d.mount) else {
-        return out;
-    };
-    for e in entries.flatten() {
-        let p = e.path();
-        if !p.is_dir() {
-            continue;
-        }
-        let mut files = Vec::new();
-        crate::library::folder::walk(&p, &mut files);
-        if !files.is_empty() {
-            out.push(p);
-        }
-    }
+/// The top-level folders of a volume, in alphabetical order: what its tree lists under it. Only the first level is
+/// read (a volume of terabytes is listed, not scanned) and the folders the OS keeps for itself are left out.
+pub fn top_folders(root: &Path) -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = std::fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir() && !os_folder(p))
+        .collect();
     out.sort();
     out
+}
+
+/// Whether the folder is one the OS keeps for itself (`$RECYCLE.BIN`, `System Volume Information`).
+fn os_folder(p: &Path) -> bool {
+    p.file_name()
+        .map(|n| {
+            let n = n.to_string_lossy();
+            n.starts_with('$') || n.eq_ignore_ascii_case("System Volume Information")
+        })
+        .unwrap_or(false)
+}
+
+/// A local volume of the machine to browse (Windows: the system disk): its top-level folders, read-only. It is not a
+/// device: it cannot be ejected and no plugin works with it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Local {
+    /// The volume as it is shown: the drive letter and the volume label ("C: (OS)").
+    pub label: String,
+    /// The root of the volume ("C:\\").
+    pub mount: PathBuf,
+    /// The file system name ("ntfs").
+    pub fs: String,
+}
+
+/// The local volumes of the machine to browse: Windows lists the system disk (the volume Windows was started from),
+/// the other systems list none (the Explorer source browses the home folder there).
+pub fn local_disks() -> Vec<Local> {
+    os::local_disks()
 }
 
 /// The names from the top level down to playlist `id` of `playlists` (a [`Library::playlists`] list in tree order), `None` for an

@@ -42,6 +42,8 @@ pub enum Kind {
     },
     /// A top-level folder of a device: it opens as a folder source, read-only.
     DeviceFolder { path: PathBuf },
+    /// A local volume of the machine to browse (the system disk): its top-level folders open as folder sources, read-only.
+    LocalDisk { label: String, path: PathBuf },
     /// A folder the user pinned (FAVORITES): it opens as a folder source, read-only.
     Pinned { label: String, path: PathBuf },
 }
@@ -89,6 +91,7 @@ impl Kind {
             (Kind::Explorer(a), Kind::Explorer(b)) => a == b,
             (Kind::Downloaded { path: a, .. }, Kind::Downloaded { path: b, .. }) => a == b,
             (Kind::DeviceFolder { path: a }, Kind::DeviceFolder { path: b }) => a == b,
+            (Kind::LocalDisk { path: a, .. }, Kind::LocalDisk { path: b, .. }) => a == b,
             (Kind::Pinned { path: a, .. }, Kind::Pinned { path: b, .. }) => a == b,
             _ => false,
         }
@@ -97,6 +100,7 @@ impl Kind {
     fn name(&self) -> String {
         match self {
             Kind::Device(d) => format!("{}  ({}, {} free)", d.label, d.fs, device::size(d.free)),
+            Kind::LocalDisk { label, .. } => label.clone(),
             _ => self.short(),
         }
     }
@@ -112,6 +116,7 @@ impl Kind {
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default(),
+            Kind::LocalDisk { label, .. } => label.clone(),
             Kind::Pinned { path, .. } => path
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
@@ -159,6 +164,9 @@ impl Kind {
             }
             Kind::DeviceFolder { path } => Ok(Box::new(Folder::open(path)?)),
             Kind::Pinned { path, .. } => Ok(Box::new(Folder::open(path)?)),
+            // A local volume is browsed by its folders: it holds no library of its own (reading the whole volume would
+            // take hours).
+            Kind::LocalDisk { .. } => Err("it is browsed by its folders".to_owned()),
         }
     }
 }
@@ -181,6 +189,11 @@ pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
             .into_iter()
             .map(Kind::Device),
     );
+    // The local volumes to browse (the system disk): they are read-only and have no device window.
+    kinds.extend(device::local_disks().into_iter().map(|l| Kind::LocalDisk {
+        label: l.label,
+        path: l.mount,
+    }));
     kinds.extend(
         plugin::library::sources()
             .into_iter()
@@ -243,6 +256,11 @@ impl Source {
         matches!(self.kind, Kind::Pinned { .. })
     }
 
+    /// Whether the source is a local volume of the machine (the system disk): it is browsed by its folders.
+    pub fn is_local(&self) -> bool {
+        matches!(self.kind, Kind::LocalDisk { .. })
+    }
+
     /// The path the source is read from again on a worker thread (`None` for a device: its own menus import from it).
     pub fn path(&self) -> Option<(PathBuf, SourceType)> {
         match &self.kind {
@@ -265,6 +283,7 @@ impl Source {
             )),
             Kind::DeviceFolder { path } => Some((path.clone(), SourceType::Folder)),
             Kind::Pinned { path, .. } => Some((path.clone(), SourceType::Folder)),
+            Kind::LocalDisk { .. } => None,
         }
     }
 }
@@ -394,6 +413,7 @@ impl View {
             .iter()
             .map(|s| SourceRows {
                 device: s.is_device(),
+                local: s.is_local(),
                 downloaded: s.is_downloaded(),
                 pinned: s.is_pinned(),
                 name: s.name.clone(),
@@ -497,7 +517,7 @@ impl View {
                 "What the plugin sources downloaded: choose a folder to open it (the files are real ones: they can be loaded, imported and searched)"
             }
             Entry::DevicesRoot => {
-                "Devices: choose a device to open it and its window (eject, sync, backup, update collection …)"
+                "Devices: the disks of the machine: choose a device to open it and its window (eject, sync, backup, update collection …); the local disk is browsed by its folders"
             }
             Entry::Source(_) => {
                 "Choose All tracks or a playlist; IMPORT TO COLLECTION (File and Track menus) adds what you choose to the Collection"
@@ -670,6 +690,12 @@ impl View {
                     s_(lists),
                 )
             }
+            // A local volume holds no library of its own: its folders are what it offers.
+            Err(_) if matches!(kind, Kind::LocalDisk { .. }) => format!(
+                "{}: {} folders to browse ({secs:.1} s)",
+                kind.short(),
+                folders.len()
+            ),
             Err(e) => format!("{}: cannot read it: {e}", kind.short()),
         };
         // A device's folders: the ones read before keep their library, the new ones are listed.
@@ -729,11 +755,13 @@ impl View {
         {
             return;
         }
-        // A device that just appeared with a library is read straight away.
+        // A device that just appeared with a library is read straight away, and so is a local volume (its folders).
         let fresh: Vec<usize> = (0..self.sources.len())
             .filter(|&i| {
-                matches!(self.sources[i].kind, Kind::Device(_))
-                    && !before.iter().any(|b| b.same(&self.sources[i].kind))
+                matches!(
+                    self.sources[i].kind,
+                    Kind::Device(_) | Kind::LocalDisk { .. }
+                ) && !before.iter().any(|b| b.same(&self.sources[i].kind))
             })
             .collect();
         for i in fresh {
@@ -786,19 +814,10 @@ fn read(app: &App, kind: Kind) {
                 }
             });
         }
-        // A device's top-level folders: the tree walks the stick once, here, and keeps the answer.
+        // A volume's top-level folders: the tree lists them, here, and keeps the answer.
         let folders = match &kind {
-            Kind::Device(d) => device::top_folders(d)
-                .into_iter()
-                .map(|p| DeviceFolder {
-                    name: p
-                        .file_name()
-                        .map(|n| n.to_string_lossy().into_owned())
-                        .unwrap_or_default(),
-                    path: p,
-                    playlists: Vec::new(),
-                })
-                .collect(),
+            Kind::Device(d) => folder_rows(device::top_folders(&d.mount)),
+            Kind::LocalDisk { path, .. } => folder_rows(device::top_folders(path)),
             _ => Vec::new(),
         };
         step(format!("{name}: listing tracks and playlists"), 0.85);
@@ -818,6 +837,21 @@ fn read(app: &App, kind: Kind) {
         });
     });
 }
+/// The folders of a volume as the tree shows them: their name and their path.
+fn folder_rows(paths: Vec<PathBuf>) -> Vec<DeviceFolder> {
+    paths
+        .into_iter()
+        .map(|p| DeviceFolder {
+            name: p
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            path: p,
+            playlists: Vec::new(),
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -68,6 +68,8 @@ pub enum Entry {
 /// One external source as the tree shows it.
 pub struct SourceRows {
     pub device: bool,
+    /// A local volume of the machine (the system disk): it is browsed by its folders, like a device but read-only.
+    pub local: bool,
     /// The folder a plugin source downloaded into (the "Downloaded" section).
     pub downloaded: bool,
     /// A folder the user pinned (the "Favorites" section).
@@ -247,7 +249,8 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         if s.downloaded || s.pinned {
             continue; // already listed under "Downloaded" / "Favorites"
         }
-        source_rows(&mut rows, i, n, usize::from(s.device));
+        // The devices and the local volumes hang under the "Devices" heading; the other sources are on their own.
+        source_rows(&mut rows, i, n, usize::from(s.device || s.local));
     }
     rows.into_iter().unzip()
 }
@@ -479,6 +482,7 @@ mod tests {
     fn the_downloads_have_their_own_section_with_their_tracks() {
         let src = |name: &str, device, downloaded, open, missing| SourceRows {
             device,
+            local: false,
             downloaded,
             pinned: false,
             name: name.into(),
@@ -534,6 +538,7 @@ mod tests {
     fn a_device_lists_its_own_folders() {
         let sources = [SourceRows {
             device: true,
+            local: false,
             downloaded: false,
             pinned: false,
             name: "USB (vfat)".into(),
@@ -572,6 +577,50 @@ mod tests {
         assert_eq!(labels[at + 2], "        ▸ Musica");
         assert_eq!(entries[at + 3], Entry::DeviceFolderList(0, 0, 0));
         assert_eq!(labels[at + 3], "            Rock");
+    }
+
+    /// The local disk (the system volume) hangs under the "Devices" heading with its own folders, read-only.
+    #[test]
+    fn the_local_disk_hangs_under_the_devices_with_its_folders() {
+        let sources = [SourceRows {
+            device: false,
+            local: true,
+            downloaded: false,
+            pinned: false,
+            name: "C: (OS)".into(),
+            open: false,
+            playlists: Vec::new(),
+            missing: Vec::new(),
+            folders: vec![FolderRow {
+                name: "Users".into(),
+                playlists: Vec::new(),
+            }],
+        }];
+        let (entries, labels) = build(&Inputs {
+            tag_list: 0,
+            session: 0,
+            lib: &[],
+            nodes: &[],
+            days: &[],
+            cats: &[],
+            tags: &[],
+            sources: &sources,
+            all_tracks: false,
+            cue_analysis: None,
+            banks: None,
+            sections: Sections::default(),
+            folded: &HashSet::new(),
+            folded_lib: &HashSet::new(),
+        });
+        let at = labels
+            .iter()
+            .position(|l| l == "▸ Devices")
+            .expect("the devices have their own section");
+        assert_eq!(entries[at + 1], Entry::Source(0));
+        assert_eq!(labels[at + 1], "    ▸ C: (OS)");
+        // Its folder, under it.
+        assert_eq!(entries[at + 2], Entry::DeviceFolder(0, 0));
+        assert_eq!(labels[at + 2], "        ▸ Users");
     }
 
     /// A list with lists under it folds them: the plugin sources come this way.
@@ -634,6 +683,7 @@ mod tests {
     fn devices_and_other_sources_open_into_their_playlists() {
         let src = |device, name: &str, open| SourceRows {
             device,
+            local: false,
             downloaded: false,
             pinned: false,
             name: name.into(),

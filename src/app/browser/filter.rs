@@ -16,24 +16,6 @@ pub enum Media {
 }
 
 impl Media {
-    /// The next one in the cycle (the chip goes ALL → AUDIO → VIDEO → ALL).
-    pub fn next(self) -> Self {
-        match self {
-            Media::All => Media::Audio,
-            Media::Audio => Media::Video,
-            Media::Video => Media::All,
-        }
-    }
-
-    /// The name the chip shows.
-    pub fn label(self) -> &'static str {
-        match self {
-            Media::All => "ALL",
-            Media::Audio => "AUDIO",
-            Media::Video => "VIDEO",
-        }
-    }
-
     /// Whether the track passes: a track with no file (a cloud track) counts as audio until it is downloaded.
     pub fn keeps(self, t: &Track) -> bool {
         match self {
@@ -267,10 +249,6 @@ mod tests {
             ..Default::default()
         };
         assert!(!passes(&song, &video, &r) && passes(&clip, &video, &r));
-        // The chip cycles through the three.
-        assert_eq!(Media::All.next(), Media::Audio);
-        assert_eq!(Media::Audio.next(), Media::Video);
-        assert_eq!(Media::Video.next(), Media::All);
     }
 
     #[test]

@@ -200,18 +200,31 @@ Lo cerrado, con su commit:
 
 | ID | Lo que se hizo | Commit |
 |----|----------------|--------|
-| BR-01 | Las pistas de nube entran en la Colecci��n antes de sonar: el historial, el color de ""reproducida"" y las listas las nombran igual y la misma pista no se loguea dos veces | 64fe8f |
-| BR-02 | Secci��n ""Downloaded"" en el �rbol: lo que los plugins de nube descargan, como fuente real (se carga, se importa, se busca) | f8a746 |
-| BR-03 | ""Not in the Collection"" por fuente y bot��n para aadirlo todo de golpe | f8a746 |
-| BR-04 | Filtro de medio (ALL / AUDIO / VIDEO) y columna ""FORMATO"" (nota musical o pel��cula) |  f92826 |
-| BR-05 | ""Devices"" lista todos los vol��genes (no solo los de biblioteca de DJ) y cada uno lista sus carpetas de primer nivel, que se abren como fuente |  6bf868 |
-| BR-06 | Carpetas fijadas (bot��n FAV, secci��n ""Favorites"", pin por etiqueta de volumen + ruta relativa) y casillas para ocultar las secciones | 61921c |
-| BR-07 | B��squeda unificada (Colecci��n + �ndice de las fijadas + fuentes le��das) con columna ORIGIN, sin disparar las b��squedas en l��nea | 6b26d39 |
+| BR-01 | Las pistas de nube entran en la Colección antes de sonar: el historial, el color de "reproducida" y las listas las nombran igual y la misma pista no se loguea dos veces | f64fe8f |
+| BR-02 | Sección "Downloaded" en el árbol: lo que los plugins de nube descargan, como fuente real (se carga, se importa, se busca) | bf8a746 |
+| BR-03 | "Not in the Collection" por fuente y botón para añadirlo todo de golpe | bf8a746 |
+| BR-04 | Filtro de medio (ALL / AUDIO / VIDEO) y columna "FORMATO" (nota musical o película) | 0f92826 |
+| BR-05 | "Devices" lista todos los volúmenes (no solo los de biblioteca de DJ) y cada uno lista sus carpetas de primer nivel, que se abren como fuente | 06bf868 |
+| BR-06 | Carpetas fijadas (botón FAV, sección "Favorites", pin por etiqueta de volumen + ruta relativa) y casillas para ocultar las secciones | f61921c |
+| BR-07 | Búsqueda unificada (Colección + índice de las fijadas + fuentes leídas) con columna ORIGIN, sin disparar las búsquedas en línea | 6b26d39 |
 
 ### Lo que queda (de la fase 5 del plan)
 
-- Filtro por origen en la barra (All / Colecci��n / YouTube / Deezer / Dispositivos).
-- Preview de v��deo en la columna PREVIEW (un fotograma en vez de la onda).
-- Aviso de duplicado al importar (""esta pista ya est�� en la Colecci��n"").
-- La estrella de la fila fijable con el clic (hoy se fija con el bot��n FAV y la estrella es solo la marca).
-- Reindexar el �ndice de las fijadas cuando el volumen se reconecta (hoy se indexa al fijar).
+- Filtro por origen en la barra (All / Colección / YouTube / Deezer / Dispositivos).
+- Preview de vídeo en la columna PREVIEW (un fotograma en vez de la onda).
+- Aviso de duplicado al importar ("esta pista ya está en la Colección").
+- La estrella de la fila fijable con el clic (hoy se fija con el botón FAV y la estrella es solo la marca).
+- Reindexar el índice de las fijadas cuando el volumen se reconecta (hoy se indexa al fijar).
+
+## 13. Cuarta tanda (21/10/2026): los volúmenes - HECHO
+
+Lo cerrado:
+
+| ID | Lo que se hizo |
+|----|----------------|
+| BR-08 | Un disco duro USB aparece en "Devices": Windows responde `DRIVE_FIXED` a un disco externo y el escaneo solo aceptaba `DRIVE_REMOVABLE` (pendrive o tarjeta) |
+| BR-09 | El disco local se puede recorrer: el volumen del sistema (C:) se lista en la sección "Devices" como `C: (OS)` y sus carpetas de primer nivel se abren como fuentes de solo lectura |
+| BR-10 | Listar un volumen ya no lo barre entero: solo se lee el primer nivel (antes se recorría el disco entero buscando audio) y ahora se ven todas sus carpetas, no solo las que tienen audio |
+
+Sigue pendiente lo de la fase 5 (arriba) y el instalador de Windows (NSIS no está disponible en esta máquina: la
+release v0.2.3 queda como borrador).
