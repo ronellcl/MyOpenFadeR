@@ -765,6 +765,10 @@ impl View {
             })
             .collect();
         for i in fresh {
+            // A volume that has just been plugged in: its pinned folders are indexed again (the search finds them).
+            if let Kind::Device(d) = &self.sources[i].kind {
+                pinned::reindex_volume(d.label.clone());
+            }
             self.read_source(app, i);
         }
         let find = || {

@@ -95,6 +95,19 @@ pub fn unpin(p: &Pinned) {
     prefs::update(|s| s.pinned_folders.retain(|t| *t != text));
 }
 
+/// Re-indexes the pins of the volume `label` (it has just been plugged in): the search finds its tracks again without
+/// waiting for the folder to be pinned again. On a worker thread: reading a big folder takes a while.
+pub fn reindex_volume(label: String) {
+    std::thread::spawn(move || {
+        let Some(dev) = device::scan().into_iter().find(|d| d.label == label) else {
+            return;
+        };
+        for p in stored().into_iter().filter(|p| p.label == label) {
+            index(&p, &dev.mount);
+        }
+    });
+}
+
 /// Reads the folder of the pin `p` (the volume is mounted at `mount`) and keeps what it holds in the index: the
 /// search finds the tracks of a pinned folder without walking the stick again. Returns how many rows it holds.
 pub fn index(p: &Pinned, mount: &Path) -> usize {
