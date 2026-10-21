@@ -46,6 +46,29 @@ impl View {
                 .get(*s)
                 .map(|s| s.missing.clone())
                 .ok_or_else(|| "the source is not open".to_owned()),
+            (None, Home::DeviceFolder(d, j)) => self
+                .sources
+                .get(*d)
+                .and_then(|s| s.folder_libs.get(*j))
+                .and_then(|l| l.clone())
+                .ok_or_else(|| "the folder is not open".to_owned())
+                .and_then(|l| l.tracks(None)),
+            (None, Home::DeviceFolderList(d, j, k)) => self
+                .sources
+                .get(*d)
+                .and_then(|s| s.folder_libs.get(*j))
+                .and_then(|l| l.clone())
+                .ok_or_else(|| "the folder is not open".to_owned())
+                .and_then(|l| {
+                    let id = self
+                        .sources
+                        .get(*d)
+                        .and_then(|s| s.folders.get(*j))
+                        .and_then(|f| f.playlists.get(*k))
+                        .map(|p| p.id.clone())
+                        .ok_or_else(|| "the folder is not open".to_owned())?;
+                    l.tracks(Some(&id))
+                }),
         };
         let state = app.global::<BrowserState>();
         let plain = anchor.is_none();

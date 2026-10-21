@@ -342,6 +342,28 @@ pub fn open_library(d: &Device) -> Result<Box<dyn Library + Send>, String> {
     Ok(Box::new(plugin::library::open_with(plugin, &d.mount)?))
 }
 
+/// The top-level folders of the device that hold audio: what its tree lists under it. The whole tree is walked once
+/// (a big stick takes a while), so the caller keeps the answer instead of asking again.
+pub fn top_folders(d: &Device) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&d.mount) else {
+        return out;
+    };
+    for e in entries.flatten() {
+        let p = e.path();
+        if !p.is_dir() {
+            continue;
+        }
+        let mut files = Vec::new();
+        crate::library::folder::walk(&p, &mut files);
+        if !files.is_empty() {
+            out.push(p);
+        }
+    }
+    out.sort();
+    out
+}
+
 /// The names from the top level down to playlist `id` of `playlists` (a [`Library::playlists`] list in tree order), `None` for an
 /// unknown id: how a playlist is found again in a library written by another program, whose ids differ.
 pub fn playlist_path(playlists: &[library::Playlist], id: &str) -> Option<Vec<String>> {

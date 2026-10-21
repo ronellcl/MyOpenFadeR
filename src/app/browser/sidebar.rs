@@ -51,6 +51,10 @@ pub enum Entry {
     Source(usize),
     /// "All tracks" of an opened source.
     SourceAll(usize),
+    /// A top-level folder of a device: (device, index into its folders).
+    DeviceFolder(usize, usize),
+    /// A folder inside a device's folder: (device, folder, index into its playlists).
+    DeviceFolderList(usize, usize, usize),
     /// The tracks of an opened source the Collection does not have.
     SourceMissing(usize),
     /// A playlist of an opened source: (source, index into its playlists).
@@ -68,6 +72,15 @@ pub struct SourceRows {
     pub playlists: Vec<Playlist>,
     /// The tracks of the source the Collection does not have.
     pub missing: Vec<Track>,
+    /// A device's top-level folders (the ones with audio), each with its name and its subfolders.
+    pub folders: Vec<FolderRow>,
+}
+
+/// A top-level folder of a device, as the tree shows it.
+pub struct FolderRow {
+    pub name: String,
+    /// The folder's own subfolders, once it has been read.
+    pub playlists: Vec<Playlist>,
 }
 
 pub struct Inputs<'a> {
@@ -197,6 +210,20 @@ fn source_rows(rows: &mut Vec<(Entry, String)>, i: &Inputs, n: usize, d: usize) 
             },
         ),
     ));
+    // A device's own folders: each opens as a source, with its tracks and its subfolders.
+    rows.extend(s.folders.iter().enumerate().flat_map(|(j, f)| {
+        let mut r = vec![(
+            Entry::DeviceFolder(n, j),
+            indent(d + 1, &format!("▸ {}", f.name)),
+        )];
+        r.extend(
+            f.playlists
+                .iter()
+                .enumerate()
+                .map(|(k, p)| (Entry::DeviceFolderList(n, j, k), playlist_label(d + 2, p))),
+        );
+        r
+    }));
     if s.open {
         rows.push((Entry::SourceAll(n), indent(d + 1, "All tracks")));
         rows.extend(
@@ -382,6 +409,7 @@ mod tests {
             open,
             playlists: Vec::new(),
             missing: vec![Track::default(); missing],
+            folders: Vec::new(),
         };
         let sources = [
             src("YouTube", false, true, true, 3),
@@ -422,6 +450,47 @@ mod tests {
         assert!(!labels.iter().any(|l| l == "    ▸ Explorer"));
     }
 
+    /// A device lists its top-level folders (the ones with audio) under it, each with its own subfolders.
+    #[test]
+    fn a_device_lists_its_own_folders() {
+        let sources = [SourceRows {
+            device: true,
+            downloaded: false,
+            name: "USB (vfat)".into(),
+            open: false,
+            playlists: Vec::new(),
+            missing: Vec::new(),
+            folders: vec![FolderRow {
+                name: "Musica".into(),
+                playlists: vec![pl("Rock", 0, false)],
+            }],
+        }];
+        let (entries, labels) = build(&Inputs {
+            tag_list: 0,
+            session: 0,
+            lib: &[],
+            nodes: &[],
+            days: &[],
+            cats: &[],
+            tags: &[],
+            sources: &sources,
+            all_tracks: false,
+            cue_analysis: None,
+            banks: None,
+        });
+        let at = labels
+            .iter()
+            .position(|l| l == "▸ Devices")
+            .expect("the devices have their own section");
+        assert_eq!(entries[at + 1], Entry::Source(0));
+        assert_eq!(labels[at + 1], "    USB (vfat)");
+        // The folder and the folder inside it.
+        assert_eq!(entries[at + 2], Entry::DeviceFolder(0, 0));
+        assert_eq!(labels[at + 2], "        ▸ Musica");
+        assert_eq!(entries[at + 3], Entry::DeviceFolderList(0, 0, 0));
+        assert_eq!(labels[at + 3], "            Rock");
+    }
+
     #[test]
     fn subtree_takes_the_folder_and_all_it_nests() {
         let lib = [
@@ -446,6 +515,7 @@ mod tests {
             open,
             playlists: vec![pl("Set", 0, true), pl("Inner", 1, false)],
             missing: Vec::new(),
+            folders: Vec::new(),
         };
         let sources = [
             src(true, "USB (vfat)", true),

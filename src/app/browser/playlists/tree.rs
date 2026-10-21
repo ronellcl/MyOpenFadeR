@@ -214,8 +214,10 @@ impl View {
     pub(in crate::app::browser) fn select(&mut self, app: &App, row: usize) {
         if let Some(e) = self.entries.get(row).cloned() {
             self.entry = e;
-            if let Entry::Source(i) = self.entry {
-                self.open_source(app, i);
+            match self.entry {
+                Entry::Source(i) => self.open_source(app, i),
+                Entry::DeviceFolder(d, j) => self.open_device_folder(app, d, j),
+                _ => {}
             }
             self.show(app);
         }

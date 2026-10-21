@@ -155,6 +155,10 @@ enum Home {
     Source(usize, Option<String>),
     /// The tracks of an opened external source the Collection does not have.
     SourceMissing(usize),
+    /// A top-level folder of a device: (device, index into its folders).
+    DeviceFolder(usize, usize),
+    /// A folder inside a device's folder: (device, folder, index into its playlists).
+    DeviceFolderList(usize, usize, usize),
 }
 
 /// The whole library with each track's store key, read again only when the store changed ([`Store::generation`]).

@@ -8,7 +8,7 @@
 
 use super::{
     loading,
-    sidebar::{Entry, SourceRows},
+    sidebar::{Entry, FolderRow, SourceRows},
     App, BrowserState, Home, View,
 };
 use crate::app::{prefs, toast};
@@ -39,6 +39,8 @@ pub enum Kind {
         label: String,
         path: PathBuf,
     },
+    /// A top-level folder of a device: it opens as a folder source, read-only.
+    DeviceFolder { path: PathBuf },
 }
 
 pub struct Source {
@@ -49,8 +51,22 @@ pub struct Source {
     pub playlists: Vec<Playlist>,
     /// The tracks of the source the Collection does not have (the files it lists that the Collection lacks).
     pub missing: Vec<Track>,
+    /// A device's top-level folders (the ones with audio) and, for each, what was read of it.
+    pub folders: Vec<DeviceFolder>,
+    /// The library of each folder of [`Source::folders`], once it was read (the folders keep their own).
+    pub folder_libs: Vec<Option<Rc<dyn Library>>>,
     /// Being read on a worker thread ([`View::read_source`]).
     reading: bool,
+}
+
+/// A top-level folder of a device: it opens as a source of its own, with its tracks and its subfolders.
+pub struct DeviceFolder {
+    /// The folder's name, as the device shows it.
+    pub name: String,
+    /// Where it is on the device.
+    pub path: PathBuf,
+    /// The folder's own subfolders, once it has been read.
+    pub playlists: Vec<Playlist>,
 }
 
 impl Kind {
@@ -69,6 +85,7 @@ impl Kind {
             ) => a == b && p == q,
             (Kind::Explorer(a), Kind::Explorer(b)) => a == b,
             (Kind::Downloaded { path: a, .. }, Kind::Downloaded { path: b, .. }) => a == b,
+            (Kind::DeviceFolder { path: a }, Kind::DeviceFolder { path: b }) => a == b,
             _ => false,
         }
     }
@@ -87,6 +104,10 @@ impl Kind {
             Kind::Plugin { label, .. } => label.clone(),
             Kind::Explorer(_) => "Explorer".to_owned(),
             Kind::Downloaded { label, .. } => label.clone(),
+            Kind::DeviceFolder { path } => path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
         }
     }
 
@@ -99,6 +120,7 @@ impl Kind {
             }
             Kind::Explorer(p) => Ok(Box::new(Folder::open(p)?)),
             Kind::Downloaded { path, .. } => Ok(Box::new(Folder::open(path)?)),
+            Kind::DeviceFolder { path } => Ok(Box::new(Folder::open(path)?)),
         }
     }
 }
@@ -114,7 +136,6 @@ pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
     kinds.extend(
         device::scan()
             .into_iter()
-            .filter(Device::has_library)
             .map(Kind::Device),
     );
     kinds.extend(
@@ -155,6 +176,8 @@ pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
                     lib: None,
                     playlists: Vec::new(),
                     missing: Vec::new(),
+                    folders: Vec::new(),
+                    folder_libs: Vec::new(),
                     reading: false,
                 },
             }
@@ -192,6 +215,7 @@ impl Source {
                     source: source.clone(),
                 },
             )),
+            Kind::DeviceFolder { path } => Some((path.clone(), SourceType::Folder)),
         }
     }
 }
@@ -285,6 +309,14 @@ impl View {
                 open: s.lib.is_some(),
                 playlists: s.playlists.clone(),
                 missing: s.missing.clone(),
+                folders: s
+                    .folders
+                    .iter()
+                    .map(|f| FolderRow {
+                        name: f.name.clone(),
+                        playlists: f.playlists.clone(),
+                    })
+                    .collect(),
             })
             .collect()
     }
@@ -314,6 +346,8 @@ impl View {
                     13
                 }
             }
+            // A folder of a device: its tracks can be imported, but it is not a library to connect.
+            Entry::DeviceFolder(..) | Entry::DeviceFolderList(..) => 14,
             Entry::SourceList(i, j)
                 if self
                     .sources
@@ -350,6 +384,8 @@ impl View {
                 }
             }
             Entry::SourceMissing(i) => Home::SourceMissing(*i),
+            Entry::DeviceFolder(d, j) => Home::DeviceFolder(*d, *j),
+            Entry::DeviceFolderList(d, j, k) => Home::DeviceFolderList(*d, *j, *k),
             Entry::DevicesRoot | Entry::DownloadedRoot => Home::Nothing,
             _ => return None,
         })
@@ -379,6 +415,16 @@ impl View {
                 *i,
                 Some(self.sources.get(*i)?.playlists.get(*j)?.id.clone()),
             ),
+            // A folder of a device: its path and the list inside it (its own subfolder).
+            Entry::DeviceFolder(d, j) => {
+                let path = self.sources.get(*d)?.folders.get(*j)?.path.clone();
+                return Some((path, SourceType::Folder, None));
+            }
+            Entry::DeviceFolderList(d, j, k) => {
+                let path = self.sources.get(*d)?.folders.get(*j)?.path.clone();
+                let list = self.sources.get(*d)?.folders.get(*j)?.playlists.get(*k)?.id.clone();
+                return Some((path, SourceType::Folder, Some(list)));
+            }
             _ => return None,
         };
         let (path, kind) = self.sources.get(i)?.path()?;
@@ -431,6 +477,25 @@ impl View {
         }
     }
 
+    /// The folder `j` of the device `i` was chosen: read it as a source of its own (its tracks and its subfolders).
+    pub(super) fn open_device_folder(&mut self, app: &App, i: usize, j: usize) {
+        let Some(folder) = self.sources.get(i).and_then(|s| s.folders.get(j)) else {
+            return;
+        };
+        if self
+            .sources
+            .get(i)
+            .and_then(|s| s.folder_libs.get(j))
+            .is_some_and(Option::is_some)
+        {
+            return;
+        }
+        let path = folder.path.clone();
+        let name = folder.name.clone();
+        loading(app, &format!("{name}: reading…"), Some(0.0));
+        read(app, Kind::DeviceFolder { path });
+    }
+
     /// Starts reading source `i` on a worker unless it is read or being read ([`read`]).
     fn read_source(&mut self, app: &App, i: usize) {
         let Some(s) = self
@@ -446,8 +511,45 @@ impl View {
     }
 
     /// Source `kind` was read ([`read`]): list it, say so, and show it when its row is still chosen.
-    fn source_read(&mut self, app: &App, kind: Kind, read: Read, secs: f32) {
+    fn source_read(
+        &mut self,
+        app: &App,
+        kind: Kind,
+        read: Read,
+        folders: Vec<DeviceFolder>,
+        secs: f32,
+    ) {
         loading(app, "", None);
+        // A device's folder: its library goes into the folder it belongs to.
+        if let Kind::DeviceFolder { path } = &kind {
+            let text = match read {
+                Ok((lib, playlists, tracks, _)) => {
+                    let lib: Rc<dyn Library> = Rc::<dyn Library + Send>::from(lib);
+                    for s in &mut self.sources {
+                        if let Some(at) = s.folders.iter().position(|f| &f.path == path) {
+                            if s.folder_libs.len() <= at {
+                                s.folder_libs.resize(at + 1, None);
+                            }
+                            s.folder_libs[at] = Some(lib.clone());
+                            s.folders[at].playlists = playlists.clone();
+                        }
+                    }
+                    let s_ = |n: usize| if n == 1 { "" } else { "s" };
+                    format!(
+                        "{}: {tracks} track{} ready ({secs:.1} s)",
+                        kind.short(),
+                        s_(tracks),
+                    )
+                }
+                Err(e) => format!("{}: cannot read it: {e}", kind.short()),
+            };
+            eprintln!("{text}");
+            toast::show(app, &text);
+            self.say(app, text);
+            self.rebuild(app);
+            self.show(app);
+            return;
+        }
         let Some(i) = self.sources.iter().position(|s| s.kind.same(&kind)) else {
             return; // unplugged or switched off meanwhile
         };
@@ -468,6 +570,32 @@ impl View {
             }
             Err(e) => format!("{}: cannot read it: {e}", kind.short()),
         };
+        // A device's folders: the ones read before keep their library, the new ones are listed.
+        if !folders.is_empty() {
+            let old: Vec<DeviceFolder> = std::mem::take(&mut s.folders);
+            let libs: Vec<Option<Rc<dyn Library>>> = std::mem::take(&mut s.folder_libs);
+            s.folders = folders
+                .into_iter()
+                .map(|f| {
+                    let playlists = old
+                        .iter()
+                        .find(|o| o.path == f.path)
+                        .map(|o| o.playlists.clone())
+                        .unwrap_or_default();
+                    DeviceFolder { playlists, ..f }
+                })
+                .collect();
+            s.folder_libs = s
+                .folders
+                .iter()
+                .map(|f| {
+                    old.iter()
+                        .position(|o| o.path == f.path)
+                        .and_then(|at| libs.get(at).cloned())
+                        .flatten()
+                })
+                .collect();
+        }
         eprintln!("{text}");
         toast::show(app, &text);
         self.say(app, text);
@@ -556,6 +684,21 @@ fn read(app: &App, kind: Kind) {
                 }
             });
         }
+        // A device's top-level folders: the tree walks the stick once, here, and keeps the answer.
+        let folders = match &kind {
+            Kind::Device(d) => device::top_folders(d)
+                .into_iter()
+                .map(|p| DeviceFolder {
+                    name: p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
+                    path: p,
+                    playlists: Vec::new(),
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
         step(format!("{name}: listing tracks and playlists"), 0.85);
         let read: Read = kind.open().and_then(|lib| {
             let playlists = lib.playlists()?;
@@ -567,7 +710,8 @@ fn read(app: &App, kind: Kind) {
         let secs = start.elapsed().as_secs_f32();
         let _ = slint::invoke_from_event_loop(move || {
             if let (Some(app), Some(view)) = (weak.upgrade(), super::view()) {
-                view.borrow_mut().source_read(&app, kind, read, secs);
+                view.borrow_mut()
+                    .source_read(&app, kind, read, folders, secs);
             }
         });
     });
