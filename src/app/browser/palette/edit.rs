@@ -79,14 +79,21 @@ impl Palette {
     /// `t` goes to the end of palette `pal`'s list; a blank palette first makes "Untitled Playlist" and asks for its name.
     pub(super) fn add_track(&self, app: &App, v: &mut View, pal: usize, t: &Track) {
         if pal == 0 {
-            let msg = if v.tags.contains(t) {
+            // The Tag List keeps the track's key, so a cloud track joins the Collection first: its key is the row, not a
+            // name that nothing resolves later.
+            let t = match v.in_collection(t.clone()) {
+                Ok(t) => t,
+                Err(e) => return v.say(app, format!("store: {e}")),
+            };
+            let msg = if v.tags.contains(&t) {
                 format!("“{}” is already in the Tag List", t.title)
             } else if v.tags.len() >= TAG_LIST_MAX {
                 format!("the Tag List holds up to {TAG_LIST_MAX} tracks")
             } else {
-                v.tags.push(t.clone());
+                let title = t.title.clone();
+                v.tags.push(t);
                 v.tags_changed(app);
-                format!("tagged “{}” ({} in the Tag List)", t.title, v.tags.len())
+                format!("tagged “{title}” ({} in the Tag List)", v.tags.len())
             };
             v.say(app, msg);
             return self.sync(v);

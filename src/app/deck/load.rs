@@ -83,6 +83,10 @@ impl Deck {
         if self.eject_locked() {
             return;
         }
+        // A cloud track (a plugin source) has no file, and the row it gets in the Collection is what the history, the
+        // "played" colour and the playlists key on: without a row the same track is logged twice, under two keys.
+        let t = self.in_collection(t);
+        let t = &t;
         self.bank.borrow_mut().take(); // an ordinary LOAD drops a Cue Bank ([`Deck::bank_pad`] puts it back)
         self.autoplay.set(false);
         self.download.borrow_mut().take(); // a download in progress is for a track that is no longer wanted
@@ -133,6 +137,18 @@ impl Deck {
             // The deck has its audio: the bandwidth is free for the track that comes next.
             prefetch_next(t);
         }
+    }
+
+    /// The track with its Collection row: a cloud track joins the Collection the first time it is played, so the
+    /// history, the "played" colour and the playlists all name it the same way. The upsert finds the row of a track
+    /// that is already in the Collection by its source and id, so it is never duplicated.
+    fn in_collection(&self, t: &Track) -> Track {
+        if t.id.is_some() || t.remote.is_none() {
+            return t.clone();
+        }
+        let mut t = t.clone();
+        t.id = store::global().collection_upsert(&t, None).ok();
+        t
     }
 
     /// Picks up a finished download: the track loads again, now with its file. A failure ends the loading state.

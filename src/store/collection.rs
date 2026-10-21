@@ -613,4 +613,27 @@ mod tests {
         assert_eq!(s.edits(&id_key(ic)).unwrap().rating, Some(2));
         std::fs::remove_dir_all(&d).unwrap();
     }
+
+    /// A cloud track (a plugin source) has no file: its row in the Collection is its identity, and the history, the
+    /// playlists and the "played" colour all name it by that row. Playing it twice must not make two rows.
+    #[test]
+    fn a_cloud_track_keeps_one_row_and_its_key() {
+        let s = Store::in_memory().unwrap();
+        let t = Track {
+            title: "Just Dance".into(),
+            artist: "Elvis".into(),
+            remote: Some(Remote {
+                plugin: "yt-dlp".into(),
+                source: "youtube".into(),
+                id: "19KstSgU-c0".into(),
+            }),
+            ..Track::default()
+        };
+        let id = s.collection_upsert(&t, None).unwrap();
+        // The same track played again: the same row (its source and id are its identity).
+        assert_eq!(s.collection_upsert(&t, None).unwrap(), id);
+        assert_eq!(s.collection_tracks().unwrap().len(), 1);
+        // With the row, its key is the row's: the history and the playlists name it the same way.
+        assert_eq!(key(&Track { id: Some(id), ..t }), id_key(id));
+    }
 }
