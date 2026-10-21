@@ -146,6 +146,21 @@ impl Store {
         Ok(rows.into_iter().collect())
     }
 
+    /// The title and the artist of the cloud tracks of a source, by their id: what a downloaded file shows when it was
+    /// downloaded before the plugin wrote its tags (the file is named after the id).
+    pub fn collection_remote_titles(&self, plugin: &str, source: &str) -> R<HashMap<String, (String, String)>> {
+        let rows: Vec<(String, String, String)> = query_all(
+            &self.db(),
+            "SELECT remote_id, title, artist FROM collection WHERE plugin = ?1 AND source = ?2",
+            [plugin, source],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)),
+        )?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, title, artist)| (id, (title, artist)))
+            .collect())
+    }
+
     /// The only row whose file has this name and size (what [`key`] gives a track without an id); `None` for none or several.
     pub(super) fn id_of_file(&self, name: &str, size: u64) -> Option<i64> {
         let mut cache = self.cache.lock();

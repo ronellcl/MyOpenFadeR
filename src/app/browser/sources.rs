@@ -19,7 +19,7 @@ use openfader::{
     plugin, store,
 };
 use slint::ComponentHandle;
-use std::{path::PathBuf, rc::Rc, time::Instant};
+use std::{collections::HashMap, path::PathBuf, rc::Rc, time::Instant};
 
 /// Where a source comes from.
 #[derive(Clone, Debug, PartialEq)]
@@ -127,7 +127,36 @@ impl Kind {
                 Ok(Box::new(plugin::library::open_with(plugin, path)?))
             }
             Kind::Explorer(p) => Ok(Box::new(Folder::open(p)?)),
-            Kind::Downloaded { path, .. } => Ok(Box::new(Folder::open(path)?)),
+            Kind::Downloaded {
+                plugin,
+                source,
+                path,
+                ..
+            } => {
+                let inner = Box::new(Folder::open(path)?);
+                let mut names = store::global()
+                    .collection_remote_titles(plugin, source)
+                    .unwrap_or_default();
+                // The files downloaded before the plugin wrote its tags: the plugin says what they are.
+                let unknown: Vec<String> = inner
+                    .tracks(None)
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(|t| t.file.as_deref().and_then(|f| f.file_stem()))
+                    .filter_map(|s| s.to_str())
+                    .filter(|s| !names.contains_key(*s))
+                    .map(str::to_owned)
+                    .take(50)
+                    .collect();
+                if !unknown.is_empty()
+                    && let Ok(info) = plugin::source::info(plugin, source, &unknown)
+                {
+                    for (id, title, artist) in info {
+                        names.insert(plugin::source::file_name(&id), (title, artist));
+                    }
+                }
+                Ok(Box::new(Named { inner, names }))
+            }
             Kind::DeviceFolder { path } => Ok(Box::new(Folder::open(path)?)),
             Kind::Pinned { path, .. } => Ok(Box::new(Folder::open(path)?)),
         }
@@ -274,6 +303,47 @@ fn holds_audio(dir: &std::path::Path) -> bool {
             .then(|| library::folder::is_audio(&e.path()))
             .unwrap_or(false)
     })
+}
+
+/// The download folder of a plugin source: its files, named with the title and the artist the Collection knows of
+/// that track. A file downloaded before the plugin wrote its tags shows the id (its name), and the Collection's cloud
+/// row of the same track has the title.
+struct Named {
+    inner: Box<dyn Library + Send>,
+    /// The remote id → (title, artist) of the Collection's cloud rows of this source.
+    names: HashMap<String, (String, String)>,
+}
+
+impl Library for Named {
+    fn kind(&self) -> &str {
+        self.inner.kind()
+    }
+
+    fn playlists(&self) -> Result<Vec<Playlist>, String> {
+        self.inner.playlists()
+    }
+
+    fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {
+        Ok(self
+            .inner
+            .tracks(playlist)?
+            .into_iter()
+            .map(|mut t| {
+                let stem = t.file.as_deref().and_then(|f| f.file_stem()).and_then(|s| s.to_str());
+                if let Some((title, artist)) = stem.and_then(|s| self.names.get(s))
+                    && (t.title.is_empty() || Some(t.title.as_str()) == stem)
+                {
+                    if !title.is_empty() {
+                        t.title = title.clone();
+                    }
+                    if t.artist.is_empty() {
+                        t.artist = artist.clone();
+                    }
+                }
+                t
+            })
+            .collect())
+    }
 }
 
 /// The tracks of the source the Collection does not have: the files it lists that the Collection does not list yet. A

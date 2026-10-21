@@ -341,6 +341,19 @@ Write the audio into `dir` as `<name>.<extension>` and answer its path (relative
 * Make the file appear complete: download into a temporary folder and rename it into `dir` at the end.
 * `dir` is `<data dir>/plugins/<plugin>/<source>/`; the data dir is `$XDG_DATA_HOME/openfader` (else `~/.local/share/openfader`).
   Deleting files there is safe, they are fetched again.
+* **Write the tags in the file** (the title, the artist, the album): the file of a download is named after the id, so without
+  the tags the browser would show the id and nothing else. The app reads the tags of the file it lists.
+
+**`info`**: the title and the artist of some tracks of the source, by their id. The app asks for the files of a download
+folder that were fetched before the plugin wrote the tags (or that it could not write), to show their title instead of
+the id.
+
+```json
+{"op": "info", "source": "youtube", "ids": ["K0HSD_i2DvA", "9bZkp7q19f0"]}
+→ {"tracks": [{"id": "K0HSD_i2DvA", "title": "Katy Perry - Roar", "artist": "Katy Perry"}]}
+```
+
+Answer only the ids you know (the rest are left out) and never fail the whole request because of one of them.
 
 ### Actions
 

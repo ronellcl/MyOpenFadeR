@@ -14,6 +14,8 @@ use std::time::Duration;
 
 /// Time a download may take.
 const FETCH_TIMEOUT: Duration = Duration::from_secs(900);
+/// Time the answer about the titles of a few tracks may take.
+const INFO_TIMEOUT: Duration = Duration::from_secs(120);
 /// Extensions of files a plugin may leave in the download folder while it is still writing them.
 const UNFINISHED: [&str; 3] = ["part", "tmp", "ytdl"];
 
@@ -104,9 +106,32 @@ pub fn fetch_in(registry: &Registry, root: &Path, r: &Remote) -> Result<PathBuf,
     result
 }
 
+/// The title and the artist of the tracks of a source, by their id: what a file downloaded before the plugin wrote its
+/// tags shows (the file is named after the id). The plugin answers from its own catalogue.
+pub fn info(plugin: &str, source: &str, ids: &[String]) -> Result<Vec<(String, String, String)>, String> {
+    let p = registry()
+        .get(plugin)
+        .ok_or_else(|| format!("plugin {plugin} is not installed"))?;
+    let reply = p.call(
+        &json!({"op": "info", "source": source, "ids": ids}),
+        INFO_TIMEOUT,
+    )?;
+    let mut out = Vec::new();
+    for t in reply["tracks"].as_array().into_iter().flatten() {
+        let (Some(id), Some(title)) = (t["id"].as_str(), t["title"].as_str()) else {
+            continue;
+        };
+        out.push((
+            id.to_owned(),
+            title.to_owned(),
+            t["artist"].as_str().unwrap_or_default().to_owned(),
+        ));
+    }
+    Ok(out)
+}
+
 /// The download itself: the plugin writes the audio into the folder and answers with its path.
-fn fetch_now(registry: &Registry, dir: &Path, name: &str, r: &Remote) -> Result<PathBuf, String> {
-    let plugin = registry
+fn fetch_now(registry: &Registry, dir: &Path, name: &str, r: &Remote) -> Result<PathBuf, String> {    let plugin = registry
         .get(&r.plugin)
         .ok_or_else(|| format!("plugin {} is not installed", r.plugin))?;
     crate::paths::at(std::fs::create_dir_all(dir), dir)?;
