@@ -220,7 +220,7 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         .filter(|(_, s)| s.pinned)
         .map(|(n, _)| n)
         .collect();
-    if !pinned.is_empty() && i.sections.favorites {
+    if i.sections.favorites {
         rows.push((Entry::FavoritesRoot, "▸ Favorites".to_owned()));
         for n in &pinned {
             rows.push((Entry::Pinned(*n), indent(1, &format!("★ {}", i.sources[*n].name))));
@@ -234,13 +234,13 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         .filter(|(_, s)| s.downloaded)
         .map(|(n, _)| n)
         .collect();
-    if !downloaded.is_empty() && i.sections.downloaded {
+    if i.sections.downloaded {
         rows.push((Entry::DownloadedRoot, "▸ Downloaded".to_owned()));
         for n in downloaded {
             source_rows(&mut rows, i, n, 1);
         }
     }
-    if i.sections.devices && i.sources.iter().any(|s| s.device) {
+    if i.sections.devices {
         rows.push((Entry::DevicesRoot, "▸ Devices".to_owned()));
     }
     for (n, s) in i.sources.iter().enumerate() {
@@ -423,6 +423,9 @@ mod tests {
                 "▸ Library (read-only)",
                 "    ▸ Folder",
                 "        Inner",
+                "▸ Favorites",
+                "▸ Downloaded",
+                "▸ Devices",
             ]
         );
         assert_eq!(entries.len(), labels.len());
@@ -461,7 +464,11 @@ mod tests {
                 Entry::UserRoot,
                 Entry::HistoryRoot,
                 Entry::TagsRoot,
-                Entry::LibRoot
+                Entry::LibRoot,
+                // The sections of the tree are always there, empty or not: the user sees them and can hide them.
+                Entry::FavoritesRoot,
+                Entry::DownloadedRoot,
+                Entry::DevicesRoot,
             ]
         );
     }
