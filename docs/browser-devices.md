@@ -101,6 +101,7 @@ plugin's search box the filter leaves the box alone (the plugin's results are no
 
 The index of the pinned folders is read when a folder is pinned and kept in a table of its own (`folder_index`): the
 search finds the tracks of a stick without walking it again. The rows are read-only and are not in the Collection.
+When a volume is plugged in again, the folders pinned on it are indexed again, so the search finds them right away.
 
 ## 7. The cloud tracks behave like any other song
 

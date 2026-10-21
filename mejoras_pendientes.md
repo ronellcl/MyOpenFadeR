@@ -214,7 +214,6 @@ Lo cerrado, con su commit:
 - Preview de vídeo en la columna PREVIEW (un fotograma en vez de la onda).
 - Aviso de duplicado al importar ("esta pista ya está en la Colección").
 - La estrella de la fila fijable con el clic (hoy se fija con el botón FAV y la estrella es solo la marca).
-- Reindexar el índice de las fijadas cuando el volumen se reconecta (hoy se indexa al fijar).
 
 ## 13. Cuarta tanda (21/10/2026): los volúmenes - HECHO
 
@@ -226,6 +225,7 @@ Lo cerrado:
 | BR-09 | El disco local se puede recorrer: el volumen del sistema (C:) se lista en la sección "Devices" como `C: (OS)` y sus carpetas de primer nivel se abren como fuentes de solo lectura | 2a7192a |
 | BR-10 | Listar un volumen ya no lo barre entero: solo se lee el primer nivel (antes se recorría el disco entero buscando audio) y ahora se ven todas sus carpetas, no solo las que tienen audio | 2a7192a |
 | BR-11 | El instalador de Windows se compila otra vez (NSIS 3.11) y sube a la release v0.2.3, ya publicada | f1a0901 |
+| BR-12 | Las carpetas fijadas se reindexan cuando el volumen se reconecta (ya no hay que fijarlas otra vez para que la búsqueda las encuentre) | a50a361 |
 
 Sigue pendiente lo de la fase 5 (arriba) y el instalador de Windows (NSIS no está disponible en esta máquina: la
 release v0.2.3 queda como borrador).
