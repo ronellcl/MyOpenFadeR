@@ -199,19 +199,26 @@ pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
     }));
     // What the plugin sources downloaded: their folders in the data dir, in the tree's "Downloaded" section.
     kinds.extend(downloaded());
-    // The cloud plugins the user can search and download from: Deezer, YouTube, SoundCloud. Each shows its own
+    // The cloud plugins the user can search and download from: Deezer, YouTube/SoundCloud. Each shows its own
     // sub-entries (Search, Downloads, …) in the tree itself.
     for p in plugin::registry().plugins.iter() {
-        match p.manifest.name.as_str() {
-            "Deezer" | "YouTube" | "SoundCloud" => {
-                kinds.push(Kind::OnlinePlugin {
-                    plugin: p.manifest.name.clone(),
-                    label: p.manifest.name.clone(),
-                });
-            }
-            _ => {}
-        }
+        let (plugin, label) = match p.manifest.name.as_str() {
+            "deezer" => ("deezer".to_owned(), "Deezer".to_owned()),
+            "yt-dlp" => ("yt-dlp".to_owned(), "YouTube / SoundCloud".to_owned()),
+            _ => continue,
+        };
+        kinds.push(Kind::OnlinePlugin { plugin, label });
     }
+    // Library plugins with a library file (iTunes, engine-dj, rekordbox, …): each shows its own file as a source.
+    kinds.extend(
+        plugin::library::sources()
+            .into_iter()
+            .map(|s| Kind::Plugin {
+                plugin: s.plugin,
+                label: s.label,
+                path: s.path,
+            }),
+    );
     kinds.extend(
         device::scan()
             .into_iter()
@@ -483,10 +490,13 @@ impl View {
     pub(super) fn source_side_kind(&self, e: &Entry) -> Option<i32> {
         let device = |i: &usize| self.sources.get(*i).is_some_and(Source::is_device);
         let downloaded = |i: &usize| self.sources.get(*i).is_some_and(Source::is_downloaded);
+        let online_plugin = |i: &usize| self.sources.get(*i).is_some_and(Source::is_online_plugin);
         Some(match e {
             Entry::DevicesRoot | Entry::DownloadedRoot | Entry::Source(_) => 10,
             // A system folder: its tracks can be imported, but it is not a library to connect.
             Entry::SystemFolder(_) => 14,
+            // A cloud plugin: its sub-entries (Search, Downloads, playlists) do the work.
+            Entry::OnlinePlugin(_) => 10,
             // A pinned folder: its tracks can be imported, but it is not a library to connect.
             Entry::Pinned(i) => {
                 if self.sources.get(*i).is_some_and(|s| s.is_device()) {
@@ -500,6 +510,8 @@ impl View {
                     10
                 } else if downloaded(i) {
                     14
+                } else if online_plugin(i) {
+                    10
                 } else {
                     11
                 }
@@ -523,11 +535,19 @@ impl View {
             {
                 if device(i) {
                     12
+                } else if online_plugin(i) {
+                    11
                 } else {
                     11
                 }
             }
             Entry::SourceList(..) => 10,
+            // A cloud plugin's Search: the plugin's own search box.
+            Entry::OnlineSearch(..) => 10,
+            // A cloud plugin's Downloads: import to collection.
+            Entry::OnlineDownloads(..) => 14,
+            // A cloud plugin's playlist: import to collection.
+            Entry::OnlinePlaylist(..) => 11,
             _ => return None,
         })
     }
@@ -759,6 +779,10 @@ impl View {
                 "{}: {} folders to browse ({secs:.1} s)",
                 kind.short(),
                 folders.len()
+            ),
+            // A cloud plugin holds no local files: its entries (Search, Downloads, …) are listed by the tree.
+            Err(_) if matches!(kind, Kind::OnlinePlugin { .. }) => format!(
+                "{}: choose Search, Downloads or a playlist below", kind.short()
             ),
             Err(e) => format!("{}: cannot read it: {e}", kind.short()),
         };
