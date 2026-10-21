@@ -29,7 +29,8 @@ pub mod connect;
 mod device;
 pub mod device_settings;
 mod gain;
-mod history;
+pub mod history;
+pub mod index;
 mod journal;
 mod matching;
 mod node;
@@ -177,6 +178,13 @@ const MIGRATIONS: &[&str] = &[
     "ALTER TABLE collection ADD COLUMN plugin TEXT;
      ALTER TABLE collection ADD COLUMN source TEXT;
      ALTER TABLE collection ADD COLUMN remote_id TEXT;",
+    // v17: the index of the pinned folders (src/store/index.rs): what they hold, read once and kept, so the search
+    // finds them without walking the stick again. The rows are read-only and are not in the Collection.
+    "CREATE TABLE folder_index (
+     id INTEGER PRIMARY KEY, volume TEXT NOT NULL, path TEXT NOT NULL, title TEXT NOT NULL, artist TEXT NOT NULL,
+     album TEXT NOT NULL, genre TEXT NOT NULL, bpm_x100 INTEGER NOT NULL, length_s INTEGER NOT NULL, key TEXT NOT NULL,
+     size INTEGER NOT NULL, mtime INTEGER NOT NULL);
+     CREATE INDEX folder_index_volume ON folder_index(volume);",
 ];
 
 /// The database behind a mutex: every method locks it for one call, so a `Store` is shared as

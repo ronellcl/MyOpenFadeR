@@ -23,7 +23,9 @@ pub const PLAYED: usize = 10;
 pub const DOWNLOADED: usize = 11;
 /// The media the track is: "a" audio, "v" video, "?" a cloud track with no file yet.
 pub const FORMAT: usize = 12;
-pub const COLUMNS: usize = 13;
+/// Where the row comes from (the search results only): the Collection, a folder, a volume.
+pub const ORIGIN: usize = 13;
+pub const COLUMNS: usize = 14;
 pub const KEY: usize = 3;
 
 /// BPM hint window: ± this fraction of the playing deck's BPM.
@@ -49,6 +51,8 @@ pub struct Facts {
     pub downloaded: bool,
     /// The media the track is: audio, video, or unknown (a cloud track with no file yet).
     pub format: Format,
+    /// Where the row comes from (the search results only).
+    pub origin: String,
 }
 
 /// The media a track is: what the FORMAT column shows.
@@ -84,6 +88,7 @@ impl Facts {
                 .as_ref()
                 .is_some_and(openfader::plugin::source::is_downloaded),
             format: Format::of(t),
+            origin: String::new(),
         }
     }
 }
@@ -153,6 +158,7 @@ pub fn cell_of(t: &Track, f: &Facts, col: usize, look: &Look) -> String {
         TIME => t.length_text(),
         RATING => "★".repeat(t.rating.into()),
         FORMAT => f.format.text().to_owned(),
+        ORIGIN => f.origin.clone(),
         _ => t.comment.clone(),
     }
 }

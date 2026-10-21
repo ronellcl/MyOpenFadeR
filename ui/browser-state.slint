@@ -51,6 +51,8 @@ export global BrowserState {
     callback filter-changed();
     /// The chosen tree row is a folder that can be pinned (the FAV button works).
     in property <bool> fav-possible;
+    /// The search results say where each row comes from (the ORIGIN column).
+    in property <bool> search-view;
     /// The chosen tree row is a pinned folder (the FAV button takes the pin off).
     in property <bool> fav-pinned;
     /// Pins the chosen folder or takes the pin off.

@@ -9,6 +9,7 @@
 
 use crate::app::prefs;
 use openfader::device::{self, Device};
+use slint::ComponentHandle;
 use std::path::{Path, PathBuf};
 
 /// A pinned folder: the volume's label and the path of the folder below it.
@@ -94,6 +95,48 @@ pub fn unpin(p: &Pinned) {
     prefs::update(|s| s.pinned_folders.retain(|t| *t != text));
 }
 
+/// Reads the folder of the pin `p` (the volume is mounted at `mount`) and keeps what it holds in the index: the
+/// search finds the tracks of a pinned folder without walking the stick again. Returns how many rows it holds.
+pub fn index(p: &Pinned, mount: &Path) -> usize {
+    let mut files = Vec::new();
+    openfader::library::folder::walk(&mount.join(&p.path), &mut files);
+    let mut rows = Vec::with_capacity(files.len());
+    for f in &files {
+        let t = openfader::library::folder::read_track(f);
+        let rel = f.strip_prefix(mount).unwrap_or(f);
+        let (size, mtime) = match f.metadata() {
+            Ok(m) => (
+                m.len() as i64,
+                m.modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map_or(0, |d| d.as_secs() as i64),
+            ),
+            Err(_) => (0, 0),
+        };
+        rows.push(openfader::store::index::Row_ {
+            id: 0,
+            volume: p.label.clone(),
+            path: rel.to_string_lossy().into_owned(),
+            title: t.title.clone(),
+            artist: t.artist.clone(),
+            album: t.album.clone(),
+            genre: t.genre.clone(),
+            bpm_x100: t.bpm_x100,
+            length_s: t.length_s,
+            key: t.key.clone(),
+            size,
+            mtime,
+        });
+    }
+    let store = openfader::store::global();
+    let n = rows.len();
+    if let Ok(written) = store.index_put(&p.label, &rows) {
+        return written;
+    }
+    n
+}
+
 impl super::View {
     /// The pin of the chosen tree row, when it is a folder that can be pinned.
     pub(super) fn chosen_pin(&self) -> Option<Pinned> {
@@ -136,8 +179,31 @@ impl super::View {
         } else {
             pin(&p);
             self.say(app, format!("{} is pinned", p.label));
+            self.index_pin(app, &p);
         }
         // The tree lists the pins: build it again.
         self.refresh_sources(app);
+    }
+
+    /// Indexes the pinned folder in the background: the search finds its tracks without walking the stick again.
+    fn index_pin(&self, app: &super::App, p: &Pinned) {
+        let Some(mount) = device::scan()
+            .into_iter()
+            .find(|d| d.label == p.label)
+            .map(|d| d.mount)
+        else {
+            return;
+        };
+        let p = p.clone();
+        let weak = app.as_weak();
+        std::thread::spawn(move || {
+            let n = index(&p, &mount);
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(app) = weak.upgrade() {
+                    app.global::<super::BrowserState>()
+                        .set_status(format!("{}: {n} tracks indexed", p.label).into());
+                }
+            });
+        });
     }
 }

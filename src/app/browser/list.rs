@@ -24,6 +24,8 @@ impl View {
                     .collect()
             }),
             (None, Home::Nothing) => Ok(Vec::new()),
+            // The search results are already in the list (the search put them there).
+            (None, Home::Search) => Ok(self.list.clone()),
             (None, Home::Tags) => Ok(self.tags.clone()),
             (None, Home::History) => Ok(self.history.clone()),
             (None, Home::Playlist(None)) => self.cache().map(|c| c.tracks.to_vec()),
@@ -100,7 +102,15 @@ impl View {
         } else {
             self.query.to_lowercase()
         };
-        let facts: Vec<Facts> = self.list.iter().map(Facts::of).collect();
+        let facts: Vec<Facts> = self
+            .list
+            .iter()
+            .enumerate()
+            .map(|(i, t)| Facts {
+                origin: self.origins.get(i).cloned().unwrap_or_default(),
+                ..Facts::of(t)
+            })
+            .collect();
         self.shown = filter::shown(
             &self.list,
             &facts,
@@ -124,6 +134,8 @@ impl View {
         // The selection follows the track, not the row index.
         let at = self.selected.as_ref().and_then(|s| self.row_of(s));
         state.set_current_row(at.map_or(-1, |n| n as i32));
+        // The search results say where each row comes from.
+        state.set_search_view(matches!(self.home, Home::Search));
         let mut status = match (&self.related, &self.home, self.suggest_status()) {
             (Some(a), ..) => format!(
                 "{} tracks relate to “{}” (registered partners, then compatible key, BPM ±6%)",

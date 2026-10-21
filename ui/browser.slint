@@ -286,6 +286,7 @@ export component Browser inherits Rectangle {
                     height: parent.height;
                     sorted-col: root.sorted-col;
                     sorted-asc: root.sorted-asc;
+                    show-origin: BrowserState.search-view;
                     sort-clicked(c) => { root.sort-by(c); }
                     focused => { root.tree-focus = false; }
                 }

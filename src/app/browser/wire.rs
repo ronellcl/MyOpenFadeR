@@ -78,6 +78,7 @@ pub fn wire(
         sidebar,
         panel_rows,
         list: Vec::new(),
+        origins: Vec::new(),
         shown: Vec::new(),
         query: String::new(),
         filter: Filter::default(),
@@ -212,9 +213,11 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
     });
     let (v, weak) = (view.clone(), app.as_weak());
     state.on_search_edited(move |text| {
+        let app = weak.unwrap();
         let mut v = v.borrow_mut();
         v.query = text.to_string();
-        v.refresh(&weak.unwrap());
+        // The box searches everything local (the Collection, the pinned folders' index, the read sources).
+        v.search_all(&app);
     });
     let (v, weak) = (view.clone(), app.as_weak());
     state.on_search_accepted(move |text| v.borrow_mut().search_online(&weak.unwrap(), &text));

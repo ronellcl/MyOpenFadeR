@@ -35,6 +35,7 @@ mod played;
 mod playlists;
 mod preview;
 mod remote;
+mod search;
 mod session;
 mod sidebar;
 mod smart;
@@ -160,6 +161,8 @@ enum Home {
     DeviceFolder(usize, usize),
     /// A folder inside a device's folder: (device, folder, index into its playlists).
     DeviceFolderList(usize, usize, usize),
+    /// The results of the unified search.
+    Search,
 }
 
 /// The whole library with each track's store key, read again only when the store changed ([`Store::generation`]).
@@ -178,6 +181,8 @@ struct View {
     sidebar: Rc<VecModel<StandardListViewItem>>,
     panel_rows: Rc<VecModel<StandardListViewItem>>,
     list: Vec<Track>,
+    /// Where each row of the search results comes from (the search view only).
+    origins: Vec<String>,
     /// Visible row → index into `list`.
     shown: Vec<usize>,
     query: String,
