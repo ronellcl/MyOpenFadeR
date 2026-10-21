@@ -46,6 +46,8 @@ export global BrowserState {
     in-out property <bool> bpm-around;
     in-out property <bool> key-match;
     in-out property <int> min-rating;
+    /// Track filter bar: the media the list keeps (0 = all, 1 = audio, 2 = video).
+    in-out property <int> media;
     callback filter-changed();
     /// Related view is on: tracks that mix with the chosen track (compatible key, BPM ±6 %).
     in-out property <bool> related;

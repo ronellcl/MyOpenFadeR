@@ -21,7 +21,9 @@ pub const KEY_HUE: usize = 8;
 pub const HINTS: usize = 9;
 pub const PLAYED: usize = 10;
 pub const DOWNLOADED: usize = 11;
-pub const COLUMNS: usize = 12;
+/// The media the track is: "a" audio, "v" video, "?" a cloud track with no file yet.
+pub const FORMAT: usize = 12;
+pub const COLUMNS: usize = 13;
 pub const KEY: usize = 3;
 
 /// BPM hint window: ± this fraction of the playing deck's BPM.
@@ -45,6 +47,28 @@ pub struct Facts {
     pub wheel: Option<Key>,
     /// A plugin track whose audio is already in the download cache (only ever true for a `remote` track).
     pub downloaded: bool,
+    /// The media the track is: audio, video, or unknown (a cloud track with no file yet).
+    pub format: Format,
+}
+
+/// The media a track is: what the FORMAT column shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Format {
+    Audio,
+    Video,
+    /// A cloud track with no file yet: it is audio once it is downloaded.
+    Unknown,
+}
+
+impl Format {
+    /// The text of the cell: what the column's icon shows.
+    pub fn text(self) -> &'static str {
+        match self {
+            Format::Audio => "a",
+            Format::Video => "v",
+            Format::Unknown => "?",
+        }
+    }
 }
 
 impl Facts {
@@ -59,6 +83,18 @@ impl Facts {
                 .remote
                 .as_ref()
                 .is_some_and(openfader::plugin::source::is_downloaded),
+            format: Format::of(t),
+        }
+    }
+}
+
+impl Format {
+    /// The media of the track: its file says so; a cloud track with no file is unknown until it is downloaded.
+    pub fn of(t: &Track) -> Self {
+        match &t.file {
+            Some(f) if openfader::video::is_video(f) => Format::Video,
+            Some(_) => Format::Audio,
+            None => Format::Unknown,
         }
     }
 }
@@ -116,6 +152,7 @@ pub fn cell_of(t: &Track, f: &Facts, col: usize, look: &Look) -> String {
         BPM => String::new(),
         TIME => t.length_text(),
         RATING => "★".repeat(t.rating.into()),
+        FORMAT => f.format.text().to_owned(),
         _ => t.comment.clone(),
     }
 }
@@ -147,6 +184,7 @@ fn shown_cell(t: &Track, f: &Facts, col: usize, r: &Reference, look: &Look) -> S
         HINTS => hints(f, r, look.level).into(),
         PLAYED => SharedString::new(), // filled in by [`row`]
         DOWNLOADED => SharedString::new(), // filled in by [`row`]
+        FORMAT => f.format.text().into(),
         // A track whose file is gone is marked "[!]" (File > Display All Missing Files lists them).
         0 if t
             .file

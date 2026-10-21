@@ -179,6 +179,7 @@ section!(
         col_rating: i32 = 0;
         col_time: i32 = 0;
         col_key: i32 = 0;
+        col_format: i32 = 0;
     }
 );
 

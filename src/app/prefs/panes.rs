@@ -38,6 +38,7 @@ panes!(
     col_rating = get_col_rating_d / set_col_rating_d,
     col_time = get_col_time_d / set_col_time_d,
     col_key = get_col_key_d / set_col_key_d,
+    col_format = get_col_format_d / set_col_format_d,
 );
 
 /// Stores the pane sizes the user dragged; nothing is written when no size changed.

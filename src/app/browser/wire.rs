@@ -2,7 +2,7 @@
 
 use super::{
     DOUBLE_CLICK, Home, View, editor,
-    filter::Filter,
+    filter::{Filter, Media},
     history, palette, tagging,
     playlists::{self, Panel},
     preview, session,
@@ -230,6 +230,11 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
             around_master: s.get_bpm_around(),
             key_match: s.get_key_match(),
             min_rating: s.get_min_rating().clamp(0, 5) as u8,
+            media: match s.get_media() {
+                1 => Media::Audio,
+                2 => Media::Video,
+                _ => Media::All,
+            },
         };
         v.refresh(&app);
     });

@@ -6,6 +6,51 @@ use super::contains_ignore_case;
 use super::table::{bpm_close, cell_of, Facts, Look, Reference, BPM, RATING, TIME};
 use openfader::{library::Track, store};
 
+/// The media the filter bar keeps: everything, only the audio, only the video.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Media {
+    #[default]
+    All,
+    Audio,
+    Video,
+}
+
+impl Media {
+    /// The next one in the cycle (the chip goes ALL → AUDIO → VIDEO → ALL).
+    pub fn next(self) -> Self {
+        match self {
+            Media::All => Media::Audio,
+            Media::Audio => Media::Video,
+            Media::Video => Media::All,
+        }
+    }
+
+    /// The name the chip shows.
+    pub fn label(self) -> &'static str {
+        match self {
+            Media::All => "ALL",
+            Media::Audio => "AUDIO",
+            Media::Video => "VIDEO",
+        }
+    }
+
+    /// Whether the track passes: a track with no file (a cloud track) counts as audio until it is downloaded.
+    pub fn keeps(self, t: &Track) -> bool {
+        match self {
+            Media::All => true,
+            Media::Audio => !is_video(t),
+            Media::Video => is_video(t),
+        }
+    }
+}
+
+/// Whether the track is a video: its file's extension says so (`video::is_video`); a track with no file is not one.
+fn is_video(t: &Track) -> bool {
+    t.file
+        .as_deref()
+        .is_some_and(openfader::video::is_video)
+}
+
 /// The filter bar's state. Combines (AND) with the search box.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Filter {
@@ -18,6 +63,8 @@ pub struct Filter {
     pub key_match: bool,
     /// Stars, 0 = any.
     pub min_rating: u8,
+    /// Only the audio, only the video, or everything.
+    pub media: Media,
 }
 
 impl Filter {
@@ -36,6 +83,9 @@ impl Filter {
 /// reference is empty.
 pub fn passes(t: &Track, x: &Facts, f: &Filter, r: &Reference, look: &Look) -> bool {
     if t.rating < f.min_rating {
+        return false;
+    }
+    if !f.media.keeps(t) {
         return false;
     }
     if (f.bpm_min > 0.0 || f.bpm_max > 0.0)
@@ -154,6 +204,7 @@ pub fn related_with<'a>(
 mod tests {
     use super::*;
     use crate::app::camelot::camelot;
+    use std::path::PathBuf;
 
     fn passes(t: &Track, f: &Filter, r: &Reference) -> bool {
         super::passes(t, &Facts::of(t), f, r, &Look::now())
@@ -189,8 +240,41 @@ mod tests {
     }
 
     #[test]
-    fn bpm_range_and_rating_bound_the_list() {
-        let (a, b, none) = (
+    fn the_media_filter_keeps_the_audio_or_only_the_video() {
+        let with = |file: Option<&str>| Track {
+            title: "t".into(),
+            file: file.map(PathBuf::from),
+            ..Track::default()
+        };
+        let (song, clip, cloud) = (
+            with(Some("C:\\music\\song.mp3")),
+            with(Some("C:\\video\\clip.mp4")),
+            with(None),
+        );
+        let r = Reference::default();
+        let all = Filter {
+            media: Media::All,
+            ..Default::default()
+        };
+        assert!(passes(&song, &all, &r) && passes(&clip, &all, &r) && passes(&cloud, &all, &r));
+        let audio = Filter {
+            media: Media::Audio,
+            ..Default::default()
+        };
+        assert!(passes(&song, &audio, &r) && !passes(&clip, &audio, &r));
+        let video = Filter {
+            media: Media::Video,
+            ..Default::default()
+        };
+        assert!(!passes(&song, &video, &r) && passes(&clip, &video, &r));
+        // The chip cycles through the three.
+        assert_eq!(Media::All.next(), Media::Audio);
+        assert_eq!(Media::Audio.next(), Media::Video);
+        assert_eq!(Media::Video.next(), Media::All);
+    }
+
+    #[test]
+    fn bpm_range_and_rating_bound_the_list() {        let (a, b, none) = (
             track("a", "8A", 120.0, 3),
             track("b", "8A", 130.0, 5),
             track("none", "8A", 0.0, 5),

@@ -10,6 +10,7 @@ export enum Icon {
     layout-2h, layout-2v, layout-4h, layout-4v, browse,
     layout-1p, layout-2p, layout-dual, layout-simple, layout-full,
     eject, star, tag, lock, info, expand, trash, zoom-in, zoom-out, zoom-reset, stems, more, usb,
+    music, film,
 }
 
 /// One icon in `color`, `width`/`height` 16 px by default (the viewbox is 16×16, so a bigger box scales the shape;
@@ -89,6 +90,9 @@ export component Glyph inherits Rectangle {
         if i == Icon.usb { return "M 5.5 5 V 1.5 H 10.5 V 5 M 4 5 H 12 V 13.5 A 1.5 1.5 0 0 1 10.5 15 H 5.5 A 1.5 1.5 0 0 1 4 13.5 Z M 6.5 9.5 H 9.5"; }
         // STEM mode: the track as three stacked layers (INST / VOCAL / DRUMS).
         if i == Icon.stems { return "M 8 2 L 14 5 L 8 8 L 2 5 Z M 2 8 L 8 11 L 14 8 M 2 11 L 8 14 L 14 11"; }
+        // A music note (the head and the stem) and a film strip (a frame with its holes).
+        if i == Icon.music { return "M 6 12.5 A 2 2 0 1 0 6 8.5 M 6 8.5 V 3 L 13 1.5 V 10.5 A 2 2 0 1 1 13 12.5 M 6 8.5 L 13 7"; }
+        if i == Icon.film { return "M 2 3 H 14 V 13 H 2 Z M 5.5 3 V 13 M 10.5 3 V 13 M 2 6 H 5.5 M 2 10 H 5.5 M 10.5 6 H 14 M 10.5 10 H 14"; }
         return "";
     }
 

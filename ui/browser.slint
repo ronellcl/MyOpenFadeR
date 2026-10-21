@@ -251,6 +251,11 @@ export component Browser inherits Rectangle {
                         width: 112px; horizontal-stretch: 0; active: BrowserState.tag-filter-count > 0;
                         clicked => { BrowserState.panel-request(2); }
                     }
+                    Chip {
+                        text: BrowserState.media == 0 ? "ALL" : (BrowserState.media == 1 ? "AUDIO" : "VIDEO");
+                        width: 72px; horizontal-stretch: 0; active: BrowserState.media != 0;
+                        clicked => { BrowserState.media = Math.mod(BrowserState.media + 1, 3); BrowserState.filter-changed(); }
+                    }
                     Rectangle { }
                 }
             }

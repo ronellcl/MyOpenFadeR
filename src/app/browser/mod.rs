@@ -48,7 +48,7 @@ pub use sources::SourceType;
 pub use wire::wire;
 
 use super::{deck::Decks, App, BrowserState};
-use filter::Filter;
+use filter::{Filter, Media};
 use openfader::{
     library::{Library, Playlist, Track},
     store::{self, HotCueBank, Node, Store, Tag, TagGroup},
