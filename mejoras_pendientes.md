@@ -194,3 +194,24 @@ Todo lo de esta tanda está detallado en [hallazgos_solucionados.md](hallazgos_s
   lenta) o hacer el salto en dos fases (el keyframe al instante, el frame exacto después).
 - Publicar el yt-dlp 1.2.4 y el motor de Deezer en el repositorio `MyOpenFadeR-Plugins` (el
   `main` ya los tiene; falta decide si se abre una *release* con el binario de yt-dlp adjunto).
+## 12. Tercera tanda (21/10/2026): el browser - HECHO
+
+Lo cerrado, con su commit:
+
+| ID | Lo que se hizo | Commit |
+|----|----------------|--------|
+| BR-01 | Las pistas de nube entran en la Colecci��n antes de sonar: el historial, el color de ""reproducida"" y las listas las nombran igual y la misma pista no se loguea dos veces | 64fe8f |
+| BR-02 | Secci��n ""Downloaded"" en el �rbol: lo que los plugins de nube descargan, como fuente real (se carga, se importa, se busca) | f8a746 |
+| BR-03 | ""Not in the Collection"" por fuente y bot��n para aadirlo todo de golpe | f8a746 |
+| BR-04 | Filtro de medio (ALL / AUDIO / VIDEO) y columna ""FORMATO"" (nota musical o pel��cula) |  f92826 |
+| BR-05 | ""Devices"" lista todos los vol��genes (no solo los de biblioteca de DJ) y cada uno lista sus carpetas de primer nivel, que se abren como fuente |  6bf868 |
+| BR-06 | Carpetas fijadas (bot��n FAV, secci��n ""Favorites"", pin por etiqueta de volumen + ruta relativa) y casillas para ocultar las secciones | 61921c |
+| BR-07 | B��squeda unificada (Colecci��n + �ndice de las fijadas + fuentes le��das) con columna ORIGIN, sin disparar las b��squedas en l��nea | 6b26d39 |
+
+### Lo que queda (de la fase 5 del plan)
+
+- Filtro por origen en la barra (All / Colecci��n / YouTube / Deezer / Dispositivos).
+- Preview de v��deo en la columna PREVIEW (un fotograma en vez de la onda).
+- Aviso de duplicado al importar (""esta pista ya est�� en la Colecci��n"").
+- La estrella de la fila fijable con el clic (hoy se fija con el bot��n FAV y la estrella es solo la marca).
+- Reindexar el �ndice de las fijadas cuando el volumen se reconecta (hoy se indexa al fijar).

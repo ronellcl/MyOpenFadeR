@@ -44,6 +44,10 @@ and a window that opens full screen.
 - **Cloud tracks in the Collection.** A track from a plugin source (YouTube, Deezer) can live in a playlist or a palette like any other: the audio downloads when a deck loads it, and the browser marks with a ✓ the ones already downloaded.
 - **The VDJ stage.** A theme can ask for the Virtual DJ layout: the FX panel and the master screen share a strip under the decks, every deck has a screen of its own, and the channel faders keep their length.
 - **The window opens full screen.** PREFERENCES > VIEW > "Full screen at start-up" (on by default). The View menu's "Pantalla completa" turns it on and off, and the choice is remembered.
+- **A browser that shows what is there.** The tree lists every mounted volume (a USB stick without a DJ library too) with its top-level folders, each open as a source of its own, and a "Downloaded" section with what the cloud plugins downloaded: real files, loadable, importable and searchable.
+- **The folders you pin.** The FAV button pins the folder the tree has chosen; the pinned folders wait for you in the "Favorites" section, and a pin survives the stick changing letter.
+- **One search for everything local.** The search box looks in the Collection, in the index of the pinned folders and in the sources that are read, and each result says where it comes from. The online searches of YouTube and Deezer stay in their own box: the filter never asks a plugin.
+- **Audio or video, said out loud.** A chip in the filter bar keeps everything, only the audio or only the video, and the track table has a FORMATO column with a note for the music and a film for the video.
 
 ## Download
 
