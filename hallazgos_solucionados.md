@@ -358,3 +358,4 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 - **El filtro de medio (ALL / AUDIO / VIDEO)** y la columna **FORMATO** (nota musical o pel��cula) dicen de qu�� es cada pista.
 - **Una sola b��squeda**: la caja del buscador mira la Colecci��n, el �ndice de las carpetas fijadas y las fuentes le��das, y cada resultado dice de d��nde sali�� (columna ORIGIN). Las b��squedas en l��nea de YouTube y Deezer no se disparan desde el filtro.
 - **Las pistas de nube ya no se loguean dos veces**: entran en la Colecci��n antes de sonar, as�� que el historial, el color de "reproducida" y las listas las nombran igual.
+- **Las descargas de YouTube dicen el t�tulo, no el id**: el plugin graba las etiquetas en el fichero que descarga (t�tulo, artista, �lbum) y la app las lee; para lo ya descargado, el plugin responde con el t�tulo de cada id (operaci��n info).
