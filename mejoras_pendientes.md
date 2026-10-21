@@ -220,11 +220,12 @@ Lo cerrado, con su commit:
 
 Lo cerrado:
 
-| ID | Lo que se hizo |
-|----|----------------|
-| BR-08 | Un disco duro USB aparece en "Devices": Windows responde `DRIVE_FIXED` a un disco externo y el escaneo solo aceptaba `DRIVE_REMOVABLE` (pendrive o tarjeta) |
-| BR-09 | El disco local se puede recorrer: el volumen del sistema (C:) se lista en la sección "Devices" como `C: (OS)` y sus carpetas de primer nivel se abren como fuentes de solo lectura |
-| BR-10 | Listar un volumen ya no lo barre entero: solo se lee el primer nivel (antes se recorría el disco entero buscando audio) y ahora se ven todas sus carpetas, no solo las que tienen audio |
+| ID | Lo que se hizo | Commit |
+|----|----------------|--------|
+| BR-08 | Un disco duro USB aparece en "Devices": Windows responde `DRIVE_FIXED` a un disco externo y el escaneo solo aceptaba `DRIVE_REMOVABLE` (pendrive o tarjeta) | 2a7192a |
+| BR-09 | El disco local se puede recorrer: el volumen del sistema (C:) se lista en la sección "Devices" como `C: (OS)` y sus carpetas de primer nivel se abren como fuentes de solo lectura | 2a7192a |
+| BR-10 | Listar un volumen ya no lo barre entero: solo se lee el primer nivel (antes se recorría el disco entero buscando audio) y ahora se ven todas sus carpetas, no solo las que tienen audio | 2a7192a |
+| BR-11 | El instalador de Windows se compila otra vez (NSIS 3.11) y sube a la release v0.2.3, ya publicada | f1a0901 |
 
 Sigue pendiente lo de la fase 5 (arriba) y el instalador de Windows (NSIS no está disponible en esta máquina: la
 release v0.2.3 queda como borrador).
