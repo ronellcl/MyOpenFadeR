@@ -110,8 +110,14 @@ impl Preset {
 
 /// The factory presets of the pack at `pack`: one per playlist, the first eight tracks (more make another preset). Empty when it cannot be read.
 pub fn factory(pack: &Path) -> Vec<Preset> {
-    let Ok(lib) = library::open(pack) else {
-        return Vec::new();
+    let lib = match library::open(pack) {
+        Ok(l) => l,
+        Err(e) => {
+            // The pack cannot be read (a path that is not there, a plugin that is off, a file that is not a pack): the
+            // presets would be empty with no word about it.
+            eprintln!("groove: the factory pack {pack:?} cannot be read: {e}");
+            return Vec::new();
+        }
     };
     let mut out = Vec::new();
     for list in lib
