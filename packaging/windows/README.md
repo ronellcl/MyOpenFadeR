@@ -42,7 +42,7 @@ and an embeddable Python.
 cargo build --release
 .\packaging\windows\build-installer.ps1 `
     -PythonDir C:\Tools\python-3.14.8-embed-amd64 `
-    -Makensis  C:\Tools\nsis-3.13\makensis.exe
+    -Makensis  C:\Tools\nsis\makensis.exe
 ```
 
 The installer installs for all users (it asks for administrator) in `%ProgramFiles%\OpenFadeR`, with Start menu and
