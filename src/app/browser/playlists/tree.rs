@@ -191,6 +191,11 @@ impl View {
             all_tracks,
             cue_analysis,
             banks: banks_on.then_some(&self.banks[..]),
+            sections: crate::app::prefs::with(|p| sidebar::Sections {
+                favorites: p.view.media_favorites,
+                downloaded: p.view.media_downloaded,
+                devices: p.view.media_devices,
+            }),
         });
         self.entries = entries;
         self.sidebar.set_vec(
@@ -231,7 +236,16 @@ impl View {
         app.global::<BrowserState>()
             .set_side_kind(self.side_kind(&self.entry));
         self.publish_source(app);
+        self.publish_favorite(app);
         self.load(app);
+    }
+
+    /// The FAV button: it works when the chosen row is a folder that can be pinned, and it is on when it is pinned.
+    fn publish_favorite(&self, app: &App) {
+        let state = app.global::<BrowserState>();
+        let pin = self.chosen_pin();
+        state.set_fav_possible(pin.is_some());
+        state.set_fav_pinned(pin.as_ref().is_some_and(crate::app::browser::pinned::is_pinned));
     }
 
     /// Name of the list on screen, for file names and messages.

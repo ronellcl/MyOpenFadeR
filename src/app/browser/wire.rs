@@ -219,6 +219,11 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
     let (v, weak) = (view.clone(), app.as_weak());
     state.on_search_accepted(move |text| v.borrow_mut().search_online(&weak.unwrap(), &text));
     let (v, weak) = (view.clone(), app.as_weak());
+    state.on_fav_toggle(move || {
+        let app = weak.unwrap();
+        v.borrow_mut().toggle_favorite(&app);
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
     state.on_filter_changed(move || {
         let app = weak.unwrap();
         let s = app.global::<BrowserState>();

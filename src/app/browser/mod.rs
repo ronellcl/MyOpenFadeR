@@ -30,6 +30,7 @@ mod history;
 mod hotcuebank;
 mod list;
 mod palette;
+mod pinned;
 mod played;
 mod playlists;
 mod preview;

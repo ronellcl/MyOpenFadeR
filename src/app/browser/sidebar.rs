@@ -45,6 +45,10 @@ pub enum Entry {
     CueAnalysis,
     /// "Devices" heading above the mounted devices.
     DevicesRoot,
+    /// "Favorites" heading above the folders the user pinned.
+    FavoritesRoot,
+    /// A folder the user pinned: its index in the sources.
+    Pinned(usize),
     /// "Downloaded" heading above what the plugin sources downloaded.
     DownloadedRoot,
     /// An external source (a device, iTunes, library xml, Explorer) by index into the browser's sources; it opens when chosen.
@@ -66,6 +70,8 @@ pub struct SourceRows {
     pub device: bool,
     /// The folder a plugin source downloaded into (the "Downloaded" section).
     pub downloaded: bool,
+    /// A folder the user pinned (the "Favorites" section).
+    pub pinned: bool,
     pub name: String,
     /// Opened: its "All tracks" and playlists are listed under it.
     pub open: bool,
@@ -98,6 +104,26 @@ pub struct Inputs<'a> {
     pub cue_analysis: Option<usize>,
     /// The store's Cue Banks when the Media Browser shows them.
     pub banks: Option<&'a [HotCueBank]>,
+    /// Which sections of the tree are shown (Preferences > View > Layout > Media Browser).
+    pub sections: Sections,
+}
+
+/// The sections of the tree the user can hide. All of them show by default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Sections {
+    pub favorites: bool,
+    pub downloaded: bool,
+    pub devices: bool,
+}
+
+impl Default for Sections {
+    fn default() -> Self {
+        Self {
+            favorites: true,
+            downloaded: true,
+            devices: true,
+        }
+    }
 }
 
 fn indent(depth: usize, label: &str) -> String {
@@ -169,6 +195,20 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             .enumerate()
             .map(|(n, p)| (Entry::Lib(n), playlist_label(1, p))),
     );
+    // The folders the user pinned, under their own heading, first in the tree.
+    let pinned: Vec<usize> = i
+        .sources
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.pinned)
+        .map(|(n, _)| n)
+        .collect();
+    if !pinned.is_empty() && i.sections.favorites {
+        rows.push((Entry::FavoritesRoot, "▸ Favorites".to_owned()));
+        for n in &pinned {
+            rows.push((Entry::Pinned(*n), indent(1, &format!("★ {}", i.sources[*n].name))));
+        }
+    }
     // What the plugin sources downloaded, under its own heading; the other sources keep their place.
     let downloaded: Vec<usize> = i
         .sources
@@ -177,18 +217,18 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         .filter(|(_, s)| s.downloaded)
         .map(|(n, _)| n)
         .collect();
-    if !downloaded.is_empty() {
+    if !downloaded.is_empty() && i.sections.downloaded {
         rows.push((Entry::DownloadedRoot, "▸ Downloaded".to_owned()));
         for n in downloaded {
             source_rows(&mut rows, i, n, 1);
         }
     }
-    if i.sources.iter().any(|s| s.device) {
+    if i.sections.devices && i.sources.iter().any(|s| s.device) {
         rows.push((Entry::DevicesRoot, "▸ Devices".to_owned()));
     }
     for (n, s) in i.sources.iter().enumerate() {
-        if s.downloaded {
-            continue; // already listed under "Downloaded"
+        if s.downloaded || s.pinned {
+            continue; // already listed under "Downloaded" / "Favorites"
         }
         source_rows(&mut rows, i, n, usize::from(s.device));
     }
@@ -331,6 +371,7 @@ mod tests {
             all_tracks: false,
             cue_analysis: None,
             banks: Some(&banks),
+            sections: Sections::default(),
         });
         assert_eq!(entries[TAG_ROW], Entry::Tags);
         assert_eq!(entries[HISTORY_ROW], Entry::Session);
@@ -382,6 +423,7 @@ mod tests {
             all_tracks: false,
             cue_analysis: None,
             banks: None,
+            sections: Sections::default(),
         });
         assert_eq!(
             e,
@@ -405,6 +447,7 @@ mod tests {
         let src = |name: &str, device, downloaded, open, missing| SourceRows {
             device,
             downloaded,
+            pinned: false,
             name: name.into(),
             open,
             playlists: Vec::new(),
@@ -428,6 +471,7 @@ mod tests {
             all_tracks: false,
             cue_analysis: None,
             banks: None,
+            sections: Sections::default(),
         });
         let at = labels
             .iter()
@@ -456,6 +500,7 @@ mod tests {
         let sources = [SourceRows {
             device: true,
             downloaded: false,
+            pinned: false,
             name: "USB (vfat)".into(),
             open: false,
             playlists: Vec::new(),
@@ -477,6 +522,7 @@ mod tests {
             all_tracks: false,
             cue_analysis: None,
             banks: None,
+            sections: Sections::default(),
         });
         let at = labels
             .iter()
@@ -511,6 +557,7 @@ mod tests {
         let src = |device, name: &str, open| SourceRows {
             device,
             downloaded: false,
+            pinned: false,
             name: name.into(),
             open,
             playlists: vec![pl("Set", 0, true), pl("Inner", 1, false)],
@@ -534,6 +581,7 @@ mod tests {
             all_tracks: true,
             cue_analysis: Some(3),
             banks: None,
+            sections: Sections::default(),
         });
         assert_eq!(l[4], "CUE Analysis (3)");
         assert_eq!(l[6], "    All Tracks");

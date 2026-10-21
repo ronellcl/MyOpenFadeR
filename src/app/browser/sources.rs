@@ -8,6 +8,7 @@
 
 use super::{
     loading,
+    pinned,
     sidebar::{Entry, FolderRow, SourceRows},
     App, BrowserState, Home, View,
 };
@@ -41,6 +42,8 @@ pub enum Kind {
     },
     /// A top-level folder of a device: it opens as a folder source, read-only.
     DeviceFolder { path: PathBuf },
+    /// A folder the user pinned (FAVORITES): it opens as a folder source, read-only.
+    Pinned { label: String, path: PathBuf },
 }
 
 pub struct Source {
@@ -86,6 +89,7 @@ impl Kind {
             (Kind::Explorer(a), Kind::Explorer(b)) => a == b,
             (Kind::Downloaded { path: a, .. }, Kind::Downloaded { path: b, .. }) => a == b,
             (Kind::DeviceFolder { path: a }, Kind::DeviceFolder { path: b }) => a == b,
+            (Kind::Pinned { path: a, .. }, Kind::Pinned { path: b, .. }) => a == b,
             _ => false,
         }
     }
@@ -108,6 +112,10 @@ impl Kind {
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default(),
+            Kind::Pinned { path, .. } => path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
         }
     }
 
@@ -121,6 +129,7 @@ impl Kind {
             Kind::Explorer(p) => Ok(Box::new(Folder::open(p)?)),
             Kind::Downloaded { path, .. } => Ok(Box::new(Folder::open(path)?)),
             Kind::DeviceFolder { path } => Ok(Box::new(Folder::open(path)?)),
+            Kind::Pinned { path, .. } => Ok(Box::new(Folder::open(path)?)),
         }
     }
 }
@@ -131,7 +140,12 @@ type Read = Result<(Box<dyn Library + Send>, Vec<Playlist>, usize, Vec<Track>), 
 /// get their label refreshed).
 pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
     let mut kinds: Vec<Kind> = Vec::new();
-    // What the plugin sources downloaded: their folders in the data dir, first in the tree (the "Downloaded" section).
+    // The folders the user pinned: they come first, in the tree's FAVORITES section.
+    kinds.extend(pinned::mounted().into_iter().map(|(p, path)| Kind::Pinned {
+        label: p.label,
+        path,
+    }));
+    // What the plugin sources downloaded: their folders in the data dir, in the tree's "Downloaded" section.
     kinds.extend(downloaded());
     kinds.extend(
         device::scan()
@@ -195,6 +209,11 @@ impl Source {
         matches!(self.kind, Kind::Downloaded { .. })
     }
 
+    /// Whether the source is a folder the user pinned (the "Favorites" section).
+    pub fn is_pinned(&self) -> bool {
+        matches!(self.kind, Kind::Pinned { .. })
+    }
+
     /// The path the source is read from again on a worker thread (`None` for a device: its own menus import from it).
     pub fn path(&self) -> Option<(PathBuf, SourceType)> {
         match &self.kind {
@@ -216,6 +235,7 @@ impl Source {
                 },
             )),
             Kind::DeviceFolder { path } => Some((path.clone(), SourceType::Folder)),
+            Kind::Pinned { path, .. } => Some((path.clone(), SourceType::Folder)),
         }
     }
 }
@@ -305,6 +325,7 @@ impl View {
             .map(|s| SourceRows {
                 device: s.is_device(),
                 downloaded: s.is_downloaded(),
+                pinned: s.is_pinned(),
                 name: s.name.clone(),
                 open: s.lib.is_some(),
                 playlists: s.playlists.clone(),
@@ -329,6 +350,14 @@ impl View {
         let downloaded = |i: &usize| self.sources.get(*i).is_some_and(Source::is_downloaded);
         Some(match e {
             Entry::DevicesRoot | Entry::DownloadedRoot | Entry::Source(_) => 10,
+            // A pinned folder: its tracks can be imported, but it is not a library to connect.
+            Entry::Pinned(i) => {
+                if self.sources.get(*i).is_some_and(|s| s.is_device()) {
+                    10
+                } else {
+                    14
+                }
+            }
             Entry::SourceAll(i) => {
                 if device(i) {
                     10
@@ -384,6 +413,7 @@ impl View {
                 }
             }
             Entry::SourceMissing(i) => Home::SourceMissing(*i),
+            Entry::Pinned(i) => Home::Source(*i, None),
             Entry::DeviceFolder(d, j) => Home::DeviceFolder(*d, *j),
             Entry::DeviceFolderList(d, j, k) => Home::DeviceFolderList(*d, *j, *k),
             Entry::DevicesRoot | Entry::DownloadedRoot => Home::Nothing,

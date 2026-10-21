@@ -49,6 +49,12 @@ export global BrowserState {
     /// Track filter bar: the media the list keeps (0 = all, 1 = audio, 2 = video).
     in-out property <int> media;
     callback filter-changed();
+    /// The chosen tree row is a folder that can be pinned (the FAV button works).
+    in property <bool> fav-possible;
+    /// The chosen tree row is a pinned folder (the FAV button takes the pin off).
+    in property <bool> fav-pinned;
+    /// Pins the chosen folder or takes the pin off.
+    callback fav-toggle();
     /// Related view is on: tracks that mix with the chosen track (compatible key, BPM ±6 %).
     in-out property <bool> related;
     callback related-toggled(bool);

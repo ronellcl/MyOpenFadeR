@@ -89,6 +89,8 @@ impl Prefs {
                 "stems_analysis" => set!(stems_fast, which(&STEMS_ANALYSIS, v)),
                 "stem_waveform" => set!(stem_wave, which(&STEM_WAVEFORM, v)),
                 "controller_audio" => set!(controller_audio, v.parse().ok()),
+                // A pinned folder: the volume's label and the folder's path below it, one line per folder.
+                "pinned_folder" => p.pinned_folders.push(v.to_owned()),
                 _ => {
                     let handled = p.sections().into_iter().find_map(|s| s.parse(k, v));
                     match handled {
@@ -136,6 +138,12 @@ impl Prefs {
         line("stems_analysis", STEMS_ANALYSIS[self.stems_fast as usize]);
         line("stem_waveform", STEM_WAVEFORM[self.stem_wave as usize]);
         line("controller_audio", &self.controller_audio.to_string());
+        // The pinned folders, one line each (alphabetical, so the file stays tidy).
+        let mut pinned = self.pinned_folders.clone();
+        pinned.sort();
+        for f in &pinned {
+            line("pinned_folder", f);
+        }
         let sections: [&dyn Section; 7] = [
             &self.view,
             &self.audio,

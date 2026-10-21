@@ -121,6 +121,10 @@ pub struct Prefs {
     pub controller_audio: bool,
     /// Keys no section knows (the generic [`Prefs::extra`] settings and keys of a newer version), kept so a save does not drop them.
     pub unknown: Vec<(String, String)>,
+    /// The folders the user pinned (FAVORITES), one per line in the settings file: the volume's label and the folder's
+    /// path below it, separated by a slash. The label (not the mount path) is what identifies the volume, so a stick
+    /// that changes letter keeps its pins.
+    pub pinned_folders: Vec<String>,
 }
 
 impl Default for Prefs {
@@ -152,6 +156,7 @@ impl Default for Prefs {
             controller_audio: true,
             stems_reset: true,
             unknown: Vec::new(),
+            pinned_folders: Vec::new(),
         }
     }
 }

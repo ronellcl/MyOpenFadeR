@@ -134,6 +134,10 @@ section!(
         media_hot_cue_bank: bool = true;
         media_track_suggestion: bool = true;
         media_explorer: bool = false;
+        /// Layout > Media Browser: the sections of the tree. The checkbox hides one.
+        media_favorites: bool = true;
+        media_downloaded: bool = true;
+        media_devices: bool = true;
         /// Layout > Browser panel.
         panel_cue_analysis: bool = false;
         panel_palette: bool = false;
@@ -305,6 +309,9 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
             v.media_track_suggestion,
         ),
         Row::check("media_explorer", "Explorer", v.media_explorer),
+        Row::check("media_favorites", "Favorites", v.media_favorites),
+        Row::check("media_downloaded", "Downloaded", v.media_downloaded),
+        Row::check("media_devices", "Devices", v.media_devices),
         Row::header("LAYOUT: BROWSER PANEL"),
         Row::check(
             "panel_cue_analysis",
