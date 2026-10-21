@@ -163,6 +163,12 @@ enum Home {
     DeviceFolderList(usize, usize, usize),
     /// The results of the unified search.
     Search,
+    /// A search entry of a cloud plugin: (source index, sub-index).
+    PluginSearch(usize, usize),
+    /// The downloads of a cloud plugin: (source index, sub-index).
+    PluginDownloads(usize, usize),
+    /// A playlist entry of a cloud plugin: (source index, playlist index).
+    PluginPlaylist(usize, usize),
 }
 
 /// The whole library with each track's store key, read again only when the store changed ([`Store::generation`]).
@@ -256,6 +262,9 @@ impl View {
                     | Home::Bank(_)
                     | Home::Day(_)
                     | Home::Dupes
+                    | Home::PluginSearch(..)
+                    | Home::PluginDownloads(..)
+                    | Home::PluginPlaylist(..)
             )
     }
 

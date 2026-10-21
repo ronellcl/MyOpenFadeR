@@ -160,6 +160,8 @@ impl View {
                 ("Favorites", p.view.media_favorites),
                 ("Downloaded", p.view.media_downloaded),
                 ("Devices", p.view.media_devices),
+                ("Música Local", p.view.media_local_music),
+                ("Música en Línea", p.view.media_online_music),
                 ("Explorer", p.view.media_explorer),
             ]
             .iter()
@@ -224,7 +226,9 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
                 0 => p.view.media_favorites = !p.view.media_favorites,
                 1 => p.view.media_downloaded = !p.view.media_downloaded,
                 2 => p.view.media_devices = !p.view.media_devices,
-                3 => p.view.media_explorer = !p.view.media_explorer,
+                3 => p.view.media_local_music = !p.view.media_local_music,
+                4 => p.view.media_online_music = !p.view.media_online_music,
+                5 => p.view.media_explorer = !p.view.media_explorer,
                 _ => {}
             });
             v.borrow_mut().refresh_sections(&app);

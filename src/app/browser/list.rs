@@ -15,6 +15,7 @@ impl View {
     pub(super) fn load(&mut self, app: &App) {
         let (home, anchor) = (self.home.clone(), self.related.clone());
         self.slots.clear();
+        let state = app.global::<BrowserState>();
         let list = match (&anchor, &home) {
             (Some(a), _) => self.cache().map(|all| {
                 let partners = self.store.matches_of(&store::key(a)).unwrap_or_default();
@@ -71,8 +72,31 @@ impl View {
                         .ok_or_else(|| "the folder is not open".to_owned())?;
                     l.tracks(Some(&id))
                 }),
+            // A cloud plugin's search: open its own search box; here we just say so.
+            (None, Home::PluginSearch(_s, _)) => {
+                state.set_status("use the plugin's search box to look up tracks".into());
+                Ok(Vec::new())
+            }
+            // A cloud plugin's downloads: list what it downloaded (the Downloaded section already shows them all).
+            (None, Home::PluginDownloads(s, _)) => {
+                let plugin_name = self.sources.get(*s).map(|src| src.name.clone()).unwrap_or_default();
+                self.sources
+                    .iter()
+                    .find(|src| {
+                        matches!(src.kind, super::sources::Kind::Downloaded { ref plugin, .. } if plugin == &plugin_name)
+                    })
+                    .map(|src| src.missing.clone())
+                    .ok_or_else(|| "the plugin's downloads are not open".to_owned())
+            }
+            // A cloud plugin's example playlist: list its tracks if they were read.
+            (None, Home::PluginPlaylist(s, j)) => self
+                .sources
+                .get(*s)
+                .and_then(|src| src.playlists.get(*j))
+                .map(|p| p.id.clone())
+                .ok_or_else(|| "the playlist is not open".to_owned())
+                .and_then(|id| self.lib.tracks(Some(&id))),
         };
-        let state = app.global::<BrowserState>();
         let plain = anchor.is_none();
         let editing = plain && !self.suggest.on; // a ranked list is no longer in the order its edit buttons act on
         state.set_related(!plain);

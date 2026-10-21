@@ -132,6 +132,7 @@ export component Browser inherits Rectangle {
                 IconButton { icon: Icon.loop; icon-size: 16px; tooltip: "Session history"; active: tree.current-item == 2 && !BrowserState.related; clicked => { root.show-list(2); } }
                 IconButton { icon: Icon.grid; icon-size: 16px; tooltip: "Duplicate tracks"; active: tree.current-item == 3 && !BrowserState.related; clicked => { root.show-list(3); } }
                 if BrowserState.related-enabled: IconButton { icon: Icon.link; icon-size: 16px; tooltip: "Related tracks"; active: BrowserState.related; clicked => { BrowserState.related-toggled(!BrowserState.related); } }
+                if BrowserState.suggest-enabled: IconButton { icon: Icon.music; icon-size: 16px; tooltip: "Track suggestion"; active: BrowserState.suggest && !BrowserState.related; clicked => { BrowserState.suggest-toggled(!BrowserState.suggest); } }
                 if DeviceState.devices.length > 0: Rectangle { height: 1px; background: Theme.line-strong; }
                 for d[i] in DeviceState.devices: IconButton {
                     icon: Icon.usb;

@@ -195,6 +195,8 @@ impl View {
                 favorites: p.view.media_favorites,
                 downloaded: p.view.media_downloaded,
                 devices: p.view.media_devices,
+                local_music: p.view.media_local_music,
+                online_music: p.view.media_online_music,
             }),
             folded: &self.folded,
             folded_lib: &self.folded_lib,
@@ -223,6 +225,11 @@ impl View {
             self.entry = e;
             match self.entry {
                 Entry::Source(i) => self.open_source(app, i),
+                Entry::SystemFolder(i) => self.open_source(app, i),
+                Entry::OnlinePlugin(i) => self.open_source(app, i),
+                Entry::OnlineSearch(i, _) => self.open_source(app, i),
+                Entry::OnlineDownloads(i, _) => self.open_source(app, i),
+                Entry::OnlinePlaylist(i, _) => self.open_source(app, i),
                 Entry::DeviceFolder(d, j) => self.open_device_folder(app, d, j),
                 _ => {}
             }
@@ -308,6 +315,19 @@ impl View {
             Entry::Session => "Session history".to_owned(),
             Entry::Dupes => "Duplicate tracks".to_owned(),
             Entry::CueAnalysis => "CUE Analysis".to_owned(),
+            Entry::LocalMusicRoot => "Música Local".to_owned(),
+            Entry::OnlineMusicRoot => "Música en Línea".to_owned(),
+            Entry::DevicesRoot => "Discos".to_owned(),
+            Entry::FavoritesRoot => "Carpetas Favoritas".to_owned(),
+            Entry::DownloadedRoot => "Downloaded".to_owned(),
+            Entry::SystemFolder(i) => self
+                .sources
+                .get(*i)
+                .map_or_else(String::new, |s| s.name.clone()),
+            Entry::OnlinePlugin(i) | Entry::OnlineSearch(i, _) | Entry::OnlineDownloads(i, _) | Entry::OnlinePlaylist(i, _) => self
+                .sources
+                .get(*i)
+                .map_or_else(String::new, |s| s.name.clone()),
             _ => "Tracks".to_owned(),
         }
     }

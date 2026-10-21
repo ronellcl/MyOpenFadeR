@@ -138,6 +138,8 @@ section!(
         media_favorites: bool = true;
         media_downloaded: bool = true;
         media_devices: bool = true;
+        media_local_music: bool = true;
+        media_online_music: bool = true;
         /// Layout > Browser panel.
         panel_cue_analysis: bool = false;
         panel_palette: bool = false;
@@ -312,6 +314,8 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         Row::check("media_favorites", "Favorites", v.media_favorites),
         Row::check("media_downloaded", "Downloaded", v.media_downloaded),
         Row::check("media_devices", "Devices", v.media_devices),
+        Row::check("media_local_music", "Música Local", v.media_local_music),
+        Row::check("media_online_music", "Música en Línea", v.media_online_music),
         Row::header("LAYOUT: BROWSER PANEL"),
         Row::check(
             "panel_cue_analysis",

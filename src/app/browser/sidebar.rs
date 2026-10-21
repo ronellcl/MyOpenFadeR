@@ -51,6 +51,20 @@ pub enum Entry {
     Pinned(usize),
     /// "Downloaded" heading above what the plugin sources downloaded.
     DownloadedRoot,
+    /// "Música Local" heading above the system folders (Music, Videos, Desktop).
+    LocalMusicRoot,
+    /// A system folder of Windows: Music, Videos, Desktop.
+    SystemFolder(usize),
+    /// "Música en Línea" heading above the cloud plugins.
+    OnlineMusicRoot,
+    /// A cloud plugin source (Deezer, YouTube, SoundCloud): its sub-entries (Search, Downloads…) are listed under it.
+    OnlinePlugin(usize),
+    /// Search entry of a cloud plugin: (plugin index, sub-index).
+    OnlineSearch(usize, usize),
+    /// Downloads entry of a cloud plugin: (plugin index, sub-index).
+    OnlineDownloads(usize, usize),
+    /// A playlist entry of a cloud plugin: (plugin index, playlist index).
+    OnlinePlaylist(usize, usize),
     /// An external source (a device, iTunes, library xml, Explorer) by index into the browser's sources; it opens when chosen.
     Source(usize),
     /// "All tracks" of an opened source.
@@ -74,6 +88,10 @@ pub struct SourceRows {
     pub downloaded: bool,
     /// A folder the user pinned (the "Favorites" section).
     pub pinned: bool,
+    /// A system folder of Windows: Music, Videos, Desktop.
+    pub system_folder: bool,
+    /// A cloud plugin source (Deezer, YouTube, SoundCloud): its sub-entries are listed under it.
+    pub online_plugin: bool,
     pub name: String,
     /// Opened: its "All tracks" and playlists are listed under it.
     pub open: bool,
@@ -120,6 +138,8 @@ pub struct Sections {
     pub favorites: bool,
     pub downloaded: bool,
     pub devices: bool,
+    pub local_music: bool,
+    pub online_music: bool,
 }
 
 impl Default for Sections {
@@ -128,6 +148,8 @@ impl Default for Sections {
             favorites: true,
             downloaded: true,
             devices: true,
+            local_music: true,
+            online_music: true,
         }
     }
 }
@@ -214,7 +236,62 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         }
         at += 1 + children;
     }
-    // The folders the user pinned, under their own heading, first in the tree.
+    // ── Música Local: system folders (Music, Videos, Desktop) ──────────────────
+    if i.sections.local_music {
+        rows.push((Entry::LocalMusicRoot, "▸ Música Local".to_owned()));
+        let system: Vec<usize> = i
+            .sources
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.system_folder)
+            .map(|(n, _)| n)
+            .collect();
+        for n in &system {
+            rows.push((Entry::SystemFolder(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
+        }
+        // Discos: devices and local volumes under their own heading.
+        let disks: Vec<usize> = i
+            .sources
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.device || s.local)
+            .map(|(n, _)| n)
+            .collect();
+        if !disks.is_empty() {
+            rows.push((Entry::DevicesRoot, indent(1, "▸ Discos")));
+            for n in &disks {
+                source_rows(&mut rows, i, *n, 2);
+            }
+        }
+    }
+    // ── Música en Línea: cloud plugins (Deezer, YouTube, SoundCloud) with sub-entries ─
+    if i.sections.online_music {
+        rows.push((Entry::OnlineMusicRoot, "▸ Música en Línea".to_owned()));
+        let online: Vec<usize> = i
+            .sources
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.online_plugin)
+            .map(|(n, _)| n)
+            .collect();
+        for n in &online {
+            rows.push((Entry::OnlinePlugin(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
+            // Sub-entries: Search and Downloads (and SoundCloud's example playlists).
+            rows.push((Entry::OnlineSearch(*n, 0), indent(2, "Búsqueda")));
+            rows.push((Entry::OnlineDownloads(*n, 0), indent(2, "Descargas")));
+            // SoundCloud's example playlists (Major Lazer, Diplo …) come from the library plugin's lists.
+            if let Some(s) = i.sources.get(*n) {
+                if s.playlists.iter().any(|p| !p.is_folder) {
+                    for (j, p) in s.playlists.iter().enumerate() {
+                        if !p.is_folder {
+                            rows.push((Entry::OnlinePlaylist(*n, j), indent(2, &p.name)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // ── Favorites (carpetas fijadas) ─────────────────────────────────────────────
     let pinned: Vec<usize> = i
         .sources
         .iter()
@@ -223,12 +300,12 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         .map(|(n, _)| n)
         .collect();
     if i.sections.favorites {
-        rows.push((Entry::FavoritesRoot, "▸ Favorites".to_owned()));
+        rows.push((Entry::FavoritesRoot, "▸ Carpetas Favoritas".to_owned()));
         for n in &pinned {
             rows.push((Entry::Pinned(*n), indent(1, &format!("★ {}", i.sources[*n].name))));
         }
     }
-    // What the plugin sources downloaded, under its own heading; the other sources keep their place.
+    // ── Downloaded (lo que los plugins bajaron) ──────────────────────────────────
     let downloaded: Vec<usize> = i
         .sources
         .iter()
@@ -242,15 +319,12 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             source_rows(&mut rows, i, n, 1);
         }
     }
-    if i.sections.devices {
-        rows.push((Entry::DevicesRoot, "▸ Devices".to_owned()));
-    }
+    // ── Other sources (Explorer, iTunes, xml plugins) on their own ───────────────
     for (n, s) in i.sources.iter().enumerate() {
-        if s.downloaded || s.pinned {
-            continue; // already listed under "Downloaded" / "Favorites"
+        if s.downloaded || s.pinned || s.system_folder || s.online_plugin || s.device || s.local {
+            continue; // already listed above
         }
-        // The devices and the local volumes hang under the "Devices" heading; the other sources are on their own.
-        source_rows(&mut rows, i, n, usize::from(s.device || s.local));
+        source_rows(&mut rows, i, n, 0);
     }
     rows.into_iter().unzip()
 }

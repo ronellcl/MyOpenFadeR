@@ -44,6 +44,11 @@ pub enum Kind {
     DeviceFolder { path: PathBuf },
     /// A local volume of the machine to browse (the system disk): its top-level folders open as folder sources, read-only.
     LocalDisk { label: String, path: PathBuf },
+    /// A folder of the system the user can browse: Music, Videos, Desktop. It opens as a folder source, read-only.
+    SystemFolder { label: String, path: PathBuf },
+    /// A cloud plugin source the user can search and download from: Deezer, YouTube, SoundCloud. It shows its own
+    /// sub-entries: Search and Downloads (and, for SoundCloud, its example playlists).
+    OnlinePlugin { plugin: String, label: String },
     /// A folder the user pinned (FAVORITES): it opens as a folder source, read-only.
     Pinned { label: String, path: PathBuf },
 }
@@ -92,6 +97,8 @@ impl Kind {
             (Kind::Downloaded { path: a, .. }, Kind::Downloaded { path: b, .. }) => a == b,
             (Kind::DeviceFolder { path: a }, Kind::DeviceFolder { path: b }) => a == b,
             (Kind::LocalDisk { path: a, .. }, Kind::LocalDisk { path: b, .. }) => a == b,
+            (Kind::SystemFolder { path: a, .. }, Kind::SystemFolder { path: b, .. }) => a == b,
+            (Kind::OnlinePlugin { plugin: a, .. }, Kind::OnlinePlugin { plugin: b, .. }) => a == b,
             (Kind::Pinned { path: a, .. }, Kind::Pinned { path: b, .. }) => a == b,
             _ => false,
         }
@@ -101,6 +108,8 @@ impl Kind {
         match self {
             Kind::Device(d) => format!("{}  ({}, {} free)", d.label, d.fs, device::size(d.free)),
             Kind::LocalDisk { label, .. } => label.clone(),
+            Kind::SystemFolder { label, .. } => label.clone(),
+            Kind::OnlinePlugin { label, .. } => label.clone(),
             _ => self.short(),
         }
     }
@@ -117,6 +126,8 @@ impl Kind {
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             Kind::LocalDisk { label, .. } => label.clone(),
+            Kind::SystemFolder { label, .. } => label.clone(),
+            Kind::OnlinePlugin { label, .. } => label.clone(),
             Kind::Pinned { path, .. } => path
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
@@ -164,9 +175,13 @@ impl Kind {
             }
             Kind::DeviceFolder { path } => Ok(Box::new(Folder::open(path)?)),
             Kind::Pinned { path, .. } => Ok(Box::new(Folder::open(path)?)),
+            // A system folder (Music, Videos, Desktop) is browsed as a folder of files.
+            Kind::SystemFolder { path, .. } => Ok(Box::new(Folder::open(path)?)),
             // A local volume is browsed by its folders: it holds no library of its own (reading the whole volume would
             // take hours).
             Kind::LocalDisk { .. } => Err("it is browsed by its folders".to_owned()),
+            // A cloud plugin has no local files: its entries (Search, Downloads, …) are listed by the tree itself.
+            Kind::OnlinePlugin { .. } => Err("it is browsed by its entries".to_owned()),
         }
     }
 }
@@ -184,6 +199,19 @@ pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
     }));
     // What the plugin sources downloaded: their folders in the data dir, in the tree's "Downloaded" section.
     kinds.extend(downloaded());
+    // The cloud plugins the user can search and download from: Deezer, YouTube, SoundCloud. Each shows its own
+    // sub-entries (Search, Downloads, …) in the tree itself.
+    for p in plugin::registry().plugins.iter() {
+        match p.manifest.name.as_str() {
+            "Deezer" | "YouTube" | "SoundCloud" => {
+                kinds.push(Kind::OnlinePlugin {
+                    plugin: p.manifest.name.clone(),
+                    label: p.manifest.name.clone(),
+                });
+            }
+            _ => {}
+        }
+    }
     kinds.extend(
         device::scan()
             .into_iter()
@@ -194,23 +222,24 @@ pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
         label: l.label,
         path: l.mount,
     }));
-    kinds.extend(
-        plugin::library::sources()
-            .into_iter()
-            .map(|s| Kind::Plugin {
-                plugin: s.plugin,
-                label: s.label,
-                path: s.path,
-            }),
-    );
+    // The system folders the user can browse: Music, Videos, Desktop. Read-only, like a volume's folders.
+    let home = openfader::paths::home().unwrap_or_default();
+    let system_folders: Vec<(&str, PathBuf)> = vec![
+        ("Música", home.join("Music")),
+        ("Vídeos", home.join("Videos")),
+        ("Escritorio", home.join("Desktop")),
+    ];
+    for (label, path) in system_folders {
+        if path.is_dir() {
+            kinds.push(Kind::SystemFolder {
+                label: label.to_owned(),
+                path,
+            });
+        }
+    }
     // `$XDG_MUSIC_DIR`, else `~/Music`, else home: the whole home holds caches and build trees, read for minutes.
-    let home = openfader::paths::home();
-    let music = std::env::var_os("XDG_MUSIC_DIR")
-        .map(PathBuf::from)
-        .or_else(|| home.as_ref().map(|h| h.join("Music")))
-        .filter(|p| p.is_dir());
-    if let (true, Some(p)) = (media_explorer, music.or(home).filter(|p| p.is_dir())) {
-        kinds.push(Kind::Explorer(p));
+    if media_explorer && home.is_dir() {
+        kinds.push(Kind::Explorer(home));
     }
     let mut old: Vec<Option<Source>> = old.into_iter().map(Some).collect();
     kinds
@@ -261,6 +290,16 @@ impl Source {
         matches!(self.kind, Kind::LocalDisk { .. })
     }
 
+    /// Whether the source is a system folder of Windows (Music, Videos, Desktop).
+    pub fn is_system_folder(&self) -> bool {
+        matches!(self.kind, Kind::SystemFolder { .. })
+    }
+
+    /// Whether the source is a cloud plugin source (Deezer, YouTube, SoundCloud).
+    pub fn is_online_plugin(&self) -> bool {
+        matches!(self.kind, Kind::OnlinePlugin { .. })
+    }
+
     /// The path the source is read from again on a worker thread (`None` for a device: its own menus import from it).
     pub fn path(&self) -> Option<(PathBuf, SourceType)> {
         match &self.kind {
@@ -284,6 +323,10 @@ impl Source {
             Kind::DeviceFolder { path } => Some((path.clone(), SourceType::Folder)),
             Kind::Pinned { path, .. } => Some((path.clone(), SourceType::Folder)),
             Kind::LocalDisk { .. } => None,
+            // A system folder is read again from its path.
+            Kind::SystemFolder { path, .. } => Some((path.clone(), SourceType::Folder)),
+            // A cloud plugin has no local path to re-read.
+            Kind::OnlinePlugin { .. } => None,
         }
     }
 }
@@ -416,6 +459,8 @@ impl View {
                 local: s.is_local(),
                 downloaded: s.is_downloaded(),
                 pinned: s.is_pinned(),
+                system_folder: matches!(s.kind, Kind::SystemFolder { .. }),
+                online_plugin: matches!(s.kind, Kind::OnlinePlugin { .. }),
                 name: s.name.clone(),
                 open: s.lib.is_some(),
                 playlists: s.playlists.clone(),
@@ -440,6 +485,8 @@ impl View {
         let downloaded = |i: &usize| self.sources.get(*i).is_some_and(Source::is_downloaded);
         Some(match e {
             Entry::DevicesRoot | Entry::DownloadedRoot | Entry::Source(_) => 10,
+            // A system folder: its tracks can be imported, but it is not a library to connect.
+            Entry::SystemFolder(_) => 14,
             // A pinned folder: its tracks can be imported, but it is not a library to connect.
             Entry::Pinned(i) => {
                 if self.sources.get(*i).is_some_and(|s| s.is_device()) {
@@ -498,14 +545,21 @@ impl View {
                 // A downloaded folder opens its tracks; a device opens its own window and its lists are below it.
                 if self.sources.get(*i).is_some_and(Source::is_downloaded) {
                     Home::Source(*i, None)
+                } else if self.sources.get(*i).is_some_and(Source::is_system_folder) {
+                    Home::Source(*i, None)
                 } else {
                     Home::Nothing
                 }
             }
+            Entry::SystemFolder(i) => Home::Source(*i, None),
             Entry::SourceMissing(i) => Home::SourceMissing(*i),
             Entry::Pinned(i) => Home::Source(*i, None),
             Entry::DeviceFolder(d, j) => Home::DeviceFolder(*d, *j),
             Entry::DeviceFolderList(d, j, k) => Home::DeviceFolderList(*d, *j, *k),
+            Entry::OnlinePlugin(_) => Home::Nothing,
+            Entry::OnlineSearch(i, j) => Home::PluginSearch(*i, *j),
+            Entry::OnlineDownloads(i, j) => Home::PluginDownloads(*i, *j),
+            Entry::OnlinePlaylist(i, j) => Home::PluginPlaylist(*i, *j),
             Entry::DevicesRoot | Entry::DownloadedRoot => Home::Nothing,
             _ => return None,
         })
@@ -518,6 +572,12 @@ impl View {
             }
             Entry::DevicesRoot => {
                 "Devices: the disks of the machine: choose a device to open it and its window (eject, sync, backup, update collection …); the local disk is browsed by its folders"
+            }
+            Entry::LocalMusicRoot => {
+                "Música Local: folders of Windows (Music, Videos, Desktop) and disks: choose one to browse its files"
+            }
+            Entry::OnlineMusicRoot => {
+                "Música en Línea: cloud plugins (Deezer, YouTube, SoundCloud): choose one to see Search, Downloads and its playlists"
             }
             Entry::Source(_) => {
                 "Choose All tracks or a playlist; IMPORT TO COLLECTION (File and Track menus) adds what you choose to the Collection"
@@ -546,6 +606,10 @@ impl View {
                 let path = self.sources.get(*d)?.folders.get(*j)?.path.clone();
                 let list = self.sources.get(*d)?.folders.get(*j)?.playlists.get(*k)?.id.clone();
                 return Some((path, SourceType::Folder, Some(list)));
+            }
+            Entry::SystemFolder(i) => {
+                let path = self.sources.get(*i)?.path()?.0.clone();
+                return Some((path, SourceType::Folder, None));
             }
             _ => return None,
         };
@@ -739,9 +803,14 @@ impl View {
     pub(super) fn refresh_sources(&mut self, app: &App) {
         let explorer = prefs::with(|p| p.view.media_explorer);
         let chosen = match &self.entry {
-            Entry::Source(i) | Entry::SourceAll(i) | Entry::SourceList(i, _) => {
-                self.sources.get(*i).map(|s| s.kind.clone())
-            }
+            Entry::Source(i)
+            | Entry::SourceAll(i)
+            | Entry::SourceList(i, _)
+            | Entry::SystemFolder(i)
+            | Entry::OnlinePlugin(i)
+            | Entry::OnlineSearch(i, _)
+            | Entry::OnlineDownloads(i, _)
+            | Entry::OnlinePlaylist(i, _) => self.sources.get(*i).map(|s| s.kind.clone()),
             _ => None,
         };
         let before: Vec<Kind> = self.sources.iter().map(|s| s.kind.clone()).collect();
@@ -755,12 +824,13 @@ impl View {
         {
             return;
         }
-        // A device that just appeared with a library is read straight away, and so is a local volume (its folders).
+        // A device that just appeared with a library is read straight away, and so is a local volume (its folders),
+        // and a system folder (its files).
         let fresh: Vec<usize> = (0..self.sources.len())
             .filter(|&i| {
                 matches!(
                     self.sources[i].kind,
-                    Kind::Device(_) | Kind::LocalDisk { .. }
+                    Kind::Device(_) | Kind::LocalDisk { .. } | Kind::SystemFolder { .. }
                 ) && !before.iter().any(|b| b.same(&self.sources[i].kind))
             })
             .collect();
@@ -781,6 +851,15 @@ impl View {
             Entry::Source(_) => find().map_or(Entry::All, Entry::Source),
             Entry::SourceAll(_) => find().map_or(Entry::All, Entry::SourceAll),
             Entry::SourceList(_, j) => find().map_or(Entry::All, |n| Entry::SourceList(n, *j)),
+            Entry::SystemFolder(_) => find().map_or(Entry::All, Entry::SystemFolder),
+            Entry::OnlinePlugin(_) => find().map_or(Entry::All, Entry::OnlinePlugin),
+            Entry::OnlineSearch(_i, _) => find().map_or(Entry::All, |n| Entry::OnlineSearch(n, 0)),
+            Entry::OnlineDownloads(_i, _) => {
+                find().map_or(Entry::All, |n| Entry::OnlineDownloads(n, 0))
+            }
+            Entry::OnlinePlaylist(_i, _) => {
+                find().map_or(Entry::All, |n| Entry::OnlinePlaylist(n, 0))
+            }
             _ => was.clone(),
         };
         self.rebuild(app);
