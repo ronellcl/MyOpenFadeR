@@ -14,7 +14,7 @@
 mod fetch;
 mod reply;
 
-pub use fetch::{fetch, fetch_in, is_downloaded};
+pub use fetch::{fetch, fetch_in, file_name, is_downloaded};
 pub use reply::track_json;
 
 use super::{Plugin, SourceDecl, registry};

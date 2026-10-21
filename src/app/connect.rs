@@ -197,6 +197,10 @@ pub fn connect_context() {
                 .to_string_lossy()
                 .into_owned(),
         ),
+        // The download folder of a plugin source is the app's own cache: there is nothing to sync with it.
+        browser::SourceType::Downloaded { .. } => {
+            return say("a download folder is the app's own cache: it cannot be connected");
+        }
     };
     match connect::connect(&store::global(), &plugin, &path, &label) {
         Ok(c) => {

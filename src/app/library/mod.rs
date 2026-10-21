@@ -299,6 +299,7 @@ fn action_index(id: &str) -> Option<usize> {
 fn act(c: &Rc<Ctx>, id: &str) {
     match id {
         "source-import" => import::source(c),
+        "source-import-all" => import::source_all(c),
         "source-connect" => super::connect::connect_context(),
         "import-track" => c.ask_path(Ask::ImportFiles, None),
         "import-folder" => c.ask_path(Ask::ImportFolder, None),

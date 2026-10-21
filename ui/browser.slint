@@ -312,10 +312,12 @@ export component Browser inherits Rectangle {
                 if BrowserState.side-kind == 8 || BrowserState.side-kind == 9: IconButton { icon: Icon.folder; icon-size: 16px; tooltip: "Duplicate to My Playlists"; clicked => { BrowserState.side-copy(); } }
                 if BrowserState.side-kind == 3 || BrowserState.side-kind == 8: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: "Export to a device"; clicked => { LibraryState.action("playlist-export-device"); } }
                 if BrowserState.side-kind == 11: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Import to Collection"; clicked => { LibraryState.action("source-import"); } }
+                if BrowserState.side-kind == 14: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Import to Collection"; clicked => { LibraryState.action("source-import"); } }
                 if BrowserState.side-kind == 11: IconButton { icon: Icon.link; icon-size: 16px; tooltip: "Connect: keep this library synced into the Collection"; clicked => { LibraryState.action("source-connect"); } }
                 if BrowserState.side-kind == 12: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Import to Collection as a playlist"; clicked => { DeviceState.import-playlist(BrowserState.source-device, BrowserState.source-list); } }
                 if BrowserState.side-kind == 12 && BrowserState.source-history: IconButton { icon: Icon.check; icon-size: 16px; tooltip: "Import into the play history"; clicked => { DeviceState.import-history(BrowserState.source-device, BrowserState.source-list); } }
                 if BrowserState.side-kind == 12: IconButton { icon: Icon.trash; icon-size: 16px; tooltip: "Delete from the device"; clicked => { DeviceState.delete-playlist(BrowserState.source-device, BrowserState.source-list); } }
+                if BrowserState.side-kind == 13: IconButton { icon: Icon.plus; icon-size: 16px; tooltip: "Import all of them to the Collection"; clicked => { LibraryState.action("source-import-all"); } }
                 if BrowserState.history-view: IconButton { icon: Icon.eject; icon-size: 16px; tooltip: "Save as M3U8"; clicked => { BrowserState.history-save(); } }
                 if !root.detached: IconButton { icon: Icon.expand; icon-size: 16px; tooltip: "Browse view (W)"; active: BrowserState.browse-max; clicked => { BrowserState.browse-max = !BrowserState.browse-max; } }
             }

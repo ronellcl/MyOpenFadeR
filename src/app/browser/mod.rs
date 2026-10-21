@@ -71,6 +71,8 @@ pub struct Context {
     pub playlist: Option<String>,
     /// An opened iTunes / xml / Explorer list on screen: where to read it again from (for IMPORT TO COLLECTION).
     pub source: Option<(std::path::PathBuf, sources::SourceType, Option<String>)>,
+    /// The tracks of the "Not in the Collection" list on screen: what IMPORT ALL adds to the Collection.
+    pub missing: Vec<Track>,
 }
 
 thread_local! {
@@ -92,6 +94,7 @@ pub fn context() -> Context {
             name: String::new(),
             playlist: None,
             source: None,
+            missing: Vec::new(),
         },
         |v| {
             let v = v.borrow();
@@ -100,6 +103,7 @@ pub fn context() -> Context {
                 list: v.shown.iter().map(|&i| v.list[i].clone()).collect(),
                 name: v.list_name(),
                 source: v.source_sel(),
+                missing: v.missing_sel(),
                 playlist: match &v.entry {
                     Entry::User(id) => Some(format!("store:{id}")),
                     Entry::Lib(i) => Some(v.lib_playlists[*i].id.clone()),
@@ -149,6 +153,8 @@ enum Home {
     CueAnalysis,
     /// A list of an opened external source (`None`: all its tracks).
     Source(usize, Option<String>),
+    /// The tracks of an opened external source the Collection does not have.
+    SourceMissing(usize),
 }
 
 /// The whole library with each track's store key, read again only when the store changed ([`Store::generation`]).

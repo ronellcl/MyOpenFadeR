@@ -47,6 +47,80 @@ impl Report {
     }
 }
 
+/// A library of a fixed list of tracks: what an import of a list on screen (the "Not in the Collection" list) reads.
+pub struct Files {
+    tracks: Vec<Track>,
+}
+
+impl Files {
+    pub fn new(tracks: Vec<Track>) -> Self {
+        Self { tracks }
+    }
+}
+
+impl Library for Files {
+    fn kind(&self) -> &str {
+        "Files"
+    }
+
+    fn playlists(&self) -> Result<Vec<Playlist>, String> {
+        Ok(Vec::new())
+    }
+
+    fn tracks(&self, _playlist: Option<&str>) -> Result<Vec<Track>, String> {
+        Ok(self.tracks.clone())
+    }
+}
+
+/// The download folder of a plugin source: its files, except the ones the Collection already holds as cloud tracks of
+/// that source (the same song under another name would be a second row).
+pub struct Downloaded {
+    inner: folder::Folder,
+    /// The names the Collection's cloud tracks of this source have (the download files are named after their id).
+    names: Vec<String>,
+}
+
+impl Downloaded {
+    pub fn open(path: &Path, plugin: &str, source: &str) -> Result<Self, String> {
+        let store = crate::store::global();
+        let names: Vec<String> = store
+            .collection_remotes()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(p, s, _)| p == plugin && s == source)
+            .map(|(_, _, id)| crate::plugin::source::file_name(&id))
+            .collect();
+        Ok(Self {
+            inner: folder::Folder::open(path)?,
+            names,
+        })
+    }
+}
+
+impl Library for Downloaded {
+    fn kind(&self) -> &str {
+        "Downloaded"
+    }
+
+    fn playlists(&self) -> Result<Vec<Playlist>, String> {
+        self.inner.playlists()
+    }
+
+    fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {
+        Ok(self
+            .inner
+            .tracks(playlist)?
+            .into_iter()
+            .filter(|t| {
+                !t.file
+                    .as_deref()
+                    .and_then(|f| f.file_stem())
+                    .is_some_and(|s| self.names.iter().any(|n| s == n.as_str()))
+            })
+            .collect())
+    }
+}
+
 /// The music files named by `paths`: a file as is (any extension, the user chose it), a folder's music files.
 pub fn audio_files(paths: &[PathBuf]) -> Vec<PathBuf> {
     let mut out = Vec::new();

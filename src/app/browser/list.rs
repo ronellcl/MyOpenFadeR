@@ -41,6 +41,11 @@ impl View {
                 .and_then(|s| s.lib.clone())
                 .ok_or_else(|| "the source is not open".to_owned())
                 .and_then(|l| l.tracks(id.as_deref())),
+            (None, Home::SourceMissing(s)) => self
+                .sources
+                .get(*s)
+                .map(|s| s.missing.clone())
+                .ok_or_else(|| "the source is not open".to_owned()),
         };
         let state = app.global::<BrowserState>();
         let plain = anchor.is_none();

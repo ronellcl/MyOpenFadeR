@@ -14,8 +14,8 @@ use super::{
 use crate::app::{prefs, toast};
 use openfader::{
     device::{self, plug, Device},
-    library::{self, folder::Folder, Library, Playlist},
-    plugin,
+    library::{self, folder::Folder, Library, Playlist, Track},
+    plugin, store,
 };
 use slint::ComponentHandle;
 use std::{path::PathBuf, rc::Rc, time::Instant};
@@ -32,6 +32,13 @@ pub enum Kind {
     },
     /// The root folder of Explorer.
     Explorer(PathBuf),
+    /// The folder where a plugin source keeps the audio it downloaded (`<data>/plugins/<plugin>/<source>`).
+    Downloaded {
+        plugin: String,
+        source: String,
+        label: String,
+        path: PathBuf,
+    },
 }
 
 pub struct Source {
@@ -40,6 +47,8 @@ pub struct Source {
     /// Read when the source is first chosen.
     pub lib: Option<Rc<dyn Library>>,
     pub playlists: Vec<Playlist>,
+    /// The tracks of the source the Collection does not have (the files it lists that the Collection lacks).
+    pub missing: Vec<Track>,
     /// Being read on a worker thread ([`View::read_source`]).
     reading: bool,
 }
@@ -59,6 +68,7 @@ impl Kind {
                 },
             ) => a == b && p == q,
             (Kind::Explorer(a), Kind::Explorer(b)) => a == b,
+            (Kind::Downloaded { path: a, .. }, Kind::Downloaded { path: b, .. }) => a == b,
             _ => false,
         }
     }
@@ -76,6 +86,7 @@ impl Kind {
             Kind::Device(d) => d.label.clone(),
             Kind::Plugin { label, .. } => label.clone(),
             Kind::Explorer(_) => "Explorer".to_owned(),
+            Kind::Downloaded { label, .. } => label.clone(),
         }
     }
 
@@ -87,20 +98,25 @@ impl Kind {
                 Ok(Box::new(plugin::library::open_with(plugin, path)?))
             }
             Kind::Explorer(p) => Ok(Box::new(Folder::open(p)?)),
+            Kind::Downloaded { path, .. } => Ok(Box::new(Folder::open(path)?)),
         }
     }
 }
 
-/// What a worker read: the library, its playlists, its track count.
-type Read = Result<(Box<dyn Library + Send>, Vec<Playlist>, usize), String>;
+/// What a worker read: the library, its playlists, its track count and the tracks the Collection does not have.
+type Read = Result<(Box<dyn Library + Send>, Vec<Playlist>, usize, Vec<Track>), String>;
 /// The sources the settings and the mounted devices call for now; those already in `old` keep their opened library (and
 /// get their label refreshed).
 pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
-    let mut kinds: Vec<Kind> = device::scan()
-        .into_iter()
-        .filter(Device::has_library)
-        .map(Kind::Device)
-        .collect();
+    let mut kinds: Vec<Kind> = Vec::new();
+    // What the plugin sources downloaded: their folders in the data dir, first in the tree (the "Downloaded" section).
+    kinds.extend(downloaded());
+    kinds.extend(
+        device::scan()
+            .into_iter()
+            .filter(Device::has_library)
+            .map(Kind::Device),
+    );
     kinds.extend(
         plugin::library::sources()
             .into_iter()
@@ -138,6 +154,7 @@ pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
                     kind,
                     lib: None,
                     playlists: Vec::new(),
+                    missing: Vec::new(),
                     reading: false,
                 },
             }
@@ -150,6 +167,11 @@ impl Source {
         matches!(self.kind, Kind::Device(_))
     }
 
+    /// Whether the source is the folder a plugin source downloaded into (the "Downloaded" section).
+    pub fn is_downloaded(&self) -> bool {
+        matches!(self.kind, Kind::Downloaded { .. })
+    }
+
     /// The path the source is read from again on a worker thread (`None` for a device: its own menus import from it).
     pub fn path(&self) -> Option<(PathBuf, SourceType)> {
         match &self.kind {
@@ -158,8 +180,87 @@ impl Source {
                 Some((path.clone(), SourceType::Plugin(plugin.clone())))
             }
             Kind::Explorer(p) => Some((p.clone(), SourceType::Folder)),
+            Kind::Downloaded {
+                plugin,
+                source,
+                path,
+                ..
+            } => Some((
+                path.clone(),
+                SourceType::Downloaded {
+                    plugin: plugin.clone(),
+                    source: source.clone(),
+                },
+            )),
         }
     }
+}
+
+/// The folders where the plugin sources keep the audio they downloaded: `<data dir>/plugins/<plugin>/<source>`, when
+/// the folder is there and holds audio. What is in them is a real file: it can be loaded, imported and searched.
+fn downloaded() -> Vec<Kind> {
+    let Some(base) = openfader::paths::data_dir() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for p in plugin::registry().plugins.iter() {
+        for s in p.manifest.sources.iter() {
+            let dir = base.join("plugins").join(&p.manifest.name).join(&s.id);
+            if dir.is_dir() && holds_audio(&dir) {
+                out.push(Kind::Downloaded {
+                    plugin: p.manifest.name.clone(),
+                    source: s.id.clone(),
+                    label: s.name.clone(),
+                    path: dir,
+                });
+            }
+        }
+    }
+    out
+}
+
+/// Whether the folder holds audio (or a video) below it: a plugin that downloaded nothing leaves an empty folder.
+fn holds_audio(dir: &std::path::Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    entries.flatten().any(|e| {
+        e.path()
+            .is_file()
+            .then(|| library::folder::is_audio(&e.path()))
+            .unwrap_or(false)
+    })
+}
+
+/// The tracks of the source the Collection does not have: the files it lists that the Collection does not list yet. A
+/// downloaded file is the Collection's own cloud track (its name is the remote id), so it counts as in it.
+fn missing_of(kind: &Kind, tracks: &[Track]) -> Vec<Track> {
+    let store = store::global();
+    let (Ok(files), Ok(remotes)) = (store.collection_files(), store.collection_remotes()) else {
+        return Vec::new();
+    };
+    // A downloaded file is named after the remote id: the cloud tracks of the Collection name theirs the same way.
+    let names: Vec<String> = match kind {
+        Kind::Downloaded { plugin, source, .. } => remotes
+            .iter()
+            .filter(|(p, s, _)| p == plugin && s == source)
+            .map(|(_, _, id)| plugin::source::file_name(id))
+            .collect(),
+        _ => Vec::new(),
+    };
+    tracks
+        .iter()
+        .filter(|t| match &t.file {
+            Some(f) => {
+                !files.contains(f)
+                    && !names
+                        .iter()
+                        .any(|n| f.file_stem().is_some_and(|s| s == n.as_str()))
+            }
+            None => true,
+        })
+        .cloned()
+        .collect()
 }
 
 /// How to read a [`Source::path`] again.
@@ -168,6 +269,8 @@ pub enum SourceType {
     /// With the library plugin of that name.
     Plugin(String),
     Folder,
+    /// The download folder of a plugin source: the files the Collection already holds as cloud tracks are left out.
+    Downloaded { plugin: String, source: String },
 }
 
 impl View {
@@ -177,24 +280,38 @@ impl View {
             .iter()
             .map(|s| SourceRows {
                 device: s.is_device(),
+                downloaded: s.is_downloaded(),
                 name: s.name.clone(),
                 open: s.lib.is_some(),
                 playlists: s.playlists.clone(),
+                missing: s.missing.clone(),
             })
             .collect()
     }
 
     /// `BrowserState.side-kind` of a source row: 10 nothing to do, 11 a list of iTunes / xml / Explorer (IMPORT TO COLLECTION),
-    /// 12 a list of a device (import / delete through the device window).
+    /// 12 a list of a device (import / delete through the device window), 13 the tracks a source does not have (IMPORT ALL),
+    /// 14 a download folder (IMPORT TO COLLECTION, but no CONNECT: the app's own cache is not synced).
     pub(super) fn source_side_kind(&self, e: &Entry) -> Option<i32> {
         let device = |i: &usize| self.sources.get(*i).is_some_and(Source::is_device);
+        let downloaded = |i: &usize| self.sources.get(*i).is_some_and(Source::is_downloaded);
         Some(match e {
-            Entry::DevicesRoot | Entry::Source(_) => 10,
+            Entry::DevicesRoot | Entry::DownloadedRoot | Entry::Source(_) => 10,
             Entry::SourceAll(i) => {
                 if device(i) {
                     10
+                } else if downloaded(i) {
+                    14
                 } else {
                     11
+                }
+            }
+            Entry::SourceMissing(i) => {
+                // The tracks the Collection does not have: the import button adds them all.
+                if device(i) {
+                    10
+                } else {
+                    13
                 }
             }
             Entry::SourceList(i, j)
@@ -224,13 +341,25 @@ impl View {
                 Some(p) if !p.is_folder => Home::Source(*i, Some(p.id.clone())),
                 _ => Home::Nothing,
             },
-            Entry::DevicesRoot | Entry::Source(_) => Home::Nothing,
+            Entry::Source(i) => {
+                // A downloaded folder opens its tracks; a device opens its own window and its lists are below it.
+                if self.sources.get(*i).is_some_and(Source::is_downloaded) {
+                    Home::Source(*i, None)
+                } else {
+                    Home::Nothing
+                }
+            }
+            Entry::SourceMissing(i) => Home::SourceMissing(*i),
+            Entry::DevicesRoot | Entry::DownloadedRoot => Home::Nothing,
             _ => return None,
         })
     }
 
     pub(super) fn source_hint(&self, e: &Entry) -> Option<&'static str> {
         Some(match e {
+            Entry::DownloadedRoot => {
+                "What the plugin sources downloaded: choose a folder to open it (the files are real ones: they can be loaded, imported and searched)"
+            }
             Entry::DevicesRoot => {
                 "Devices: choose a device to open it and its window (eject, sync, backup, update collection …)"
             }
@@ -254,6 +383,18 @@ impl View {
         };
         let (path, kind) = self.sources.get(i)?.path()?;
         Some((path, kind, list))
+    }
+
+    /// The tracks of the "Not in the Collection" list on screen, for IMPORT ALL.
+    pub(super) fn missing_sel(&self) -> Vec<Track> {
+        match &self.entry {
+            Entry::SourceMissing(i) => self
+                .sources
+                .get(*i)
+                .map(|s| s.missing.clone())
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        }
     }
 
     /// The chosen device's id and playlist, for the strip's device buttons.
@@ -313,10 +454,10 @@ impl View {
         let s = &mut self.sources[i];
         s.reading = false;
         let text = match read {
-            Ok((lib, playlists, tracks)) => {
+            Ok((lib, playlists, tracks, missing)) => {
                 let lists = playlists.iter().filter(|p| !p.is_folder).count();
                 let lib: Rc<dyn Library> = Rc::<dyn Library + Send>::from(lib);
-                (s.lib, s.playlists) = (Some(lib), playlists);
+                (s.lib, s.playlists, s.missing) = (Some(lib), playlists, missing);
                 let s_ = |n: usize| if n == 1 { "" } else { "s" };
                 format!(
                     "{}: {tracks} track{}, {lists} playlist{} ready ({secs:.1} s)",
@@ -418,8 +559,10 @@ fn read(app: &App, kind: Kind) {
         step(format!("{name}: listing tracks and playlists"), 0.85);
         let read: Read = kind.open().and_then(|lib| {
             let playlists = lib.playlists()?;
-            let tracks = lib.tracks(None)?.len();
-            Ok((lib, playlists, tracks))
+            let tracks = lib.tracks(None)?;
+            let count = tracks.len();
+            let missing = missing_of(&kind, &tracks);
+            Ok((lib, playlists, count, missing))
         });
         let secs = start.elapsed().as_secs_f32();
         let _ = slint::invoke_from_event_loop(move || {

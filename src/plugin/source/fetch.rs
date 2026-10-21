@@ -25,7 +25,7 @@ static RUNNING: LazyLock<Mutex<HashMap<String, Shared>>> = LazyLock::new(Default
 
 /// `id` as a file name: ASCII letters, digits, `-` and `_` stay, every other byte becomes `%XX`, so two ids never
 /// share a name.
-pub(super) fn file_name(id: &str) -> String {
+pub fn file_name(id: &str) -> String {
     id.bytes()
         .map(|b| match b {
             b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' => (b as char).to_string(),

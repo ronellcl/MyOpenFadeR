@@ -211,12 +211,33 @@ pub fn source(c: &Rc<Ctx>) {
             let src: Box<dyn library::Library> = match kind {
                 SourceType::Plugin(plugin) => Box::new(open_with(&plugin, &path)?),
                 SourceType::Folder => Box::new(library::folder::Folder::open(&path)?),
+                SourceType::Downloaded { plugin, source } => {
+                    Box::new(library::import::Downloaded::open(&path, &plugin, &source)?)
+                }
             };
             let scope = match &list {
                 Some(id) => import::Scope::List(id),
                 None => import::Scope::All { playlists: false },
             };
             import::library(&store, &*src, &known, scope, &p)
+        },
+        finished,
+    );
+}
+
+/// IMPORT ALL on the "Not in the Collection" list on screen: the tracks it lists join the Collection.
+pub fn source_all(c: &Rc<Ctx>) {
+    use crate::app::browser;
+    let tracks = browser::context().missing;
+    if tracks.is_empty() {
+        return c.say("the Collection has all of them");
+    }
+    let (store, known, p) = job(c, "importing");
+    c.say("importing…");
+    c.spawn(
+        move || {
+            let src = Box::new(library::import::Files::new(tracks));
+            import::library(&store, &*src, &known, import::Scope::All { playlists: false }, &p)
         },
         finished,
     );

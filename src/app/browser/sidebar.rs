@@ -6,7 +6,7 @@
 //! (the opened source's own playlists, read-only; its "Histories" folder is among them).
 
 use openfader::{
-    library::Playlist,
+    library::{Playlist, Track},
     plugin::device::MAX_BANKS,
     store::{HotCueBank, Tag, TagGroup, Node, NodeKind},
 };
@@ -45,10 +45,14 @@ pub enum Entry {
     CueAnalysis,
     /// "Devices" heading above the mounted devices.
     DevicesRoot,
+    /// "Downloaded" heading above what the plugin sources downloaded.
+    DownloadedRoot,
     /// An external source (a device, iTunes, library xml, Explorer) by index into the browser's sources; it opens when chosen.
     Source(usize),
     /// "All tracks" of an opened source.
     SourceAll(usize),
+    /// The tracks of an opened source the Collection does not have.
+    SourceMissing(usize),
     /// A playlist of an opened source: (source, index into its playlists).
     SourceList(usize, usize),
 }
@@ -56,10 +60,14 @@ pub enum Entry {
 /// One external source as the tree shows it.
 pub struct SourceRows {
     pub device: bool,
+    /// The folder a plugin source downloaded into (the "Downloaded" section).
+    pub downloaded: bool,
     pub name: String,
     /// Opened: its "All tracks" and playlists are listed under it.
     pub open: bool,
     pub playlists: Vec<Playlist>,
+    /// The tracks of the source the Collection does not have.
+    pub missing: Vec<Track>,
 }
 
 pub struct Inputs<'a> {
@@ -148,33 +156,62 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             .enumerate()
             .map(|(n, p)| (Entry::Lib(n), playlist_label(1, p))),
     );
+    // What the plugin sources downloaded, under its own heading; the other sources keep their place.
+    let downloaded: Vec<usize> = i
+        .sources
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.downloaded)
+        .map(|(n, _)| n)
+        .collect();
+    if !downloaded.is_empty() {
+        rows.push((Entry::DownloadedRoot, "▸ Downloaded".to_owned()));
+        for n in downloaded {
+            source_rows(&mut rows, i, n, 1);
+        }
+    }
     if i.sources.iter().any(|s| s.device) {
         rows.push((Entry::DevicesRoot, "▸ Devices".to_owned()));
     }
     for (n, s) in i.sources.iter().enumerate() {
-        let d = usize::from(s.device);
-        rows.push((
-            Entry::Source(n),
-            indent(
-                d,
-                &if s.device {
-                    s.name.clone()
-                } else {
-                    format!("▸ {}", s.name)
-                },
-            ),
-        ));
-        if s.open {
-            rows.push((Entry::SourceAll(n), indent(d + 1, "All tracks")));
-            rows.extend(
-                s.playlists
-                    .iter()
-                    .enumerate()
-                    .map(|(j, p)| (Entry::SourceList(n, j), playlist_label(d + 1, p))),
-            );
+        if s.downloaded {
+            continue; // already listed under "Downloaded"
         }
+        source_rows(&mut rows, i, n, usize::from(s.device));
     }
     rows.into_iter().unzip()
+}
+
+/// The rows of the source `n`: its own row and, when it is open, its tracks, its playlists and the tracks the
+/// Collection does not have.
+fn source_rows(rows: &mut Vec<(Entry, String)>, i: &Inputs, n: usize, d: usize) {
+    let s = &i.sources[n];
+    rows.push((
+        Entry::Source(n),
+        indent(
+            d,
+            &if s.device {
+                s.name.clone()
+            } else {
+                format!("▸ {}", s.name)
+            },
+        ),
+    ));
+    if s.open {
+        rows.push((Entry::SourceAll(n), indent(d + 1, "All tracks")));
+        rows.extend(
+            s.playlists
+                .iter()
+                .enumerate()
+                .map(|(j, p)| (Entry::SourceList(n, j), playlist_label(d + 1, p))),
+        );
+        if !s.missing.is_empty() {
+            rows.push((
+                Entry::SourceMissing(n),
+                indent(d + 1, "Not in the Collection"),
+            ));
+        }
+    }
 }
 
 /// The library playlist `at` with everything nested under it, as (index, depth below `at`); `at` itself first.
@@ -334,6 +371,57 @@ mod tests {
         );
     }
 
+    /// The downloads have their own section, before the devices, and an opened one lists its tracks and what the
+    /// Collection does not have.
+    #[test]
+    fn the_downloads_have_their_own_section_with_their_tracks() {
+        let src = |name: &str, device, downloaded, open, missing| SourceRows {
+            device,
+            downloaded,
+            name: name.into(),
+            open,
+            playlists: Vec::new(),
+            missing: vec![Track::default(); missing],
+        };
+        let sources = [
+            src("YouTube", false, true, true, 3),
+            src("Explorer", false, false, false, 0),
+            src("USB", true, false, false, 0),
+        ];
+        let (entries, labels) = build(&Inputs {
+            tag_list: 0,
+            session: 0,
+            lib: &[],
+            nodes: &[],
+            days: &[],
+            cats: &[],
+            tags: &[],
+            sources: &sources,
+            all_tracks: false,
+            cue_analysis: None,
+            banks: None,
+        });
+        let at = labels
+            .iter()
+            .position(|l| l == "▸ Downloaded")
+            .expect("the downloads have their own section");
+        assert_eq!(entries[at], Entry::DownloadedRoot);
+        // The section comes before the devices, and the download lists its tracks and what the Collection lacks.
+        assert_eq!(entries[at + 1], Entry::Source(0));
+        assert_eq!(labels[at + 1], "    ▸ YouTube");
+        assert_eq!(entries[at + 2], Entry::SourceAll(0));
+        assert_eq!(labels[at + 2], "        All tracks");
+        assert_eq!(entries[at + 3], Entry::SourceMissing(0));
+        assert_eq!(labels[at + 3], "        Not in the Collection");
+        // The other sources keep their place.
+        let devices = labels
+            .iter()
+            .position(|l| l == "▸ Devices")
+            .expect("the devices have their own section");
+        assert!(devices > at);
+        assert!(!labels.iter().any(|l| l == "    ▸ Explorer"));
+    }
+
     #[test]
     fn subtree_takes_the_folder_and_all_it_nests() {
         let lib = [
@@ -353,9 +441,11 @@ mod tests {
     fn devices_and_other_sources_open_into_their_playlists() {
         let src = |device, name: &str, open| SourceRows {
             device,
+            downloaded: false,
             name: name.into(),
             open,
             playlists: vec![pl("Set", 0, true), pl("Inner", 1, false)],
+            missing: Vec::new(),
         };
         let sources = [
             src(true, "USB (vfat)", true),

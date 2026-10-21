@@ -123,6 +123,29 @@ impl Store {
         )
     }
 
+    /// The files the Collection holds: what a source's tracks are matched against to know which of them it lacks.
+    /// The cloud tracks have no file, so they are not in it (a cloud track is in the Collection by its source and id).
+    pub fn collection_files(&self) -> R<HashSet<PathBuf>> {
+        let paths: Vec<String> = query_all(
+            &self.db(),
+            "SELECT path FROM collection WHERE path NOT LIKE ?1",
+            ["\u{1}remote:%"],
+            |r| r.get::<_, String>(0),
+        )?;
+        Ok(paths.into_iter().map(PathBuf::from).collect())
+    }
+
+    /// The cloud tracks the Collection holds: their source and id, to tell a downloaded file from one it already has.
+    pub fn collection_remotes(&self) -> R<HashSet<(String, String, String)>> {
+        let rows: Vec<(String, String, String)> = query_all(
+            &self.db(),
+            "SELECT plugin, source, remote_id FROM collection WHERE plugin IS NOT NULL",
+            [],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)),
+        )?;
+        Ok(rows.into_iter().collect())
+    }
+
     /// The only row whose file has this name and size (what [`key`] gives a track without an id); `None` for none or several.
     pub(super) fn id_of_file(&self, name: &str, size: u64) -> Option<i64> {
         let mut cache = self.cache.lock();
