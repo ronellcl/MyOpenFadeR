@@ -502,7 +502,9 @@ impl View {
             Entry::Source(_) => {
                 "Choose All tracks or a playlist; IMPORT TO COLLECTION (File and Track menus) adds what you choose to the Collection"
             }
-            Entry::SourceList(..) => "Folder of the source: choose a playlist inside it",
+            Entry::SourceList(..) => {
+                "The source's own lists: of a device, the playlists of your DJ library; of a plugin, the ones it ships with (its own accounts)"
+            }
             _ => return None,
         })
     }

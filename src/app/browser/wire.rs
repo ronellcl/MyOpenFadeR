@@ -109,6 +109,8 @@ pub fn wire(
         editing: None,
         confirm: None,
         sources: Vec::new(),
+        folded: std::collections::HashSet::new(),
+        folded_lib: std::collections::HashSet::new(),
         played,
         strips: strip::Strips::new(app),
         _timer: Timer::default(),
@@ -209,6 +211,12 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
     state.on_playlist_selected(move |i| {
         if let Ok(i) = usize::try_from(i) {
             v.borrow_mut().select(&weak.unwrap(), i);
+        }
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
+    state.on_playlist_clicked(move |i| {
+        if let Ok(i) = usize::try_from(i) {
+            v.borrow_mut().click_row(&weak.unwrap(), i);
         }
     });
     let (v, weak) = (view.clone(), app.as_weak());

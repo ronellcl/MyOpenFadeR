@@ -196,6 +196,8 @@ impl View {
                 downloaded: p.view.media_downloaded,
                 devices: p.view.media_devices,
             }),
+            folded: &self.folded,
+            folded_lib: &self.folded_lib,
         });
         self.entries = entries;
         self.sidebar.set_vec(
@@ -226,6 +228,44 @@ impl View {
             }
             self.show(app);
         }
+    }
+
+    /// The user clicked a row of the tree: a list with lists under it folds them, and the sources fold their branch too.
+    pub(in crate::app::browser) fn click_row(&mut self, app: &App, row: usize) {
+        let Some(e) = self.entries.get(row).cloned() else {
+            return;
+        };
+        match e {
+            Entry::Lib(i) => {
+                // A list with lists under it folds them (the plugin sources come this way).
+                if self.lib_has_children(i) {
+                    if !self.folded_lib.remove(&i) {
+                        self.folded_lib.insert(i);
+                    }
+                    self.rebuild(app);
+                }
+            }
+            Entry::Source(i) => {
+                // The first click reads the source (its branch opens with it); the next ones fold and unfold it.
+                if self.sources.get(i).is_some_and(|s| s.lib.is_some()) {
+                    if !self.folded.remove(&i) {
+                        self.folded.insert(i);
+                    }
+                    self.rebuild(app);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Whether the list `i` of the library has other lists under it.
+    fn lib_has_children(&self, i: usize) -> bool {
+        let Some(p) = self.lib_playlists.get(i) else {
+            return false;
+        };
+        self.lib_playlists
+            .get(i + 1)
+            .is_some_and(|c| c.depth > p.depth)
     }
 
     /// Shows what the chosen entry lists.

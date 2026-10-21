@@ -229,6 +229,10 @@ struct View {
     confirm: Option<Entry>,
     /// The mounted devices and the iTunes / xml / Explorer sources (see [`sources`]).
     sources: Vec<sources::Source>,
+    /// The sources whose branch the user folded (only their own row is in the tree).
+    folded: std::collections::HashSet<usize>,
+    /// The lists of the library whose branch the user folded.
+    folded_lib: std::collections::HashSet<usize>,
     /// Tracks the table dims, by store key; see [`played`].
     played: std::collections::HashSet<String>,
     _timer: Timer,

@@ -11,6 +11,8 @@ export global BrowserState {
     /// The step that read is at, one readable line ("KINGSTON: reading the library 2.1 of 4.8 MB"), shown beside the bar.
     in property <string> load-text;
     callback playlist-selected(int);
+    /// The user clicked a row of the tree (the keyboard does not fold a branch).
+    callback playlist-clicked(int);
     /// Row index in `tracks` (the filtered, sorted view).
     callback track-selected(int);
     /// Left-button press on a row (same index); Rust turns two quick presses on one row into a double-click.
@@ -88,8 +90,7 @@ export global BrowserState {
     callback list-move(int);
     /// Table row of the chosen track (-1 none); Rust moves it when a list is rebuilt.
     in-out property <int> current-row: -1;
-    /// The tree's chosen sidebar row and the table header's sort column / direction, kept here (not in the components) so that the browser
-    /// in the split-screen window shows the same ones (src/app/split/).
+    /// The tree's chosen sidebar row and the table header's sort column / direction, kept here (not in the components) so that the browser    /// in the split-screen window shows the same ones (src/app/split/).
     in-out property <int> tree-row: -1;
     in-out property <int> sort-col: -1;
     in-out property <bool> sort-asc;

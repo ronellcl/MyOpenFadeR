@@ -158,6 +158,7 @@ export component Browser inherits Rectangle {
                     if (i != BrowserState.tag-row) { root.list-row = i; }
                     BrowserState.playlist-selected(i);
                 }
+                row-clicked(i) => { BrowserState.playlist-clicked(i); }
                 focused => { root.tree-focus = true; }
             }
             // NEW opens the picker (playlist / folder / smart playlist, or Tags category / tag); RENAME / DELETE apply to what is
@@ -217,6 +218,7 @@ export component Browser inherits Rectangle {
                     }
                     Chip { text: "FILTER"; width: 54px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: root.filter-open; clicked => { root.filter-open = !root.filter-open; } }
                     Chip { text: "FAV"; width: 44px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; tooltip: "Pin the chosen folder (a volume's folder) or take the pin off"; enabled: BrowserState.fav-possible; active: BrowserState.fav-pinned; clicked => { BrowserState.fav-toggle(); } }
+                    Chip { text: "SECTIONS"; width: 76px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; tooltip: "Show or hide the sections of the tree (Favorites, Downloaded, Devices, Explorer)"; clicked => { BrowserState.panel-request(5); } }
                     search := TextField {
                         width: 200px;
                         y: (parent.height - self.height) / 2;

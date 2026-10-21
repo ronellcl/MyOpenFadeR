@@ -46,6 +46,8 @@ pub enum Panel {
     More(Vec<Act>),
     /// What MORE can do with the chosen Cue Bank.
     Bank(Vec<hotcuebank::Act>),
+    /// The sections of the tree the user shows or hides.
+    Sections,
 }
 
 /// One entry of the MORE panel.
@@ -150,6 +152,30 @@ impl View {
     }
 }
 
+impl View {
+    /// The SECTIONS panel: the sections of the tree the user shows or hides, without going to the preferences.
+    pub(super) fn open_sections(&mut self, app: &App) {
+        let rows: Vec<String> = crate::app::prefs::with(|p| {
+            [
+                ("Favorites", p.view.media_favorites),
+                ("Downloaded", p.view.media_downloaded),
+                ("Devices", p.view.media_devices),
+                ("Explorer", p.view.media_explorer),
+            ]
+            .iter()
+            .map(|(name, on)| format!("[{}] {name}", if *on { "x" } else { " " }))
+            .collect()
+        });
+        self.show_panel(app, Panel::Sections, "SECTIONS OF THE TREE", rows);
+    }
+
+    /// A section of the tree was shown or hidden: the panel says the new state and the tree is built again.
+    pub(super) fn refresh_sections(&mut self, app: &App) {
+        self.open_sections(app);
+        self.rebuild(app);
+    }
+}
+
 pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
     let state = app.global::<BrowserState>();
     let (v, weak) = (view.clone(), app.as_weak());
@@ -184,13 +210,27 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
             1 => v.open_tag_panel(&app, true),
             2 => v.open_tag_panel(&app, false),
             3 => v.open_new(&app),
+            5 => v.open_sections(&app),
             _ => v.open_more(&app),
         }
     });
     let (v, weak) = (view.clone(), app.as_weak());
     state.on_panel_row(move |i| {
-        let (app, mut v) = (weak.unwrap(), v.borrow_mut());
+        let app = weak.unwrap();
         let Ok(i) = usize::try_from(i) else { return };
+        // The sections are settings: they are changed outside the View's borrow (the settings' listeners use it).
+        if matches!(v.borrow().panel, Panel::Sections) {
+            crate::app::prefs::update(|p| match i {
+                0 => p.view.media_favorites = !p.view.media_favorites,
+                1 => p.view.media_downloaded = !p.view.media_downloaded,
+                2 => p.view.media_devices = !p.view.media_devices,
+                3 => p.view.media_explorer = !p.view.media_explorer,
+                _ => {}
+            });
+            v.borrow_mut().refresh_sections(&app);
+            return;
+        }
+        let (app, mut v) = (weak.unwrap(), v.borrow_mut());
         if let Panel::Bank(acts) = &v.panel {
             let act = acts.get(i).cloned();
             v.close_panel(&app);
@@ -211,7 +251,7 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
             Panel::AddTo(ids) | Panel::New(ids) | Panel::Assign(ids) | Panel::Filter(ids) => {
                 ids.get(i).copied().flatten()
             }
-            Panel::Closed | Panel::More(_) | Panel::Bank(_) => None,
+            Panel::Closed | Panel::More(_) | Panel::Bank(_) | Panel::Sections => None,
         };
         let Some(id) = id else { return };
         match v.panel {

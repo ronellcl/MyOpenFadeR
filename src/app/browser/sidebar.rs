@@ -10,7 +10,7 @@ use openfader::{
     plugin::device::MAX_BANKS,
     store::{HotCueBank, Tag, TagGroup, Node, NodeKind},
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Sidebar row of the session Tag List (row 0 is "All tracks").
 pub const TAG_ROW: usize = 1;
@@ -106,6 +106,10 @@ pub struct Inputs<'a> {
     pub banks: Option<&'a [HotCueBank]>,
     /// Which sections of the tree are shown (Preferences > View > Layout > Media Browser).
     pub sections: Sections,
+    /// The sources whose children are hidden (the user folded the branch).
+    pub folded: &'a HashSet<usize>,
+    /// The lists of the library whose children are hidden (the user folded the branch).
+    pub folded_lib: &'a HashSet<usize>,
 }
 
 /// The sections of the tree the user can hide. All of them show by default.
@@ -189,12 +193,25 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         );
     }
     rows.push((Entry::LibRoot, "▸ Library (read-only)".to_owned()));
-    rows.extend(
-        i.lib
+    // The library's own playlists: a list with lists under it folds them (the plugin sources come this way).
+    let mut at = 0;
+    while at < i.lib.len() {
+        let p = &i.lib[at];
+        let children = i.lib[at + 1..]
             .iter()
-            .enumerate()
-            .map(|(n, p)| (Entry::Lib(n), playlist_label(1, p))),
-    );
+            .take_while(|c| c.depth > p.depth)
+            .count();
+        rows.push((Entry::Lib(at), playlist_label(1, p)));
+        if children > 0 && !i.folded_lib.contains(&at) {
+            rows.extend(
+                i.lib[at + 1..at + 1 + children]
+                    .iter()
+                    .enumerate()
+                    .map(|(k, c)| (Entry::Lib(at + 1 + k), playlist_label(1, c))),
+            );
+        }
+        at += 1 + children;
+    }
     // The folders the user pinned, under their own heading, first in the tree.
     let pinned: Vec<usize> = i
         .sources
@@ -239,6 +256,8 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
 /// Collection does not have.
 fn source_rows(rows: &mut Vec<(Entry, String)>, i: &Inputs, n: usize, d: usize) {
     let s = &i.sources[n];
+    // A folded branch shows only its own row: the user opens it with a click.
+    let folded = i.folded.contains(&n);
     rows.push((
         Entry::Source(n),
         indent(
@@ -250,6 +269,9 @@ fn source_rows(rows: &mut Vec<(Entry, String)>, i: &Inputs, n: usize, d: usize) 
             },
         ),
     ));
+    if folded {
+        return;
+    }
     // A device's own folders: each opens as a source, with its tracks and its subfolders.
     rows.extend(s.folders.iter().enumerate().flat_map(|(j, f)| {
         let mut r = vec![(
@@ -372,6 +394,8 @@ mod tests {
             cue_analysis: None,
             banks: Some(&banks),
             sections: Sections::default(),
+            folded: &HashSet::new(),
+            folded_lib: &HashSet::new(),
         });
         assert_eq!(entries[TAG_ROW], Entry::Tags);
         assert_eq!(entries[HISTORY_ROW], Entry::Session);
@@ -424,6 +448,8 @@ mod tests {
             cue_analysis: None,
             banks: None,
             sections: Sections::default(),
+            folded: &HashSet::new(),
+            folded_lib: &HashSet::new(),
         });
         assert_eq!(
             e,
@@ -472,6 +498,8 @@ mod tests {
             cue_analysis: None,
             banks: None,
             sections: Sections::default(),
+            folded: &HashSet::new(),
+            folded_lib: &HashSet::new(),
         });
         let at = labels
             .iter()
@@ -523,6 +551,8 @@ mod tests {
             cue_analysis: None,
             banks: None,
             sections: Sections::default(),
+            folded: &HashSet::new(),
+            folded_lib: &HashSet::new(),
         });
         let at = labels
             .iter()
@@ -535,6 +565,47 @@ mod tests {
         assert_eq!(labels[at + 2], "        ▸ Musica");
         assert_eq!(entries[at + 3], Entry::DeviceFolderList(0, 0, 0));
         assert_eq!(labels[at + 3], "            Rock");
+    }
+
+    /// A list with lists under it folds them: the plugin sources come this way.
+    #[test]
+    fn a_folded_list_hides_the_lists_under_it() {
+        let lib = [
+            pl("SoundCloud", 0, true),
+            pl("Search", 1, false),
+            pl("Diplo", 1, false),
+            pl("Explorer", 0, false),
+        ];
+        let open = |folded: &HashSet<usize>| {
+            let (entries, labels) = build(&Inputs {
+                tag_list: 0,
+                session: 0,
+                lib: &lib,
+                nodes: &[],
+                days: &[],
+                cats: &[],
+                tags: &[],
+                sources: &[],
+                all_tracks: false,
+                cue_analysis: None,
+                banks: None,
+                sections: Sections::default(),
+                folded: &HashSet::new(),
+                folded_lib: folded,
+            });
+            (entries, labels)
+        };
+        // Open: the list and the two under it.
+        let (entries, labels) = open(&HashSet::new());
+        let at = labels.iter().position(|l| l == "    ▸ SoundCloud").unwrap();
+        assert_eq!(labels[at + 1], "        Search");
+        assert_eq!(labels[at + 2], "        Diplo");
+        assert_eq!(entries[at + 1], Entry::Lib(1));
+        // Folded: only the list itself.
+        let (entries, labels) = open(&HashSet::from([0]));
+        let at = labels.iter().position(|l| l == "    ▸ SoundCloud").unwrap();
+        assert_eq!(labels[at + 1], "    Explorer");
+        assert_eq!(entries[at + 1], Entry::Lib(3));
     }
 
     #[test]
@@ -582,6 +653,8 @@ mod tests {
             cue_analysis: Some(3),
             banks: None,
             sections: Sections::default(),
+            folded: &HashSet::new(),
+            folded_lib: &HashSet::new(),
         });
         assert_eq!(l[4], "CUE Analysis (3)");
         assert_eq!(l[6], "    All Tracks");

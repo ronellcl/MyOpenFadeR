@@ -9,6 +9,8 @@ export component TreeView inherits Rectangle {
     in-out property <int> current-item: -1;
     /// The chosen row changed by click, key or `set-current-item`.
     callback item-changed(int);
+    /// The user clicked the row (the keyboard does not fold a branch).
+    callback row-clicked(int);
     callback focused;
     out property <bool> has-focus: fs.has-focus;
     background: Theme.panel;
@@ -57,6 +59,7 @@ export component TreeView inherits Rectangle {
                                 root.focused();
                                 fs.focus();
                                 root.set-current-item(i);
+                                root.row-clicked(i);
                             }
                         }
                         // Preferences > Advanced > Browse > Edit Library: rename by double click.
