@@ -178,6 +178,8 @@ En cada arranque la aplicación le pide a GitHub la versión más nueva; cuando 
 
 Enchufa un controlador que aún no tenga mapeo y la aplicación ofrece el archivo que le corresponde del repositorio de mapeos: un clic en INSTALL y el controlador funciona. Los archivos de mapeo cubren la capa por defecto de cada controlador; el aprendizaje MIDI y los LED de respuesta vienen de serie, y la detección de conexión y desconexión recoge controladores mientras la aplicación está en marcha. El formato está descrito en [docs/mappings.md](docs/mappings.md).
 
+Para aparatos externos, PREFERENCIAS > CONTROLADOR > OTHERS > MIDI CLOCK OUT toma parte del nombre de un puerto de salida y envía un reloj MIDI de 24 PPQN al tempo y al beat de la mesa líder: START en su siguiente compás y STOP cuando ya no suena ninguna, para que una caja de ritmos o un secuenciador siga la mezcla (y vuelva a engancharse tras desconectar y conectar el aparato).
+
 ## Atajos de teclado
 
 Una tabla mueve las acciones y la ayuda de `?` (Shift = mesa B, Ctrl = mesa C, Ctrl+Shift = mesa D):

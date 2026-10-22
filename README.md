@@ -178,6 +178,8 @@ At each start the app asks GitHub for the newest release; when it is newer than 
 
 Plug in a controller that has no mapping yet and the app offers the matching file from the mapping repository: one click on INSTALL and the controller works. Mapping files cover the default layer of each controller; MIDI learn and LED feedback are built in, and hot-plug detection picks controllers up while the app runs. The format is described in [docs/mappings.md](docs/mappings.md).
 
+For external gear, PREFERENCES > CONTROLLER > OTHERS > MIDI CLOCK OUT takes part of an output port's name and sends a 24 PPQN MIDI clock at the lead deck's tempo and beat: START on that deck's next bar line and STOP when nothing plays any more, so a drum machine or a sequencer follows the mix (and picks the clock up again after an unplug and replug).
+
 ## Keyboard shortcuts
 
 One table drives dispatch and the `?` help overlay (Shift = deck B, Ctrl = deck C, Ctrl+Shift = deck D):
