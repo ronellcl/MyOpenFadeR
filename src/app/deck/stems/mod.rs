@@ -23,6 +23,7 @@ mod job;
 
 use super::Deck;
 use crate::app::prefs;
+use openfader::audio;
 use openfader::audio::{BASS, DRUMS, INST, STEM_COUNT, VOCAL};
 use openfader::stems::Job;
 use slint::{ComponentHandle, ModelRc, VecModel};
@@ -195,6 +196,22 @@ impl Deck {
     /// The separation is finished: every frame has its stems (INSTANT DOUBLES start from it).
     pub(super) fn stems_complete(&self) -> bool {
         self.stems.borrow().complete
+    }
+
+    /// Hands `stems` to the player and marks them ready, keeping a handle for reuse; `false` when the player
+    /// refuses them (no audio).
+    pub(super) fn attach_stems(&self, stems: &Arc<audio::Stems>) -> bool {
+        match self.with_player(|p| p.set_stems(Some(stems.clone()))) {
+            Some(Ok(())) => {
+                let mut s = self.stems.borrow_mut();
+                s.attached = Some(stems.clone());
+                s.ready = true;
+                drop(s);
+                self.apply_stems();
+                true
+            }
+            _ => false,
+        }
     }
 
     /// The mute state (true = silent) of VOCAL, INST, BASS, DRUMS.

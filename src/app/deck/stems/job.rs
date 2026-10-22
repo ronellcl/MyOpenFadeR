@@ -118,6 +118,12 @@ impl Deck {
             return;
         }
         self.stemwave_pcm(&pcm);
+        // The stems of this track are still in memory (the same track loaded again, an INSTANT DOUBLE): reuse them.
+        if let Some(previous) = self.stems.borrow().attached.clone() {
+            if stems_attach_completed(self, file.clone(), pcm.clone(), previous) {
+                return;
+            }
+        }
         let quality = if fast {
             Quality::Speed
         } else {
@@ -132,6 +138,7 @@ impl Deck {
             Some(Ok(())) => {
                 s.ready = true;
                 s.text = progress_text(Phase::Opening, 0.0);
+                s.attached = Some(job.stems().clone());
                 s.job = Some(job);
             }
             failed => {
@@ -203,9 +210,9 @@ impl Deck {
         };
         match result {
             Ok(stems) => {
-                if let Some(stems) = stems {
+                if let Some(stems) = &stems {
                     let ready = self.stems.borrow().ready;
-                    if !ready && !self.attach_stems(&stems) {
+                    if !ready && !self.attach_stems(stems) {
                         self.stems_clear_job();
                         return;
                     }
@@ -214,8 +221,8 @@ impl Deck {
                     let mut s = self.stems.borrow_mut();
                     (s.complete, s.text) = (true, "100% READY".into());
                 }
-                if let Some(stems) = stems {
-                    self.stemwave_stems(&stems);
+                if let Some(stems) = &stems {
+                    self.stemwave_stems(stems);
                 }
                 self.show_stems();
                 self.finish_double();
