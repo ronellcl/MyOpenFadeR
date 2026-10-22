@@ -233,6 +233,8 @@ struct View {
     editing: Option<editor::Editing>,
     /// DELETE was pressed once on this entry.
     confirm: Option<Entry>,
+    /// The poll timer that shows finished video-frame decodes in the Preview column.
+    _video_preview: Timer,
     /// The mounted devices and the iTunes / xml / Explorer sources (see [`sources`]).
     sources: Vec<sources::Source>,
     /// The sources whose branch the user folded (only their own row is in the tree).

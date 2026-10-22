@@ -9,7 +9,7 @@
 //! filtering and scrolling read no analysis again. ponytail: a track's library cues or analysis files changing under a
 //! running app are not noticed (sources are read-only); the cache is cleared whole when full, add LRU if that shows.
 
-use super::View;
+use super::{table, View};
 use crate::app::{
     App, BrowserState, analyze, prefs,
     prefs::view::CueMarkers,
@@ -19,13 +19,18 @@ use openfader::{
     analysis::{self, Analysis},
     library::{Library, Track},
     store::{self, Edits},
+    video,
 };
-use slint::{ComponentHandle, Image, Model, VecModel};
+use slint::{
+    ComponentHandle, Image, Model, Rgb8Pixel, SharedPixelBuffer, Timer, TimerMode, VecModel,
+};
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     path::PathBuf,
     rc::Rc,
+    sync::mpsc::{Receiver, TryRecvError, channel},
+    time::Duration,
 };
 
 /// Logical size of a strip; ui/browser-table.slint draws it 1:1.
@@ -51,6 +56,10 @@ struct Drawn {
 pub(super) struct Strips {
     model: Rc<VecModel<Image>>,
     cache: RefCell<HashMap<(PathBuf, usize, bool, bool), Drawn>>,
+    /// Decoded video frames by file: a still frame instead of the waveform for video tracks.
+    video_cache: RefCell<HashMap<PathBuf, Image>>,
+    /// Video rows whose frame is being decoded: row → (file, receiver of raw RGB bytes). The poll timer shows each one when it lands.
+    pending: RefCell<HashMap<usize, (PathBuf, Receiver<Result<Vec<u8>, String>>)>>,
 }
 
 impl Strips {
@@ -61,12 +70,16 @@ impl Strips {
         Self {
             model,
             cache: RefCell::default(),
+            video_cache: RefCell::default(),
+            pending: RefCell::default(),
         }
     }
 
-    /// The rows changed (new list, sort, filter): every strip is blank until its row asks for it again.
+    /// The rows changed (new list, sort, filter): every strip is blank until its row asks for it again; in-flight video
+    /// decodes for rows that no longer exist are dropped.
     pub fn reset(&self, rows: usize) {
         self.model.set_vec(vec![Image::default(); rows]);
+        self.pending.borrow_mut().clear();
     }
 
     /// `t`'s strip: the cached drawing while the store's edits of the track and the detected analysis are the ones it was
@@ -185,6 +198,28 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
             return;
         };
         let scale = app.window().scale_factor().round().max(1.0) as usize;
+        // A video track shows a still frame instead of the waveform; its ffmpeg decode runs off the UI thread
+        // so scrolling past video rows never blocks.
+        if matches!(table::Format::of(t), table::Format::Video) {
+            let Some(file) = &t.file else {
+                return;
+            };
+            if v.strips.model.row_count() != v.shown.len() {
+                v.strips.reset(v.shown.len());
+            }
+            if let Some(image) = v.strips.video_cache.borrow().get(file) {
+                v.strips.model.set_row_data(row, image.clone());
+                return;
+            }
+            if v.strips.pending.borrow().contains_key(&row) {
+                return; // already decoding this row
+            }
+            v.strips.model.set_row_data(row, Image::default());
+            let position_ms = video_position_ms(t);
+            let rx = decode_frame(file.clone(), position_ms);
+            v.strips.pending.borrow_mut().insert(row, (file.clone(), rx));
+            return;
+        }
         let image = v.strips.image(&*v.lib, t, scale);
         if v.strips.model.row_count() != v.shown.len() {
             v.strips.reset(v.shown.len());
@@ -202,6 +237,57 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>) {
             v.refresh(&app);
         }
     });
+    // Polls the in-flight video frame decodes and shows each still as it lands.
+    let (v, weak) = (view.clone(), app.as_weak());
+    let timer = Timer::default();
+    timer.start(TimerMode::Repeated, Duration::from_millis(100), move || {
+        let Some(_) = weak.upgrade() else { return };
+        let Ok(v) = v.try_borrow() else { return };
+        let mut done: Vec<(usize, PathBuf, Result<Vec<u8>, String>)> = Vec::new();
+        for (row, (file, rx)) in v.strips.pending.borrow_mut().iter_mut() {
+            match rx.try_recv() {
+                Err(TryRecvError::Empty) => {}
+                Ok(Ok(bytes)) => done.push((*row, file.clone(), Ok(bytes))),
+                _ => done.push((*row, file.clone(), Err("decode finished".into()))),
+            }
+        }
+        for (row, file, result) in done {
+            v.strips.pending.borrow_mut().remove(&row);
+            match result {
+                Ok(bytes) => {
+                    let mut buf =
+                        SharedPixelBuffer::<Rgb8Pixel>::new(video::WIDTH as u32, video::HEIGHT as u32);
+                    buf.make_mut_bytes().copy_from_slice(&bytes);
+                    let image = Image::from_rgb8(buf);
+                    v.strips.video_cache.borrow_mut().insert(file, image.clone());
+                    if row < v.strips.model.row_count() {
+                        v.strips.model.set_row_data(row, image);
+                    }
+                }
+                Err(_) if row < v.strips.model.row_count() => {
+                    v.strips.model.set_row_data(row, Image::default());
+                }
+                _ => {}
+            }
+        }
+    });
+    view.borrow_mut()._video_preview = timer;
+}
+
+/// Decodes one frame of `file` at `position_ms` on a background thread; the receiver yields its raw RGB bytes
+/// (`slint::Image` is not `Send`, so the picture is assembled back on the UI thread).
+fn decode_frame(file: PathBuf, position_ms: u32) -> Receiver<Result<Vec<u8>, String>> {
+    let (tx, rx) = channel();
+    std::thread::spawn(move || {
+        let result = video::frame_at(&file, position_ms).map(|frame| frame.rgb);
+        let _ = tx.send(result);
+    });
+    rx
+}
+
+/// Where the preview frame of a video track is taken: a tenth of the way into it.
+fn video_position_ms(t: &Track) -> u32 {
+    t.length_s as u32 * 1000 / 10
 }
 
 #[cfg(test)]

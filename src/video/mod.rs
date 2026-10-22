@@ -19,8 +19,9 @@ pub mod mix;
 pub mod probe;
 pub mod stream;
 
+use std::io::Read;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 /// A console program (`ffmpeg` / `ffprobe`) launched from the window would flash a terminal on Windows: every video
 /// load would open one for each child. The child keeps its pipes and its output; only the console is dropped.
@@ -48,6 +49,37 @@ pub const EXTS: [&str; 3] = ["mp4", "mov", "m4v"];
 
 pub fn is_video(path: &Path) -> bool {
     crate::paths::has_extension(path, &EXTS)
+}
+
+/// One frame of `path` at `position_ms`, RGB24, [`WIDTH`] × [`HEIGHT`] (letterboxed, never distorted).
+/// A fast keyframe seek: good enough for a still preview, not frame-accurate.
+pub fn frame_at(path: &Path, position_ms: u32) -> Result<Frame, String> {
+    let ss = position_ms as f64 / 1000.0;
+    let vf = format!("scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black");
+    let mut cmd = Command::new("ffmpeg");
+    cmd.args([
+        "-hide_banner", "-loglevel", "error", "-nostdin",
+        "-ss", &format!("{ss:.4}"),
+        "-i",
+    ])
+    .arg(path)
+    .args(["-frames:v", "1", "-vf", &vf, "-pix_fmt", "rgb24", "-f", "rawvideo", "-"])
+    .stdin(Stdio::null())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::null());
+    no_window(&mut cmd);
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("ffmpeg: {e} (install ffmpeg to decode video frames)"))?;
+    let mut out = child.stdout.take().ok_or("ffmpeg: no stdout")?;
+    let mut rgb = vec![0; BYTES];
+    out.read_exact(&mut rgb).map_err(|e| format!("ffmpeg: {e}"))?;
+    drop(out);
+    let status = child.wait().map_err(|e| format!("ffmpeg: {e}"))?;
+    if !status.success() {
+        return Err(format!("ffmpeg: exit {}", status));
+    }
+    Ok(Frame { rgb })
 }
 
 /// One decoded picture, RGB24, [`WIDTH`] × [`HEIGHT`].
