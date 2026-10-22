@@ -375,3 +375,15 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 - **History con botón derecho**: renombrar sesión (mantiene la fecha como clave interna) y eliminar sesión.
 - **Related tracks con auto-ancla**: si no hay track seleccionado, Related toma el primero de la lista visible en lugar de mostrar vacío.
 - **Instalador v0.3.1**: NSIS 3.11 disponible, instalador compilado y subido a la release v0.3.1 en GitHub (ya no es borrador).
+
+### De la sexta tanda (22/10/2026): el navegador y el reloj - HECHO
+
+- **Filtro por origen**: ALL / COLLECTION / YOUTUBE / DEEZER en la barra del navegador; la Colección es lo que no viene de un plugin de nube.
+- **La estrella de una carpeta fijada se pulsa**: un clic en su fila la fija o la quita, sin tener que seleccionarla antes.
+- **Aviso de duplicado al importar**: si la pista ya está en la Colección, la carga lo dice en vez de añadirla otra vez.
+- **Editar los detalles de una pista**: título, artista, álbum, género, sello y comentario desde el panel de la pista; se guarda en la Colección y se ve al momento en la lista y en el panel.
+- **Los stems no se separan dos veces**: al recargar la misma pista (o un INSTANT DOUBLE) se reutilizan los stems que ya están en memoria si la caché encaja en frames y rejilla.
+- **Memory cues como barras anchas con bandera M**: se distinguen de los hot cues de un vistazo y usan el color `Theme.memory-cue` del tema.
+- **Salida de reloj MIDI**: PREFERENCIAS > CONTROLADOR > OTHERS > MIDI CLOCK OUT toma parte del nombre de un puerto de salida y manda 24 PPQN al tempo y beat de la mesa líder, START en su siguiente compás y STOP cuando no suena ninguna; si el aparato se desconecta, el hilo reabre el puerto solo.
+- **Tests**: los del navegador vuelven a pasar (árbol plegable, secciones Música Local / Música en Línea / Carpetas Favoritas y origen de la Colección); `cargo test --bin` queda en verde.
+
