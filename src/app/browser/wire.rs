@@ -2,7 +2,7 @@
 
 use super::{
     DOUBLE_CLICK, Home, View, editor,
-    filter::{Filter, Media},
+    filter::{Filter, Media, Origin},
     history, palette, tagging,
     playlists::{self, Panel},
     preview, session,
@@ -34,6 +34,11 @@ fn related_shown(p: &prefs::Prefs) -> bool {
 
 /// Chooses `t` (track panel, the deck-side callback) and loads it into the first deck that is not playing.
 pub(super) fn load_to_deck(app: &App, on_track: &dyn Fn(&Track), t: &Track) {
+    // Si la pista ya está en la colección y viene de un plugin (YouTube, Deezer…), avisar.
+    if t.id.is_some() && t.remote.is_some() {
+        app.global::<BrowserState>()
+            .set_status("esta pista ya está en la Colección".into());
+    }
     trackinfo::show(app, t);
     on_track(t);
     let decks = app.global::<DeckState>();
@@ -108,6 +113,7 @@ pub fn wire(
         panel: Panel::Closed,
         editing: None,
         confirm: None,
+        _video_preview: Timer::default(),
         sources: Vec::new(),
         folded: std::collections::HashSet::new(),
         folded_lib: std::collections::HashSet::new(),
@@ -253,6 +259,25 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
                 2 => Media::Video,
                 _ => Media::All,
             },
+            origin: match s.get_origin() {
+                1 => Origin::Collection,
+                2 => Origin::YouTube,
+                3 => Origin::Deezer,
+                _ => Origin::All,
+            },
+        };
+        v.refresh(&app);
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
+    state.on_origin_changed(move || {
+        let app = weak.unwrap();
+        let s = app.global::<BrowserState>();
+        let mut v = v.borrow_mut();
+        v.filter.origin = match s.get_origin() {
+            1 => Origin::Collection,
+            2 => Origin::YouTube,
+            3 => Origin::Deezer,
+            _ => Origin::All,
         };
         v.refresh(&app);
     });

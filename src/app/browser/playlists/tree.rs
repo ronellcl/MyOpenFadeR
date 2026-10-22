@@ -271,6 +271,12 @@ impl View {
                 }
                 self.rebuild(app);
             }
+            // A pinned folder: click pins/unpins it (the FAV toggle).
+            Entry::Pinned(i) => {
+                self.toggle_favorite(app);
+                self.rebuild(app);
+                self.show(app);
+            }
             _ => {}
         }
     }

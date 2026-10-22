@@ -50,7 +50,10 @@ export global BrowserState {
     in-out property <int> min-rating;
     /// Track filter bar: the media the list keeps (0 = all, 1 = audio, 2 = video).
     in-out property <int> media;
+    /// Track filter bar: the origin the list keeps (0 = all, 1 = collection, 2 = youtube, 3 = deezer).
+    in-out property <int> origin;
     callback filter-changed();
+    callback origin-changed();
     /// The chosen tree row is a folder that can be pinned (the FAV button works).
     in property <bool> fav-possible;
     /// The search results say where each row comes from (the ORIGIN column).

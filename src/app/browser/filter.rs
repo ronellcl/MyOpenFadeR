@@ -26,6 +26,31 @@ impl Media {
     }
 }
 
+/// The origin of a track: where it comes from.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Origin {
+    #[default]
+    All,
+    /// Tracks in the Collection (local files or cloud tracks already imported).
+    Collection,
+    /// YouTube tracks (remote tracks from the yt-dlp plugin).
+    YouTube,
+    /// Deezer tracks (remote tracks from the deezer plugin).
+    Deezer,
+}
+
+impl Origin {
+    /// Whether the track passes: matches the origin filter.
+    pub fn keeps(self, t: &Track) -> bool {
+        match self {
+            Origin::All => true,
+            Origin::Collection => t.remote.is_none(),
+            Origin::YouTube => t.remote.as_ref().is_some_and(|r| r.plugin == "yt-dlp"),
+            Origin::Deezer => t.remote.as_ref().is_some_and(|r| r.plugin == "deezer"),
+        }
+    }
+}
+
 /// Whether the track is a video: its file's extension says so (`video::is_video`); a track with no file is not one.
 fn is_video(t: &Track) -> bool {
     t.file
@@ -47,6 +72,8 @@ pub struct Filter {
     pub min_rating: u8,
     /// Only the audio, only the video, or everything.
     pub media: Media,
+    /// Only tracks from this origin: everything, only the Collection, only YouTube, only Deezer.
+    pub origin: Origin,
 }
 
 impl Filter {
@@ -68,6 +95,9 @@ pub fn passes(t: &Track, x: &Facts, f: &Filter, r: &Reference, look: &Look) -> b
         return false;
     }
     if !f.media.keeps(t) {
+        return false;
+    }
+    if !f.origin.keeps(t) {
         return false;
     }
     if (f.bpm_min > 0.0 || f.bpm_max > 0.0)
@@ -249,6 +279,51 @@ mod tests {
             ..Default::default()
         };
         assert!(!passes(&song, &video, &r) && passes(&clip, &video, &r));
+    }
+
+    #[test]
+    fn the_origin_filter_keeps_the_collection_or_only_a_plugin() {
+        let with_remote = |plugin: &str| Track {
+            title: "t".into(),
+            remote: Some(openfader::library::Remote {
+                plugin: plugin.into(),
+                source: "s".into(),
+                id: "id".into(),
+            }),
+            ..Track::default()
+        };
+        let (song, youtube, deezer) = (
+            with_remote("folder"),
+            with_remote("yt-dlp"),
+            with_remote("deezer"),
+        );
+        let r = Reference::default();
+        let all = Filter {
+            origin: Origin::All,
+            ..Default::default()
+        };
+        assert!(passes(&song, &all, &r) && passes(&youtube, &all, &r) && passes(&deezer, &all, &r));
+        let collection = Filter {
+            origin: Origin::Collection,
+            ..Default::default()
+        };
+        assert!(passes(&song, &collection, &r));
+        assert!(!passes(&youtube, &collection, &r));
+        assert!(!passes(&deezer, &collection, &r));
+        let yt = Filter {
+            origin: Origin::YouTube,
+            ..Default::default()
+        };
+        assert!(!passes(&song, &yt, &r));
+        assert!(passes(&youtube, &yt, &r));
+        assert!(!passes(&deezer, &yt, &r));
+        let dz = Filter {
+            origin: Origin::Deezer,
+            ..Default::default()
+        };
+        assert!(!passes(&song, &dz, &r));
+        assert!(!passes(&youtube, &dz, &r));
+        assert!(passes(&deezer, &dz, &r));
     }
 
     #[test]

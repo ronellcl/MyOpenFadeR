@@ -260,6 +260,11 @@ export component Browser inherits Rectangle {
                         width: 72px; horizontal-stretch: 0; active: BrowserState.media != 0;
                         clicked => { BrowserState.media = Math.mod(BrowserState.media + 1, 3); BrowserState.filter-changed(); }
                     }
+                    Chip {
+                        text: BrowserState.origin == 0 ? "ALL" : (BrowserState.origin == 1 ? "COLLECTION" : (BrowserState.origin == 2 ? "YOUTUBE" : "DEEZER"));
+                        width: 72px; horizontal-stretch: 0; active: BrowserState.origin != 0;
+                        clicked => { BrowserState.origin = Math.mod(BrowserState.origin + 1, 4); BrowserState.origin-changed(); }
+                    }
                     Rectangle { }
                 }
             }
