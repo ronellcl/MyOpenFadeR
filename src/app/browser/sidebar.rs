@@ -498,6 +498,8 @@ mod tests {
             sections: Sections::default(),
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
+            folded_sections: &HashSet::new(),
+            day_names: &HashMap::new(),
         });
         assert_eq!(entries[TAG_ROW], Entry::Tags);
         assert_eq!(entries[HISTORY_ROW], Entry::Session);
@@ -555,6 +557,8 @@ mod tests {
             sections: Sections::default(),
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
+            folded_sections: &HashSet::new(),
+            day_names: &HashMap::new(),
         });
         assert_eq!(
             e,
@@ -584,6 +588,8 @@ mod tests {
             local: false,
             downloaded,
             pinned: false,
+            system_folder: false,
+            online_plugin: false,
             name: name.into(),
             open,
             playlists: Vec::new(),
@@ -610,6 +616,8 @@ mod tests {
             sections: Sections::default(),
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
+            folded_sections: &HashSet::new(),
+            day_names: &HashMap::new(),
         });
         let at = labels
             .iter()
@@ -640,6 +648,8 @@ mod tests {
             local: false,
             downloaded: false,
             pinned: false,
+            system_folder: false,
+            online_plugin: false,
             name: "USB (vfat)".into(),
             open: false,
             playlists: Vec::new(),
@@ -664,6 +674,8 @@ mod tests {
             sections: Sections::default(),
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
+            folded_sections: &HashSet::new(),
+            day_names: &HashMap::new(),
         });
         let at = labels
             .iter()
@@ -686,6 +698,8 @@ mod tests {
             local: true,
             downloaded: false,
             pinned: false,
+            system_folder: false,
+            online_plugin: false,
             name: "C: (OS)".into(),
             open: false,
             playlists: Vec::new(),
@@ -710,6 +724,8 @@ mod tests {
             sections: Sections::default(),
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
+            folded_sections: &HashSet::new(),
+            day_names: &HashMap::new(),
         });
         let at = labels
             .iter()
@@ -747,6 +763,8 @@ mod tests {
                 sections: Sections::default(),
                 folded: &HashSet::new(),
                 folded_lib: folded,
+                folded_sections: &HashSet::new(),
+                day_names: &HashMap::new(),
             });
             (entries, labels)
         };
@@ -785,6 +803,8 @@ mod tests {
             local: false,
             downloaded: false,
             pinned: false,
+            system_folder: false,
+            online_plugin: false,
             name: name.into(),
             open,
             playlists: vec![pl("Set", 0, true), pl("Inner", 1, false)],
@@ -811,6 +831,8 @@ mod tests {
             sections: Sections::default(),
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
+            folded_sections: &HashSet::new(),
+            day_names: &HashMap::new(),
         });
         assert_eq!(l[4], "CUE Analysis (3)");
         assert_eq!(l[6], "    All Tracks");
