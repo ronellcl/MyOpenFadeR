@@ -150,6 +150,12 @@ fn wire(app: &App) {
         let new = (c != cur).then_some(c as u8); // the set colour again clears it
         edit(&app, |s, k| s.set_color(k, new));
     });
+    let weak = app.as_weak();
+    s.on_edit_details(move || {
+        let app = weak.unwrap();
+        let Some(t) = shown() else { return };
+        super::track_edit::show(&app, &t);
+    });
     s.set_color_palette(ModelRc::new(VecModel::from(
         store::TRACK_COLORS
             .iter()

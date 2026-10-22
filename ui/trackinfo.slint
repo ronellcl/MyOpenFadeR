@@ -1,4 +1,4 @@
-import { Glyph, Icon, TextField } from "widgets.slint";
+import { Chip, Glyph, Icon, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 
 /// Details of the selected track. Rust fills it through this global (src/app/trackinfo.rs).
@@ -31,6 +31,8 @@ export global TrackInfoState {
     callback color-set(int);
     /// The comment is edited in place: Enter saves it.
     callback comment-edited(string);
+    /// Open the Edit Details dialog for the shown track.
+    callback edit-details;
 }
 
 component Line inherits Text {
@@ -128,6 +130,12 @@ export component TrackInfo inherits Rectangle {
                     }
                 }
             }
+        }
+        HorizontalLayout {
+            alignment: start;
+            spacing: Theme.space-lg;
+            vertical-stretch: 0;
+            Chip { text: "Edit details…"; clicked => { TrackInfoState.edit-details(); } }
         }
         TextField {
             text <=> TrackInfoState.comment;

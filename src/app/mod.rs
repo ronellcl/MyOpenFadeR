@@ -95,6 +95,7 @@ mod sampler;
 mod skin;
 mod split;
 mod stems_model;
+mod track_edit;
 mod toast;
 mod trackinfo;
 mod video;

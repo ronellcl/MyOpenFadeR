@@ -4,6 +4,7 @@ import { FxPanel, FxSlot, FxState, FxUnit } from "fx.slint";
 import { FxRackState, RackView } from "fxrack.slint";
 import { Mixer, MixerBar, MixerState, ChannelView, BusView, VideoMonitor } from "mixer.slint";
 import { TrackInfoState } from "trackinfo.slint";
+import { TrackEdit, TrackEditState } from "track-edit.slint";
 import { CueRowView, PadOpt, PadView, PadsState } from "pads.slint";
 import { HelpOverlay, HelpLine, KeysState } from "help.slint";
 import { AboutOverlay, AboutState, UpdateOverlay } from "about.slint";
@@ -35,7 +36,7 @@ import { Palette } from "std-widgets.slint";
 import { ThemeCard, ThemeState, TokenRow } from "themes.slint";
 import { CatalogState, GetMapping, GetPlugin, GetTheme, OfferBanner, RepoView } from "catalog.slint";
 // Re-exported so Rust can reach them via `app.global::<…>()` and by name.
-export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowView, DeckState, DeckView, DeviceItem, DeviceState, DjEditor, DjItem, DjSystemState, DragState, DupeRow, EditState, ExportDeck, ExportModeState, FixtureView, FxState, FxUnit, HelpLine, KeymapState, KeysState, LayoutState, LibraryState, LightingState, MidiState, MissingRow, MixDeckView, MixPointState, MixerState, PadOpt, PadView, PadsState, PaneState, PluginState, PrefRowData, PrefsState, SamplerState, SlotView, SplitWindow, Theme, ToastState, TrackInfoState, VideoDeckView, VideoItem, VideoState, VideoWindow }
+export { AutomixState, BackupItem, BrowserState, BusView, ChannelView, CueRowView, DeckState, DeckView, DeviceItem, DeviceState, DjEditor, DjItem, DjSystemState, DragState, DupeRow, EditState, ExportDeck, ExportModeState, FixtureView, FxState, FxUnit, HelpLine, KeymapState, KeysState, LayoutState, LibraryState, LightingState, MidiState, MissingRow, MixDeckView, MixPointState, MixerState, PadOpt, PadView, PadsState, PaneState, PluginState, PrefRowData, PrefsState, SamplerState, SlotView, SplitWindow, Theme, ToastState, TrackEditState, TrackInfoState, VideoDeckView, VideoItem, VideoState, VideoWindow }
 export { DrumSlotView, GrooveDeckView, GrooveState, HotCue, PhraseSeg }
 export { FxRackState, RackView, FxSlot }
 export { ActionItem, FormatItem, FormatOption }
@@ -540,6 +541,7 @@ export component App inherits Window {
     StemsModelCard { x: root.width - self.width - Theme.space-xl; y: root.height - self.height - Theme.h-bar - Theme.space-xl; } // above the dialogs: it runs on while they are open
     MidiOverlay {}
     PrefsOverlay {}
+    TrackEdit {}
     LibraryOverlays { x: 0; y: 0; width: root.width; height: root.height; }
     PluginOverlays { x: 0; y: 0; width: root.width; height: root.height; }
     DeviceOverlay {}

@@ -1,0 +1,52 @@
+import { DialogFrame, FormRow, Note } from "dialog.slint";
+import { Chip, TextField } from "widgets.slint";
+import { Theme } from "theme.slint";
+
+/// Edit the details of the chosen track (src/app/track_edit.rs).
+export global TrackEditState {
+    in-out property <bool> open;
+    in-out property <string> title;
+    in-out property <string> artist;
+    in-out property <string> album;
+    in-out property <string> genre;
+    in-out property <string> label;
+    in-out property <string> comment;
+    /// The new values, in the order of the form rows.
+    callback save(string, string, string, string, string, string);
+    callback closed;
+}
+
+/// The Edit Details dialog: the scrim or the close button closes it; SAVE persists the six fields.
+export component TrackEdit inherits DialogFrame {
+    visible: TrackEditState.open;
+    title: "EDIT TRACK DETAILS";
+    card-width: 640px;
+    closed => { TrackEditState.open = false; }
+    VerticalLayout {
+        spacing: Theme.space-md;
+        FormRow { label: "TITLE"; TextField { text <=> TrackEditState.title; } }
+        FormRow { label: "ARTIST"; TextField { text <=> TrackEditState.artist; } }
+        FormRow { label: "ALBUM"; TextField { text <=> TrackEditState.album; } }
+        FormRow { label: "GENRE"; TextField { text <=> TrackEditState.genre; } }
+        FormRow { label: "LABEL"; TextField { text <=> TrackEditState.label; } }
+        FormRow { label: "COMMENT"; TextField { text <=> TrackEditState.comment; } }
+        Note {
+            text: "Saved to the Collection; the table and the track panel refresh at once.";
+            vertical-stretch: 0;
+        }
+        HorizontalLayout {
+            spacing: Theme.space-lg;
+            alignment: end;
+            vertical-stretch: 0;
+            Chip { text: "Cancel"; clicked => { TrackEditState.open = false; } }
+            Chip {
+                text: "Save";
+                active: true;
+                clicked => {
+                    TrackEditState.save(TrackEditState.title, TrackEditState.artist, TrackEditState.album, TrackEditState.genre, TrackEditState.label, TrackEditState.comment);
+                    TrackEditState.open = false;
+                }
+            }
+        }
+    }
+}

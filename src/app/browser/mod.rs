@@ -128,6 +128,13 @@ pub fn loading(app: &App, text: &str, progress: Option<f32>) {
     s.set_load_progress(progress.unwrap_or(-1.0));
 }
 
+/// The track panel (or the Edit Details dialog) edited `t`: every copy of it in the visible list
+/// shows the new values at once.
+pub fn track_edited(app: &App, t: &Track) {
+    let Some(v) = view() else { return };
+    v.borrow_mut().track_edited(app, t);
+}
+
 /// Where the list comes from when Related is off.
 #[derive(Clone)]
 enum Home {

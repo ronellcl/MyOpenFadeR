@@ -202,6 +202,13 @@ impl View {
         let put = |t: &mut Track| {
             if store::key(t) == key {
                 (t.rating, t.comment) = (edited.rating, edited.comment.clone());
+                (t.title, t.artist, t.album, t.genre, t.label) = (
+                    edited.title.clone(),
+                    edited.artist.clone(),
+                    edited.album.clone(),
+                    edited.genre.clone(),
+                    edited.label.clone(),
+                );
             }
         };
         [&mut self.list, &mut self.tags, &mut self.history]

@@ -130,6 +130,44 @@ impl Store {
         self.set_field("color", key, color.filter(|c| (1..=8).contains(c)))
     }
 
+    /// The collection row of `key` (`t{id}`): `None` when the track is not in the Collection.
+    fn collection_id(key: &str) -> Option<i64> {
+        key.strip_prefix('t')?.parse().ok()
+    }
+
+    /// Sets one metadata column (`title`, `artist`, `album`, `genre` or `label`) of the Collection
+    /// row of `key` (`t{id}`); an error when the track is not in the Collection. `col` is one of our
+    /// own literals, never user input.
+    fn set_collection_field(&self, col: &str, key: &str, value: &str) -> R<()> {
+        let Some(id) = Self::collection_id(key) else {
+            return Err(format!("this track is not in the Collection"));
+        };
+        self.run(
+            &format!("UPDATE collection SET {col} = ?1 WHERE id = ?2"),
+            params![value, id],
+        )
+    }
+
+    pub fn set_title(&self, key: &str, title: &str) -> R<()> {
+        self.set_collection_field("title", key, title)
+    }
+
+    pub fn set_artist(&self, key: &str, artist: &str) -> R<()> {
+        self.set_collection_field("artist", key, artist)
+    }
+
+    pub fn set_album(&self, key: &str, album: &str) -> R<()> {
+        self.set_collection_field("album", key, album)
+    }
+
+    pub fn set_genre(&self, key: &str, genre: &str) -> R<()> {
+        self.set_collection_field("genre", key, genre)
+    }
+
+    pub fn set_label(&self, key: &str, label: &str) -> R<()> {
+        self.set_collection_field("label", key, label)
+    }
+
     /// Stores the whole cue list of `key` (hot cues, memory cues, loops; list order kept); `None` drops it
     /// so the library's cues show again. The list is the user's from now on (no longer [`Store::cues_are_auto`]).
     pub fn set_cues(&self, key: &str, cues: Option<&[Cue]>) -> R<()> {
