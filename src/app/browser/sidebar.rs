@@ -516,10 +516,10 @@ mod tests {
                 "    House (smart)",
                 "▸ Cue Bank",
                 "    Peak (0/8)",
-                "▸ History",
+                "▾ History",
                 "    2026-10-13 (3)",
                 "    2026-10-12 (1)",
-                "▸ Tags",
+                "▾ Tags",
                 "    ▸ Genre",
                 "        Deep",
                 "    ▸ Mood",
@@ -527,9 +527,10 @@ mod tests {
                 "▸ Library (read-only)",
                 "    ▸ Folder",
                 "        Inner",
-                "▸ Favorites",
-                "▸ Downloaded",
-                "▸ Devices",
+                "▾ Música Local",
+                "▾ Música en Línea",
+                "▸ Carpetas Favoritas",
+                "▾ Downloaded",
             ]
         );
         assert_eq!(entries.len(), labels.len());
@@ -571,10 +572,12 @@ mod tests {
                 Entry::HistoryRoot,
                 Entry::TagsRoot,
                 Entry::LibRoot,
-                // The sections of the tree are always there, empty or not: the user sees them and can hide them.
+                // The sections of the tree are always there (the devices one only when there is a disk), empty or not:
+                // the user sees them and can hide them.
+                Entry::LocalMusicRoot,
+                Entry::OnlineMusicRoot,
                 Entry::FavoritesRoot,
                 Entry::DownloadedRoot,
-                Entry::DevicesRoot,
             ]
         );
     }
@@ -621,22 +624,22 @@ mod tests {
         });
         let at = labels
             .iter()
-            .position(|l| l == "▸ Downloaded")
+            .position(|l| l == "▾ Downloaded")
             .expect("the downloads have their own section");
         assert_eq!(entries[at], Entry::DownloadedRoot);
-        // The section comes before the devices, and the download lists its tracks and what the Collection lacks.
+        // The download lists its tracks and what the Collection lacks.
         assert_eq!(entries[at + 1], Entry::Source(0));
         assert_eq!(labels[at + 1], "    ▸ YouTube");
         assert_eq!(entries[at + 2], Entry::SourceAll(0));
         assert_eq!(labels[at + 2], "        All tracks");
         assert_eq!(entries[at + 3], Entry::SourceMissing(0));
         assert_eq!(labels[at + 3], "        Not in the Collection");
-        // The other sources keep their place.
-        let devices = labels
+        // The devices hang under Música Local, above it.
+        let discs = labels
             .iter()
-            .position(|l| l == "▸ Devices")
-            .expect("the devices have their own section");
-        assert!(devices > at);
+            .position(|l| l == "    ▾ Discos")
+            .expect("the devices hang under Música Local");
+        assert!(discs < at);
         assert!(!labels.iter().any(|l| l == "    ▸ Explorer"));
     }
 
@@ -679,15 +682,15 @@ mod tests {
         });
         let at = labels
             .iter()
-            .position(|l| l == "▸ Devices")
-            .expect("the devices have their own section");
+            .position(|l| l == "    ▾ Discos")
+            .expect("the devices hang under Música Local");
         assert_eq!(entries[at + 1], Entry::Source(0));
-        assert_eq!(labels[at + 1], "    USB (vfat)");
+        assert_eq!(labels[at + 1], "        USB (vfat)");
         // The folder and the folder inside it.
         assert_eq!(entries[at + 2], Entry::DeviceFolder(0, 0));
-        assert_eq!(labels[at + 2], "        ▸ Musica");
+        assert_eq!(labels[at + 2], "            ▸ Musica");
         assert_eq!(entries[at + 3], Entry::DeviceFolderList(0, 0, 0));
-        assert_eq!(labels[at + 3], "            Rock");
+        assert_eq!(labels[at + 3], "                Rock");
     }
 
     /// The local disk (the system volume) hangs under the "Devices" heading with its own folders, read-only.
@@ -729,13 +732,13 @@ mod tests {
         });
         let at = labels
             .iter()
-            .position(|l| l == "▸ Devices")
-            .expect("the devices have their own section");
+            .position(|l| l == "    ▾ Discos")
+            .expect("the devices hang under Música Local");
         assert_eq!(entries[at + 1], Entry::Source(0));
-        assert_eq!(labels[at + 1], "    ▸ C: (OS)");
+        assert_eq!(labels[at + 1], "        ▸ C: (OS)");
         // Its folder, under it.
         assert_eq!(entries[at + 2], Entry::DeviceFolder(0, 0));
-        assert_eq!(labels[at + 2], "        ▸ Users");
+        assert_eq!(labels[at + 2], "            ▸ Users");
     }
 
     /// A list with lists under it folds them: the plugin sources come this way.
@@ -836,16 +839,22 @@ mod tests {
         });
         assert_eq!(l[4], "CUE Analysis (3)");
         assert_eq!(l[6], "    All Tracks");
-        let at = l.iter().position(|x| x == "▸ Devices").unwrap();
+        let at = l
+            .iter()
+            .position(|x| x == "    ▾ Discos")
+            .expect("the devices hang under Música Local");
         assert_eq!(
             &l[at..],
             [
-                "▸ Devices",
-                "    USB (vfat)",
-                "        All tracks",
-                "        ▸ Set",
-                "            Inner",
-                "    SD",
+                "    ▾ Discos",
+                "        USB (vfat)",
+                "            All tracks",
+                "            ▸ Set",
+                "                Inner",
+                "        SD",
+                "▾ Música en Línea",
+                "▸ Carpetas Favoritas",
+                "▾ Downloaded",
                 "▸ iTunes",
                 "    All tracks",
                 "    ▸ Set",

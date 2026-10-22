@@ -293,7 +293,10 @@ mod tests {
             ..Track::default()
         };
         let (song, youtube, deezer) = (
-            with_remote("folder"),
+            Track {
+                title: "t".into(),
+                ..Track::default()
+            },
             with_remote("yt-dlp"),
             with_remote("deezer"),
         );
