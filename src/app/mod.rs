@@ -165,6 +165,7 @@ pub fn run(
     library::wire(&app, lib.clone(), decks.clone());
     let _split = split::wire(&app); // the split-screen browser window is made on first use
     edit::wire(&app, lib.clone(), decks.clone(), selected.clone());
+    track_edit::wire(&app); // the Edit Details dialog of the track panel
     plugins::wire(&app, lib.clone(), decks.clone());
     welcome::wire(&app); // after the plugin manager, which ACCEPT refreshes
     drop::wire(&app);
