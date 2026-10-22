@@ -189,7 +189,6 @@ impl View {
                 }
                 Ok(e)
             }
-            Ask::Rename(_) => return,
             Ask::NewCategory => st.add_mytag_category(&name).map(Entry::Category),
             Ask::NewTag(c) => st.add_mytag(c, &name).map(Entry::Tag),
             Ask::NewBank => st.add_bank(&name).map(Entry::Bank),

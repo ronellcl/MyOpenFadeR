@@ -271,8 +271,9 @@ impl View {
                 }
                 self.rebuild(app);
             }
-            // A pinned folder: click pins/unpins it (the FAV toggle).
+            // A pinned folder: click pins/unpins it (the FAV toggle works on the chosen row).
             Entry::Pinned(i) => {
+                self.entry = Entry::Pinned(i);
                 self.toggle_favorite(app);
                 self.rebuild(app);
                 self.show(app);
