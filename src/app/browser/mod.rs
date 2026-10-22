@@ -239,8 +239,12 @@ struct View {
     folded: std::collections::HashSet<usize>,
     /// The lists of the library whose branch the user folded.
     folded_lib: std::collections::HashSet<usize>,
+    /// The tree's root sections the user folded (History, Tags, Devices, Downloaded, Música Local, Música en Línea).
+    folded_sections: std::collections::HashSet<Entry>,
     /// Tracks the table dims, by store key; see [`played`].
     played: std::collections::HashSet<String>,
+    /// Day → custom display name for a stored history session (renamed by the user; keeps the date as the key).
+    day_names: std::collections::HashMap<String, String>,
     _timer: Timer,
     _preview: Timer,
     /// The SUGGEST tab: the list ranked for a track ([`suggest`]).

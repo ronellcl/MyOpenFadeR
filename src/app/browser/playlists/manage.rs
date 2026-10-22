@@ -183,6 +183,12 @@ impl View {
             Ask::Rename(e @ Entry::Category(id)) => st.rename_mytag_category(id, &name).map(|()| e),
             Ask::Rename(e @ Entry::Tag(id)) => st.rename_mytag(id, &name).map(|()| e),
             Ask::Rename(e @ Entry::Bank(id)) => st.rename_bank(id, &name).map(|()| e),
+            Ask::Rename(e) => {
+                if let Entry::Day(day) = &e {
+                    self.day_names.insert(day.clone(), name.clone());
+                }
+                Ok(e)
+            }
             Ask::Rename(_) => return,
             Ask::NewCategory => st.add_mytag_category(&name).map(Entry::Category),
             Ask::NewTag(c) => st.add_mytag(c, &name).map(Entry::Tag),
@@ -228,6 +234,7 @@ impl View {
             }),
             Entry::Tag(id) => s.action(&format!("{label}tag"), || s.delete_mytag(*id)),
             Entry::Bank(id) => s.action(&format!("{label}cue bank"), || s.delete_bank(*id)),
+            Entry::Day(day) => s.action(&format!("{label}session"), || s.history_delete_day(day)),
             _ => return,
         };
         if self.try_store(app, r).is_none() {
@@ -236,6 +243,7 @@ impl View {
         self.entry = match e {
             Entry::User(_) => Entry::UserRoot,
             Entry::Bank(_) => Entry::BankRoot,
+            Entry::Day(_) => Entry::HistoryRoot,
             _ => Entry::TagsRoot,
         };
         self.rebuild(app);

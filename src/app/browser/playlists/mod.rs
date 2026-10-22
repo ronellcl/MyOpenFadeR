@@ -66,7 +66,7 @@ pub enum Act {
 fn is_named(e: &Entry) -> bool {
     matches!(
         e,
-        Entry::User(_) | Entry::Category(_) | Entry::Tag(_) | Entry::Bank(_)
+        Entry::User(_) | Entry::Category(_) | Entry::Tag(_) | Entry::Bank(_) | Entry::Day(_)
     )
 }
 

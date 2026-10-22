@@ -167,7 +167,7 @@ export component Browser inherits Rectangle {
             HorizontalLayout {
                 spacing: Theme.gap;
                 vertical-stretch: 0;
-                property <bool> editable: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || (BrowserState.side-kind >= 6 && BrowserState.side-kind <= 7) || BrowserState.side-kind == 14;
+                property <bool> editable: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || (BrowserState.side-kind >= 6 && BrowserState.side-kind <= 7) || BrowserState.side-kind == 14 || BrowserState.side-kind == 15;
                 Chip { text: "NEW"; font-size: Theme.font-xs; tooltip: "New playlist / folder / smart playlist / Tags / Cue Bank"; enabled: (BrowserState.side-kind >= 1 && BrowserState.side-kind <= 7) || BrowserState.side-kind >= 13; clicked => { BrowserState.panel-request(3); } }
                 Chip { text: "RENAME"; font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-rename(); } }
                 Chip { text: "DELETE"; font-size: Theme.font-xs; enabled: parent.editable; clicked => { BrowserState.side-delete(); } }

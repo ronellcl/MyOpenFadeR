@@ -99,9 +99,10 @@ export component TrackTable inherits Rectangle {
     property <length> w-time: Math.max(PaneState.min-col, 50px + PaneState.col-time-d);
     property <length> w-key: Math.max(PaneState.min-col, 52px + PaneState.col-key-d);
     property <length> w-format: Math.max(PaneState.min-col, 68px + PaneState.col-format-d);
+    property <length> w-bitrate: Math.max(PaneState.min-col, 56px + PaneState.col-bitrate-d);
     property <length> w-origin: root.show-origin ? 130px : 0px;
     property <length> w-scroll: 14px;
-    property <length> w-title: max(PaneState.min-title, root.width - root.w-scroll - root.w-lead - root.w-preview - root.w-artist - root.w-genre - root.w-comment - root.w-bpm - root.w-rating - root.w-time - root.w-key - root.w-format - root.w-origin);
+    property <length> w-title: max(PaneState.min-title, root.width - root.w-scroll - root.w-lead - root.w-preview - root.w-artist - root.w-genre - root.w-comment - root.w-bpm - root.w-rating - root.w-time - root.w-key - root.w-format - root.w-bitrate - root.w-origin);
     property <length> x-preview: root.w-lead;
     property <length> x-title: root.x-preview + root.w-preview;
     property <length> x-artist: root.x-title + root.w-title;
@@ -112,9 +113,10 @@ export component TrackTable inherits Rectangle {
     property <length> x-time: root.x-rating + root.w-rating;
     property <length> x-key: root.x-time + root.w-time;
     property <length> x-format: root.x-key + root.w-key;
+    property <length> x-bitrate: root.x-format + root.w-format;
     /// The search results say where each row comes from.
     in property <bool> show-origin: false;
-    property <length> x-origin: root.x-format + root.w-format;
+    property <length> x-origin: root.x-bitrate + root.w-bitrate;
     property <length> menu-x;
     property <length> menu-y;
     property <bool> list-view: BrowserState.tag-view || BrowserState.user-view;
@@ -155,6 +157,7 @@ export component TrackTable inherits Rectangle {
                 HeaderCell { x: root.x-time; width: root.w-time; height: parent.height; title: "TIME"; right: true; sorted: root.sorted-col == 5; asc: root.sorted-asc; clicked => { root.sort-clicked(5); } }
                 HeaderCell { x: root.x-key; width: root.w-key; height: parent.height; title: "KEY"; sorted: root.sorted-col == 3; asc: root.sorted-asc; clicked => { root.sort-clicked(3); } }
                 HeaderCell { x: root.x-format; width: root.w-format; height: parent.height; title: "FORMATO"; sorted: root.sorted-col == 12; asc: root.sorted-asc; clicked => { root.sort-clicked(12); } }
+                HeaderCell { x: root.x-bitrate; width: root.w-bitrate; height: parent.height; title: "BITRATE"; right: true; sorted: root.sorted-col == 14; asc: root.sorted-asc; clicked => { root.sort-clicked(14); } }
                 if root.show-origin: HeaderCell { x: root.x-origin; width: root.w-origin; height: parent.height; title: "ORIGIN"; }
                 // The column borders (drag; double-click = the default width); the title's right border drags the artist column.
                 ColEdge { dflt: 130px; invert: true; border: root.x-artist; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-artist-d; }
@@ -166,6 +169,7 @@ export component TrackTable inherits Rectangle {
                 ColEdge { dflt: 50px; border: root.x-time + root.w-time; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-time-d; }
                 ColEdge { dflt: 52px; border: root.x-key + root.w-key; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-key-d; }
                 ColEdge { dflt: 68px; border: root.x-format + root.w-format; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-format-d; }
+                ColEdge { dflt: 56px; border: root.x-bitrate + root.w-bitrate; slack: root.w-title - PaneState.min-title; value <=> PaneState.col-bitrate-d; }
             }
             list := ListView {
                 for cells[i] in BrowserState.tracks: Rectangle {
@@ -194,6 +198,7 @@ export component TrackTable inherits Rectangle {
                     if cells[12].text == "a": Glyph { x: root.x-format + Theme.space-md; width: 14px; height: 14px; y: (parent.height - self.height) / 2; icon: Icon.music; tint: Theme.text-dim; }
                     if cells[12].text == "v": Glyph { x: root.x-format + Theme.space-md; width: 14px; height: 14px; y: (parent.height - self.height) / 2; icon: Icon.film; tint: Theme.text-dim; }
                     if cells[12].text == "?": Cell { x: root.x-format + Theme.space-md; width: root.w-format - Theme.space-md; text: "?"; color: Theme.text-faint; }
+                    Cell { x: root.x-bitrate + Theme.space-md; width: root.w-bitrate - Theme.space-md; text: cells[14].text; right: true; color: Theme.row-dim; }
                     if root.show-origin: Cell { x: root.x-origin + Theme.space-md; width: root.w-origin - Theme.space-md; text: cells[13].text; color: Theme.row-dim; }
                     DragArea {
                         data: BrowserState.drag-track(i);

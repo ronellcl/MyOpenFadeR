@@ -39,6 +39,7 @@ panes!(
     col_time = get_col_time_d / set_col_time_d,
     col_key = get_col_key_d / set_col_key_d,
     col_format = get_col_format_d / set_col_format_d,
+    col_bitrate = get_col_bitrate_d / set_col_bitrate_d,
 );
 
 /// Stores the pane sizes the user dragged; nothing is written when no size changed.

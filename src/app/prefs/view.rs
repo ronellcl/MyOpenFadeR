@@ -186,6 +186,7 @@ section!(
         col_time: i32 = 0;
         col_key: i32 = 0;
         col_format: i32 = 0;
+        col_bitrate: i32 = 0;
     }
 );
 

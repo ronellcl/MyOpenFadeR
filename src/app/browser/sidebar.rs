@@ -17,7 +17,7 @@ pub const TAG_ROW: usize = 1;
 /// Sidebar row of the Session history, right after the Tag List.
 pub const HISTORY_ROW: usize = 2;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Entry {
     All,
     Tags,
@@ -130,6 +130,10 @@ pub struct Inputs<'a> {
     pub folded: &'a HashSet<usize>,
     /// The lists of the library whose children are hidden (the user folded the branch).
     pub folded_lib: &'a HashSet<usize>,
+    /// The tree's root sections the user folded (History, Tags, Devices, Downloaded, Música Local, Música en Línea).
+    pub folded_sections: &'a HashSet<Entry>,
+    /// Day → custom display name for a renamed history session.
+    pub day_names: &'a HashMap<String, String>,
 }
 
 /// The sections of the tree the user can hide. All of them show by default.
@@ -200,21 +204,30 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             (Entry::Bank(b.id), indent(1, &label))
         }));
     }
-    rows.push((Entry::HistoryRoot, "▸ History".to_owned()));
-    rows.extend(
-        i.days
-            .iter()
-            .map(|(day, n)| (Entry::Day(day.clone()), indent(1, &format!("{day} ({n})")))),
-    );
-    rows.push((Entry::TagsRoot, "▸ Tags".to_owned()));
-    for c in i.cats {
-        rows.push((Entry::Category(c.id), indent(1, &format!("▸ {}", c.name))));
+    let history_folded = i.folded_sections.contains(&Entry::HistoryRoot);
+    rows.push((Entry::HistoryRoot, if history_folded { "▸ History" } else { "▾ History" }.to_owned()));
+    if !history_folded {
         rows.extend(
-            i.tags
+            i.days
                 .iter()
-                .filter(|t| t.category == c.id)
-                .map(|t| (Entry::Tag(t.id), indent(2, &t.name))),
+                .map(|(day, n)| {
+                    let name = i.day_names.get(day).cloned().unwrap_or_else(|| day.clone());
+                    (Entry::Day(day.clone()), indent(1, &format!("{} ({n})", name)))
+                }),
         );
+    }
+    let tags_folded = i.folded_sections.contains(&Entry::TagsRoot);
+    rows.push((Entry::TagsRoot, if tags_folded { "▸ Tags" } else { "▾ Tags" }.to_owned()));
+    if !tags_folded {
+        for c in i.cats {
+            rows.push((Entry::Category(c.id), indent(1, &format!("▸ {}", c.name))));
+            rows.extend(
+                i.tags
+                    .iter()
+                    .filter(|t| t.category == c.id)
+                    .map(|t| (Entry::Tag(t.id), indent(2, &t.name))),
+            );
+        }
     }
     rows.push((Entry::LibRoot, "▸ Library (read-only)".to_owned()));
     // The library's own playlists: a list with lists under it folds them (the plugin sources come this way).
@@ -238,53 +251,62 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
     }
     // ── Música Local: system folders (Music, Videos, Desktop) ──────────────────
     if i.sections.local_music {
-        rows.push((Entry::LocalMusicRoot, "▸ Música Local".to_owned()));
-        let system: Vec<usize> = i
-            .sources
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| s.system_folder)
-            .map(|(n, _)| n)
-            .collect();
-        for n in &system {
-            rows.push((Entry::SystemFolder(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
-        }
-        // Discos: devices and local volumes under their own heading.
-        let disks: Vec<usize> = i
-            .sources
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| s.device || s.local)
-            .map(|(n, _)| n)
-            .collect();
-        if !disks.is_empty() {
-            rows.push((Entry::DevicesRoot, indent(1, "▸ Discos")));
-            for n in &disks {
-                source_rows(&mut rows, i, *n, 2);
+        let local_folded = i.folded_sections.contains(&Entry::LocalMusicRoot);
+        rows.push((Entry::LocalMusicRoot, if local_folded { "▸ Música Local" } else { "▾ Música Local" }.to_owned()));
+        if !local_folded {
+            let system: Vec<usize> = i
+                .sources
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.system_folder)
+                .map(|(n, _)| n)
+                .collect();
+            for n in &system {
+                rows.push((Entry::SystemFolder(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
+            }
+            // Discos: devices and local volumes under their own heading.
+            let disks: Vec<usize> = i
+                .sources
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.device || s.local)
+                .map(|(n, _)| n)
+                .collect();
+            if !disks.is_empty() {
+                let disks_folded = i.folded_sections.contains(&Entry::DevicesRoot);
+                rows.push((Entry::DevicesRoot, indent(1, if disks_folded { "▸ Discos" } else { "▾ Discos" })));
+                if !disks_folded {
+                    for n in &disks {
+                        source_rows(&mut rows, i, *n, 2);
+                    }
+                }
             }
         }
     }
     // ── Música en Línea: cloud plugins (Deezer, YouTube, SoundCloud) with sub-entries ─
     if i.sections.online_music {
-        rows.push((Entry::OnlineMusicRoot, "▸ Música en Línea".to_owned()));
-        let online: Vec<usize> = i
-            .sources
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| s.online_plugin)
-            .map(|(n, _)| n)
-            .collect();
-        for n in &online {
-            rows.push((Entry::OnlinePlugin(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
-            // Sub-entries: Search and Downloads (and SoundCloud's example playlists).
-            rows.push((Entry::OnlineSearch(*n, 0), indent(2, "Búsqueda")));
-            rows.push((Entry::OnlineDownloads(*n, 0), indent(2, "Descargas")));
-            // SoundCloud's example playlists (Major Lazer, Diplo …) come from the library plugin's lists.
-            if let Some(s) = i.sources.get(*n) {
-                if s.playlists.iter().any(|p| !p.is_folder) {
-                    for (j, p) in s.playlists.iter().enumerate() {
-                        if !p.is_folder {
-                            rows.push((Entry::OnlinePlaylist(*n, j), indent(2, &p.name)));
+        let online_folded = i.folded_sections.contains(&Entry::OnlineMusicRoot);
+        rows.push((Entry::OnlineMusicRoot, if online_folded { "▸ Música en Línea" } else { "▾ Música en Línea" }.to_owned()));
+        if !online_folded {
+            let online: Vec<usize> = i
+                .sources
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.online_plugin)
+                .map(|(n, _)| n)
+                .collect();
+            for n in &online {
+                rows.push((Entry::OnlinePlugin(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
+                // Sub-entries: Search and Downloads (and SoundCloud's example playlists).
+                rows.push((Entry::OnlineSearch(*n, 0), indent(2, "Búsqueda")));
+                rows.push((Entry::OnlineDownloads(*n, 0), indent(2, "Descargas")));
+                // SoundCloud's example playlists (Major Lazer, Diplo …) come from the library plugin's lists.
+                if let Some(s) = i.sources.get(*n) {
+                    if s.playlists.iter().any(|p| !p.is_folder) {
+                        for (j, p) in s.playlists.iter().enumerate() {
+                            if !p.is_folder {
+                                rows.push((Entry::OnlinePlaylist(*n, j), indent(2, &p.name)));
+                            }
                         }
                     }
                 }
@@ -314,9 +336,12 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         .map(|(n, _)| n)
         .collect();
     if i.sections.downloaded {
-        rows.push((Entry::DownloadedRoot, "▸ Downloaded".to_owned()));
-        for n in downloaded {
-            source_rows(&mut rows, i, n, 1);
+        let downloaded_folded = i.folded_sections.contains(&Entry::DownloadedRoot);
+        rows.push((Entry::DownloadedRoot, if downloaded_folded { "▸ Downloaded" } else { "▾ Downloaded" }.to_owned()));
+        if !downloaded_folded {
+            for n in downloaded {
+                source_rows(&mut rows, i, n, 1);
+            }
         }
     }
     // ── Other sources (Explorer, iTunes, xml plugins) on their own ───────────────

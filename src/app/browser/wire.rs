@@ -111,6 +111,8 @@ pub fn wire(
         sources: Vec::new(),
         folded: std::collections::HashSet::new(),
         folded_lib: std::collections::HashSet::new(),
+        folded_sections: std::collections::HashSet::new(),
+        day_names: std::collections::HashMap::new(),
         played,
         strips: strip::Strips::new(app),
         _timer: Timer::default(),
@@ -266,11 +268,16 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
         let on = on && prefs::with(related_shown);
         if on {
             v.suggest_off();
+            // Related needs an anchor track: if none is chosen, pick the first visible one so Related has
+            // something to show instead of an empty list.
+            if v.selected.is_none() {
+                v.selected = v.list.first().cloned();
+            }
         }
         v.related = if on { v.selected.clone() } else { None };
         if on && v.related.is_none() {
             app.global::<BrowserState>()
-                .set_status("select a track to see what relates to it".into());
+                .set_status("no tracks to relate".into());
         }
         v.load(&app);
     });

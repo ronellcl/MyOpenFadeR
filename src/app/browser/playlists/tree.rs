@@ -95,6 +95,7 @@ impl View {
             Entry::Bank(_) => 14,
             Entry::Category(_) => 6,
             Entry::Tag(_) => 7,
+            Entry::Day(_) => 15,
             Entry::Lib(i) => {
                 if self.lib_playlists[*i].is_folder {
                     9
@@ -200,6 +201,8 @@ impl View {
             }),
             folded: &self.folded,
             folded_lib: &self.folded_lib,
+            folded_sections: &self.folded_sections,
+            day_names: &self.day_names,
         });
         self.entries = entries;
         self.sidebar.set_vec(
@@ -261,6 +264,13 @@ impl View {
                     self.rebuild(app);
                 }
             }
+            // Root sections: click folds/unfolds their children (History, Tags, Devices, Downloaded, Música Local, Música en Línea).
+            Entry::HistoryRoot | Entry::TagsRoot | Entry::DevicesRoot | Entry::DownloadedRoot | Entry::LocalMusicRoot | Entry::OnlineMusicRoot => {
+                if !self.folded_sections.remove(&e) {
+                    self.folded_sections.insert(e);
+                }
+                self.rebuild(app);
+            }
             _ => {}
         }
     }
@@ -309,7 +319,7 @@ impl View {
                 .get(*i)
                 .and_then(|s| s.playlists.get(*j))
                 .map_or_else(String::new, |p| p.name.clone()),
-            Entry::Day(d) => d.clone(),
+            Entry::Day(d) => self.day_names.get(d).cloned().unwrap_or_else(|| d.clone()),
             Entry::All => "All tracks".to_owned(),
             Entry::Tags => "Tag List".to_owned(),
             Entry::Session => "Session history".to_owned(),

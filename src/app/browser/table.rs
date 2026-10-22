@@ -25,7 +25,9 @@ pub const DOWNLOADED: usize = 11;
 pub const FORMAT: usize = 12;
 /// Where the row comes from (the search results only): the Collection, a folder, a volume.
 pub const ORIGIN: usize = 13;
-pub const COLUMNS: usize = 14;
+/// kbps of the audio file ("320 kbps", "256 kbps", …; empty when unknown).
+pub const BITRATE: usize = 14;
+pub const COLUMNS: usize = 15;
 pub const KEY: usize = 3;
 
 /// BPM hint window: ± this fraction of the playing deck's BPM.
@@ -159,6 +161,13 @@ pub fn cell_of(t: &Track, f: &Facts, col: usize, look: &Look) -> String {
         RATING => "★".repeat(t.rating.into()),
         FORMAT => f.format.text().to_owned(),
         ORIGIN => f.origin.clone(),
+        BITRATE => {
+            if t.bitrate > 0 {
+                format!("{} kbps", t.bitrate)
+            } else {
+                String::new()
+            }
+        }
         _ => t.comment.clone(),
     }
 }

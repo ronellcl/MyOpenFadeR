@@ -40,6 +40,11 @@ impl Store {
             [day],
         )
     }
+
+    /// Delete every play logged on `day` from the stored history.
+    pub fn history_delete_day(&self, day: &str) -> R<()> {
+        self.run("DELETE FROM history WHERE day = ?1", params![day])
+    }
 }
 
 #[cfg(test)]
