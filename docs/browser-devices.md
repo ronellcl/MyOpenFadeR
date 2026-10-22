@@ -103,6 +103,10 @@ The index of the pinned folders is read when a folder is pinned and kept in a ta
 search finds the tracks of a stick without walking it again. The rows are read-only and are not in the Collection.
 When a volume is plugged in again, the folders pinned on it are indexed again, so the search finds them right away.
 
+## 7. Foldable sections
+
+Every root section of the tree (History, Tags, Devices, Downloaded, Música Local, Música en Línea) can be folded and unfolded with a click on its heading (the icon toggles between ▸ and ▾). Only the heading is shown when folded; the keyboard only moves the selection and never folds a branch. Folded state is kept while the app runs.
+
 ## 7. The cloud tracks behave like any other song
 
 A track from a plugin source joins the Collection **before it plays** (`src/app/deck/load.rs`): the history, the
@@ -118,8 +122,9 @@ two rows.
 | The pinned folders and their index | `src/app/browser/pinned.rs` |
 | The unified search | `src/app/browser/search.rs` |
 | The media filter | `src/app/browser/filter.rs` |
-| The table's cells (FORMAT, ORIGIN) | `src/app/browser/table.rs` |
+| The table's cells (FORMAT, ORIGIN, BITRATE) | `src/app/browser/table.rs` |
 | The index of the pinned folders (the table) | `src/store/index.rs` |
 | The volumes and their folders | `src/device/mod.rs` |
 | The volumes of each system | `src/device/windows.rs`, `src/device/linux.rs`, `src/device/macos.rs` |
 | The tree and the table | `ui/browser-tree.slint`, `ui/browser-table.slint` |
+| Foldable sections (History, Tags, Devices, Downloaded, Música Local, Música en Línea) | `src/app/browser/sidebar.rs`, `src/app/browser/playlists/tree.rs` |

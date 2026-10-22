@@ -367,3 +367,11 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 - **El disco local se puede recorrer**: el volumen donde está Windows (C:) se lista en la misma sección como **C: (OS)**, y sus carpetas de primer nivel se abren como fuentes de solo lectura, para navegar entre las carpetas del disco.
 - **Listar un volumen no lo barre entero**: antes se recorría el árbol entero del disco buscando audio (1,8 TB = minutos); ahora solo se lee el primer nivel (instantáneo) y las carpetas se abren bajo demanda.
 - **Se ven todas las carpetas del volumen**, no solo las que tienen audio: se puede navegar por el disco entero, no solo por su música.
+
+### De la quinta tanda (21/10/2026): el navegador - HECHO
+
+- **Columna BITRATE**: la tabla de tracks muestra el bitrate del archivo ("320 kbps", "256 kbps", etc.) a la derecha de FORMATO; queda vacío cuando el bitrate es desconocido (0).
+- **Secciones plegables del árbol**: un clic en History, Tags, Devices, Downloaded, Música Local o Música en Línea pliega/despliega sus hijos (el ícono cambia entre ▸ y ▾); el teclado solo mueve la selección.
+- **History con botón derecho**: renombrar sesión (mantiene la fecha como clave interna) y eliminar sesión.
+- **Related tracks con auto-ancla**: si no hay track seleccionado, Related toma el primero de la lista visible en lugar de mostrar vacío.
+- **Instalador v0.3.1**: NSIS 3.11 disponible, instalador compilado y subido a la release v0.3.1 en GitHub (ya no es borrador).

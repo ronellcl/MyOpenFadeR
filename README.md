@@ -49,6 +49,10 @@ and a window that opens full screen.
 - **The folders you pin.** The FAV button pins the folder the tree has chosen; the pinned folders wait for you in the "Favorites" section, and a pin survives the stick changing letter.
 - **One search for everything local.** The search box looks in the Collection, in the index of the pinned folders and in the sources that are read, and each result says where it comes from. The online searches of YouTube and Deezer stay in their own box: the filter never asks a plugin.
 - **Audio or video, said out loud.** A chip in the filter bar keeps everything, only the audio or only the video, and the track table has a FORMATO column with a note for the music and a film for the video.
+- **Bitrate.** The track table gains a BITRATE column to the right of FORMATO, showing "320 kbps", "256 kbps", … (empty when unknown).
+- **Foldable sections.** A click on History, Tags, Devices, Downloaded, Música Local or Música en Línea folds/unfolds their children (the icon toggles between ▸ and ▾); the keyboard only moves the selection.
+- **History right-click.** Right-click a session row to rename it (keeping its date as the key) or delete it.
+- **Related tracks auto-anchor.** If no track is chosen when Related turns on, it anchors on the first visible track instead of showing nothing.
 
 ## Download
 

@@ -224,8 +224,25 @@ Lo cerrado:
 | BR-08 | Un disco duro USB aparece en "Devices": Windows responde `DRIVE_FIXED` a un disco externo y el escaneo solo aceptaba `DRIVE_REMOVABLE` (pendrive o tarjeta) | 2a7192a |
 | BR-09 | El disco local se puede recorrer: el volumen del sistema (C:) se lista en la sección "Devices" como `C: (OS)` y sus carpetas de primer nivel se abren como fuentes de solo lectura | 2a7192a |
 | BR-10 | Listar un volumen ya no lo barre entero: solo se lee el primer nivel (antes se recorría el disco entero buscando audio) y ahora se ven todas sus carpetas, no solo las que tienen audio | 2a7192a |
-| BR-11 | El instalador de Windows se compila otra vez (NSIS 3.11) y sube a la release v0.2.3, ya publicada | f1a0901 |
+| BR-11 | El instalador de Windows se compila otra vez (NSIS 3.11) y sube a la release v0.3.1, ya publicada | f1a0901 |
 | BR-12 | Las carpetas fijadas se reindexan cuando el volumen se reconecta (ya no hay que fijarlas otra vez para que la búsqueda las encuentre) | a50a361 |
 
-Sigue pendiente lo de la fase 5 (arriba) y el instalador de Windows (NSIS no está disponible en esta máquina: la
-release v0.2.3 queda como borrador).
+Sigue pendiente lo de la fase 5 (arriba).
+
+## 14. Quinta tanda (21/10/2026): el navegador - HECHO
+
+Lo cerrado:
+
+| ID | Lo que se hizo | Commit |
+|----|----------------|--------|
+| BR-13 | Columna BITRATE en la tabla de tracks (kbps, a la derecha de FORMATO) | 38f1bf4 |
+| BR-14 | Secciones del árbol plegables (History, Tags, Devices, Downloaded, Música Local, Música en Línea) | 38f1bf4 |
+| BR-15 | History: renombrar sesión manteniendo fecha y eliminar sesión con clic derecho | 38f1bf4 |
+| BR-16 | Related tracks: auto-ancla al primer track visible si no hay selección | 38f1bf4 |
+
+## Fase 5 (pendiente)
+
+- Filtro por origen en la barra (All / Colección / YouTube / Deezer / Dispositivos).
+- Preview de vídeo en la columna PREVIEW (un fotograma en vez de la onda).
+- Aviso de duplicado al importar ("esta pista ya está en la Colección").
+- La estrella de la fila fijable con el clic (hoy se fija con el botón FAV y la estrella es solo la marca).

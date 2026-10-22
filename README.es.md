@@ -49,6 +49,10 @@ escenario VDJ y una ventana que abre a pantalla completa.
 - **Las carpetas que fijas.** El botón FAV fija la carpeta que tengas elegida; las carpetas fijadas te esperan en la sección "Favorites", y el pin sobrevive a que el USB cambie de letra.
 - **Una sola búsqueda para todo lo local.** La caja del buscador mira la Colección, el índice de las carpetas fijadas y las fuentes ya leídas, y cada resultado dice de dónde salió. Las búsquedas en línea de YouTube y Deezer se quedan en su propia caja: el filtro no pregunta a ningún plugin.
 - **Audio o vídeo, dicho claro.** Un chip en la barra de filtros deja pasar todo, solo el audio o solo el vídeo, y la tabla de pistas tiene la columna FORMATO con una nota para la música y una película para el vídeo.
+- **Bitrate.** La tabla de pistas gana la columna BITRATE a la derecha de FORMATO, mostrando "320 kbps", "256 kbps", … (vacío cuando es desconocido).
+- **Secciones plegables.** Un clic en Historial, Etiquetas, Discos, Downloaded, Música Local o Música en Línea pliega/despliega sus hijos (el ícono cambia entre ▸ y ▾); el teclado solo mueve la selección.
+- **Historial con clic derecho.** Clic derecho en una fila de sesión para renombrarla (manteniendo la fecha como clave interna) o eliminarla.
+- **Related tracks con ancla automática.** Si no hay pista elegida al activar Related, toma la primera visible en lugar de mostrar vacío.
 
 ## Descarga
 
