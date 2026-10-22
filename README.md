@@ -84,6 +84,9 @@ Copy-Item C:\Tools\ffmpeg\ffmpeg-*-essentials\bin\ffmpeg.exe, C:\Tools\ffmpeg\ff
 
 To install it for your user on Linux instead (the `openfader` command and an application menu entry, with the plugins, themes and mappings bundled): `./install.sh`. It also sets the default plugin, theme and mapping repositories of PREFERENCES (GET PLUGINS / GET THEMES / GET MAPPINGS), which the app uses anyway until you edit the list. Run it again to update; `./install.sh --uninstall` removes it.
 
+### Raspberry Pi
+
+For a Raspberry Pi 3, 4 or CM4 (64-bit Raspberry Pi OS, Debian 13), `docker buildx build -f Dockerfile.pi -o dist/pi .` cross-compiles an optimised archive on any x86_64 machine. See [docs/raspberry-pi.md](docs/raspberry-pi.md) for memory use (about 200 MB with two tracks playing, software renderer) and settings.
 ## A tour
 
 ### Analysis that is ready when you load

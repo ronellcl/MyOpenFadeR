@@ -10,6 +10,7 @@
 //! regions under 2 s dropped.
 
 use crate::analysis::{Stft, mono_decimate};
+use crate::audio::Frames;
 
 const N: usize = 4096;
 const HOP: usize = N / 2;
@@ -129,8 +130,8 @@ fn regions(p: &[Option<f32>], frame_ms: f64) -> Vec<VocalRegion> {
         .collect()
 }
 
-/// Vocal regions of interleaved stereo f32 PCM (`rate` Hz). CPU light (a few hundred ms for a long track).
-pub fn vocal_regions(samples: &[f32], rate: u32) -> Vec<VocalRegion> {
+/// Vocal regions of stereo audio read through [`Frames`] (`rate` Hz). CPU light (a few hundred ms for a long track).
+pub fn vocal_regions<S: Frames + ?Sized>(samples: &S, rate: u32) -> Vec<VocalRegion> {
     let d = ((rate + TARGET_RATE / 2) / TARGET_RATE).max(1) as usize;
     let x = mono_decimate(samples, d);
     let r = rate as f32 / d as f32;

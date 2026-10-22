@@ -10,6 +10,7 @@
 //! USB library (tests/key_usb.rs); the harmonic voting and the minor prior were tuned on that library too.
 
 use super::Stft;
+use crate::audio::Frames;
 
 /// Krumhansl-Kessler probe-tone ratings, tonic first.
 const KK_MAJOR: [f32; 12] = [
@@ -65,7 +66,7 @@ fn spectral_peaks(x: &[f32], rate: f32) -> Vec<(u32, f32, f32)> {
 
 /// Twelve-bin pitch-class profile (C = 0) summed over the track, tuning-corrected, every peak also voting for the
 /// pitch classes of the fundamentals it could be a harmonic of. All zero for silence.
-pub fn chroma(samples: &[f32], rate: u32) -> [f32; 12] {
+pub fn chroma<S: Frames + ?Sized>(samples: &S, rate: u32) -> [f32; 12] {
     let d = (rate / LOW_RATE).max(1) as usize;
     let peaks = spectral_peaks(&super::mono_decimate(samples, d), rate as f32 / d as f32);
     // Per-frame normalised weights, so loud and quiet passages count alike.
@@ -134,8 +135,8 @@ pub fn from_chroma(c: &[f32; 12]) -> Option<String> {
     Some(camelot(best.1 % 12, best.1 >= 12))
 }
 
-/// Key of interleaved stereo f32 PCM; `None` for silence or audio shorter than one analysis window (~0.75 s).
-pub fn detect(samples: &[f32], rate: u32) -> Option<String> {
+/// Key of stereo audio read through [`Frames`]; `None` for silence or audio shorter than one analysis window (~0.75 s).
+pub fn detect<S: Frames + ?Sized>(samples: &S, rate: u32) -> Option<String> {
     from_chroma(&chroma(samples, rate))
 }
 

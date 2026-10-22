@@ -93,8 +93,9 @@ pub fn active() -> usize {
     prefs::with(|p| p.decks.clamp(2, DECKS))
 }
 
-/// A decoded track plus, when the library gave no grid / 3-band waveform, [`analysis::analyze`]'s result.
-type Decoded = (audio::Pcm, Option<analysis::Analysis>);
+/// A decoded track (16-bit, with the fingerprint the decode made) plus, when the library gave no grid / 3-band
+/// waveform, [`analysis::analyze`]'s result.
+type Decoded = (audio::Track16, Option<analysis::Analysis>);
 
 /// Audio still decoding (and analysing): the receiver (dropping it cancels the result) and the
 /// track title and status notes to rebuild the status line from when it arrives.

@@ -27,16 +27,19 @@ pub use openfader_plugin::library::{
     PREVIEW_ENTRIES,
 };
 
+use crate::audio::{Frames, mono};
+
 /// Beat grid, 3-band waveforms, musical key, vocal regions and phrases (`beats`, `three_band_detail`,
-/// `three_band_preview`, `key`, `vocal`, `phrases` from [`auto::phrases`]) computed from interleaved stereo f32 PCM
-/// (`audio::Pcm::samples`, `.rate`) under the current [`options`]; a part switched off stays empty, other fields stay
-/// empty. CPU heavy (seconds for a long track): call off the UI thread.
-pub fn analyze(samples: &[f32], rate: u32) -> Analysis {
+/// `three_band_preview`, `key`, `vocal`, `phrases` from [`auto::phrases`]) computed from stereo audio (`rate` Hz) read
+/// front to back through [`Frames`]: interleaved f32 or a deck's `Track16` (no f32 copy is made), under the current
+/// [`options`]; a part switched off stays empty, other fields stay empty. CPU heavy (seconds for a long track): call
+/// off the UI thread.
+pub fn analyze<S: Frames + ?Sized>(samples: &S, rate: u32) -> Analysis {
     analyze_with(samples, rate, &options::get())
 }
 
 /// [`analyze`] under `o`. Key and vocal detection run on their own threads while this one does waveform, grid and phrases.
-pub fn analyze_with(samples: &[f32], rate: u32, o: &options::Options) -> Analysis {
+pub fn analyze_with<S: Frames + ?Sized>(samples: &S, rate: u32, o: &options::Options) -> Analysis {
     std::thread::scope(|s| {
         fn join<T>(h: std::thread::ScopedJoinHandle<'_, T>) -> T {
             h.join().unwrap_or_else(|e| std::panic::resume_unwind(e))
@@ -179,21 +182,22 @@ impl Stft {
     }
 }
 
-/// Mono, anti-aliased (triangular window of 2d samples) decimation by `d` of interleaved stereo. The mono signal is read on
-/// the fly: no full-length copy (key and vocal detection run this at once, on tracks of up to an hour).
-fn mono_decimate(samples: &[f32], d: usize) -> Vec<f32> {
-    let n = samples.len() / 2;
-    let mono = |i: usize| (samples[2 * i] + samples[2 * i + 1]) * 0.5;
+/// Mono, anti-aliased (triangular window of 2d samples) decimation by `d` of stereo audio read through [`Frames`]. The
+/// mono signal is read on the fly: no full-length copy (key and vocal detection run this at once, on tracks of up to an hour).
+fn mono_decimate<S: Frames + ?Sized>(samples: &S, d: usize) -> Vec<f32> {
+    let n = samples.frame_count();
     if d == 1 {
-        return (0..n).map(mono).collect();
+        return samples.frames_in(0..n).map(mono).collect();
     }
     let norm = 1.0 / (d * d) as f32;
     (0..n / d)
         .map(|k| {
             let lo = (k * d).saturating_sub(d);
             let hi = (k * d + d).min(n);
-            (lo..hi)
-                .map(|i| mono(i) * (d - (i as isize - (k * d) as isize).unsigned_abs()) as f32)
+            samples
+                .frames_in(lo..hi)
+                .enumerate()
+                .map(|(j, f)| mono(f) * (d - (lo + j).abs_diff(k * d)) as f32)
                 .sum::<f32>()
                 * norm
         })

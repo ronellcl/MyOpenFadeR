@@ -301,19 +301,23 @@ impl Player {
     /// Replaces the track: pauses, seeks to 0, clears the loop, the reverse and any slip divergence.
     /// Rate, key shift, slip mode and volume persist.
     pub fn load(&mut self, pcm: Pcm) {
+        self.load16(Track16::from(pcm));
+    }
+
+    /// [`load`](Self::load) of a track already quantised to 16-bit: a decoded file never builds a full-length f32 copy.
+    pub fn load16(&mut self, track: Track16) {
         self.pause();
         self.shared.scratch.store(false, Relaxed);
         self.shared.lp.store(0, Relaxed);
         self.shared.t.reset();
-        self.src_rate = pcm.rate;
-        self.shared.src_rate.store(pcm.rate, Relaxed);
+        self.src_rate = track.rate;
+        self.shared.src_rate.store(track.rate, Relaxed);
         drop(self.shared.beats.lock().take()); // the grid belongs to the old track
-        self.frames = (pcm.samples.len() / 2) as u64;
+        self.frames = track.frames() as u64;
         self.shared.seek.store(0f64.to_bits(), Relaxed);
         self.shared.pos.store(0f64.to_bits(), Relaxed);
         let old_stems = self.shared.stems.lock().take();
-        let track = Arc::new(Track16::from(pcm)); // the f32 is gone; quantised before taking the lock
-        let old = std::mem::replace(&mut *self.shared.pcm.lock(), track);
+        let old = std::mem::replace(&mut *self.shared.pcm.lock(), Arc::new(track));
         self.has_stems = false;
         drop((old, old_stems)); // free outside the lock path of the audio thread
     }

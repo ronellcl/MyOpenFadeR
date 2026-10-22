@@ -67,3 +67,6 @@ tests/
 - Machine-local paths, keys and user data are never in tracked files. USB tests read `OPENFADER_USB` and skip when it is unset. Keys come from env vars or the git-ignored `.local/` files.
 - Format claims are labelled inferred or ours in the doc comment of the child that implements them. The core names no third-party software; only plugins and mapping files may.
 - Repositories: core (`OpenFadeR`), `OpenFadeR-Plugins` (`extension/plugin/`), `OpenFadeR-Map` (`mappings/`), `OpenFadeR-Themes` (`extension/skin/`).
+
+## Memory
+- A deck track, a browser preview track and a bulk-analysis track never exist as a full-length f32 buffer: `audio::decode_track16_cancellable` quantises each packet into one `Track16` buffer (reserved from the header's frame count) and hashes the audio fingerprint from the decoder's f32 frames (`analysis::fingerprint::Window`, so the fingerprint is the one `fingerprint::of` gives the f32 decode). Gain, auto cue, the fallback waveform and the analysis read that same `Arc<Track16>` through `audio::Frames`, which f32 slices implement too. Sampler, edit and groove stay on f32 `Pcm`.

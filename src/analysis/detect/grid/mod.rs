@@ -28,6 +28,7 @@ mod tests;
 
 use super::{FLUX_HZ, PRECISE_FLUX_HZ, hops};
 use crate::analysis::Beat;
+use crate::audio::Frames;
 
 /// Track Analysis Mode.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -356,14 +357,14 @@ fn onsets(f: &[f32], refine: bool) -> Vec<(f64, f64)> {
 
 /// Beat grid over the whole track from the first beat at/after 0 to the end, `bar_pos` 1 on the
 /// downbeat, with the default options (steady tempo, 85-175 BPM).
-pub fn beat_grid(samples: &[f32], rate: u32) -> Vec<Beat> {
+pub fn beat_grid<S: Frames + ?Sized>(samples: &S, rate: u32) -> Vec<Beat> {
     beat_grid_with(samples, rate, &GridOptions::default())
 }
 
 /// [`beat_grid`] under `opt`: constant tempo (one `bpm_x100` throughout) unless the options track the beats
 /// ([`GridOptions::tracks`]), then each tempo segment carries its own ([`dynamic::segments`]).
 /// Empty when no tempo can be found (silence, too short).
-pub fn beat_grid_with(samples: &[f32], rate: u32, opt: &GridOptions) -> Vec<Beat> {
+pub fn beat_grid_with<S: Frames + ?Sized>(samples: &S, rate: u32, opt: &GridOptions) -> Vec<Beat> {
     let (e, fr) = hops(samples, rate, opt.flux_hz());
     let f = flux(&e, fr);
     let n = f.len();
@@ -390,7 +391,7 @@ pub fn beat_grid_with(samples: &[f32], rate: u32, opt: &GridOptions) -> Vec<Beat
 
     // Beats from the first at/after 0 (+0.5 frame: an onset is seen in the frame it starts in).
     let k0 = (-(phi + 0.5) / p).ceil() as i64;
-    let frames = (samples.len() / 2) as f64 / rate as f64 * fr;
+    let frames = samples.frame_count() as f64 / rate as f64 * fr;
     let k_end = ((frames - phi - 0.5) / p).floor() as i64;
     let times: Vec<f64> = (k0..=k_end).map(|k| phi + 0.5 + k as f64 * p).collect();
     let bpm = (6000.0 * fr / p).round() as u16;

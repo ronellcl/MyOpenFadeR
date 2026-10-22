@@ -24,19 +24,21 @@ use std::{
     sync::mpsc::{channel, Receiver, TryRecvError},
 };
 
-/// Decode the file of `t`; when `need` (no grid, no 3-band waveform) is set, also analyse the audio before
-/// sending, so the PCM is never cloned. A Collection track that has no fingerprint yet gets one from the audio.
+/// Decode the file of `t` straight to 16-bit (the fingerprint comes with it); when `need` (no grid, no 3-band
+/// waveform) is set, also analyse the audio before sending, so the track is never cloned.
 fn decode_and_analyze(t: Track, need: bool) -> Receiver<Result<Decoded, String>> {
     let (tx, rx) = channel();
     std::thread::spawn(move || {
         let Some(file) = t.file.as_deref() else {
             return;
         };
-        let _ = tx.send(audio::decode(file).map(|pcm| {
-            analysis::cache::remember_fingerprint(&t, &pcm);
-            let a = need.then(|| analysis::cache::analyze_cached(&t, &pcm.samples, pcm.rate).0);
-            (pcm, a)
-        }));
+        let _ = tx.send(
+            audio::decode_track16_cancellable(file, &|| false).map(|(track, print)| {
+                analysis::cache::remember_fingerprint(&t, &print);
+                let a = need.then(|| analysis::cache::analyze_cached(&t, &track, track.rate).0);
+                (track, a)
+            }),
+        );
     });
     rx
 }
@@ -246,7 +248,7 @@ impl Deck {
             let rx = match pcm {
                 Some(pcm) => {
                     let (tx, rx) = channel();
-                    let _ = tx.send(Ok((pcm, None)));
+                    let _ = tx.send(Ok((audio::Track16::from(pcm), None)));
                     Some(rx)
                 }
                 None => t
@@ -374,7 +376,7 @@ impl Deck {
         let mut added_cues = false;
         let mut stem_src = None;
         match res {
-            Ok((pcm, analysed)) => {
+            Ok((track, analysed)) => {
                 // Fill only what the library lacked; keep its beats / waveform otherwise.
                 if let Some(an) = analysed {
                     notes.retain(|n| n != "not analysed");
@@ -387,7 +389,7 @@ impl Deck {
                     if l.analysis.three_band_detail.is_empty() && !an.three_band_detail.is_empty() {
                         l.analysis.three_band_detail = an.three_band_detail;
                         l.analysis.three_band_preview = an.three_band_preview;
-                        l.detail = render::detail::wave(&l.analysis, Some(&pcm));
+                        l.detail = render::detail::wave_frames(&l.analysis, Some((&track, track.rate)));
                         notes.push("waveform: analysed".into());
                     }
                 }
@@ -400,16 +402,16 @@ impl Deck {
                     l.analysis.cues.extend(auto);
                 }
                 if l.detail.is_none() {
-                    l.detail = render::detail::wave(&l.analysis, Some(&pcm));
+                    l.detail = render::detail::wave_frames(&l.analysis, Some((&track, track.rate)));
                     notes.push("detail: from audio".into());
                 }
                 // AUTO GAIN comes from the store (measured and saved on the track's first load, [`gain::resolve`]); AUTO CUE
                 // puts the cue point (and the playhead) on the first sound unless LOAD SETTING chose a cue. A sampler slice is no track to cue.
-                (l.gain_analysed, l.gain_adjust) = gain::resolve(l.track.as_ref(), &pcm);
+                (l.gain_analysed, l.gain_adjust) = gain::resolve(l.track.as_ref(), &track, track.rate);
                 let (auto_cue, db) =
                     prefs::with(|p| (p.controller.auto_cue, p.controller.auto_cue_db()));
                 if auto_cue && !l.cue_locked && l.track.is_some() {
-                    if let Some(ms) = autocue::first_sound(&pcm, db) {
+                    if let Some(ms) = autocue::first_sound(&track, track.rate, db) {
                         l.cue_ms = ms;
                     }
                 }
@@ -421,7 +423,7 @@ impl Deck {
                     .filter(|_| prefs::with(|p| p.stems));
                 if let Some(player) = &self.player {
                     let mut player = player.borrow_mut();
-                    player.load(pcm);
+                    player.load16(track);
                     player.seek(l.cue_ms);
                     l.duration_ms = player.duration_ms();
                 }

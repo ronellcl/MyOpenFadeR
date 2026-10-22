@@ -18,7 +18,7 @@ use super::{
     options::{self, Options, Profile},
     Analysis, Beat,
 };
-use crate::{library::Track, paths::at, store};
+use crate::{audio::Frames, library::Track, paths::at, store};
 use std::path::{Path, PathBuf};
 
 const MAGIC: &[u8; 4] = b"RKAC";
@@ -278,7 +278,7 @@ pub enum Source {
 
 /// Stored analysis under the current [`options`], else [`super::analyze`] of the decoded `samples` + [`store`].
 /// ponytail: a failed cache write is dropped silently; the result is still returned.
-pub fn analyze_cached(t: &Track, samples: &[f32], rate: u32) -> (Analysis, Source) {
+pub fn analyze_cached<S: Frames + ?Sized>(t: &Track, samples: &S, rate: u32) -> (Analysis, Source) {
     let o = options::get();
     let ignored = match load_for(t, &o) {
         Ok(Some(a)) => return (a, Source::Cache),
@@ -292,7 +292,7 @@ pub fn analyze_cached(t: &Track, samples: &[f32], rate: u32) -> (Analysis, Sourc
 }
 
 /// [`super::analyze_with`] `o`, stored for `t` whatever the cache held.
-pub fn analyze_fresh(t: &Track, samples: &[f32], rate: u32, o: &Options) -> Analysis {
+pub fn analyze_fresh<S: Frames + ?Sized>(t: &Track, samples: &S, rate: u32, o: &Options) -> Analysis {
     let a = super::analyze_with(samples, rate, o);
     let _ = store(t, &a, o.profile());
     a
@@ -303,30 +303,29 @@ pub fn get_or_analyze(t: &Track) -> Result<(Analysis, Source), String> {
     if let Ok(Some(a)) = load_for(t, &options::get()) {
         return Ok((a, Source::Cache));
     }
-    let pcm = crate::audio::decode(audio_of(t)?)?;
-    remember_fingerprint(t, &pcm);
-    Ok(analyze_cached(t, &pcm.samples, pcm.rate))
+    let (track, print) = crate::audio::decode_track16_cancellable(audio_of(t)?, &|| false)?;
+    remember_fingerprint(t, &print);
+    Ok(analyze_cached(t, &track, track.rate))
 }
 
 /// Analyses `t` again under the current options, ignoring and replacing what the cache holds (an explicit
 /// "Analyze Track").
 pub fn reanalyze(t: &Track) -> Result<Analysis, String> {
-    let pcm = crate::audio::decode(audio_of(t)?)?;
-    remember_fingerprint(t, &pcm);
-    Ok(analyze_fresh(t, &pcm.samples, pcm.rate, &options::get()))
+    let (track, print) = crate::audio::decode_track16_cancellable(audio_of(t)?, &|| false)?;
+    remember_fingerprint(t, &print);
+    Ok(analyze_fresh(t, &track, track.rate, &options::get()))
 }
 
 /// Gives a Collection track the fingerprint of its decoded audio ([`super::fingerprint`]) when it has none yet: what finds
 /// the file again after it moved. Tracks outside the Collection (no id) and failed writes are skipped silently.
-pub fn remember_fingerprint(t: &Track, pcm: &crate::audio::Pcm) {
+pub fn remember_fingerprint(t: &Track, print: &str) {
     let Some(id) = t.id else { return };
     let store = store::global();
     if store.fingerprint(id).ok().flatten().is_some() {
         return;
     }
-    let fp = super::fingerprint::of(pcm);
-    if !fp.is_empty() {
-        let _ = store.set_fingerprint(id, &fp);
+    if !print.is_empty() {
+        let _ = store.set_fingerprint(id, print);
     }
 }
 
