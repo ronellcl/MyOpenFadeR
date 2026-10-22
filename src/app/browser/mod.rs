@@ -248,7 +248,7 @@ struct View {
     folded: std::collections::HashSet<usize>,
     /// The lists of the library whose branch the user folded.
     folded_lib: std::collections::HashSet<usize>,
-    /// The tree's root sections the user folded (History, Tags, Devices, Downloaded, Música Local, Música en Línea).
+    /// The tree's root sections the user folded (History, Tags, Devices, Downloaded, Local Music, Online Music).
     folded_sections: std::collections::HashSet<Entry>,
     /// Tracks the table dims, by store key; see [`played`].
     played: std::collections::HashSet<String>,

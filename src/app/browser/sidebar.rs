@@ -51,11 +51,11 @@ pub enum Entry {
     Pinned(usize),
     /// "Downloaded" heading above what the plugin sources downloaded.
     DownloadedRoot,
-    /// "Música Local" heading above the system folders (Music, Videos, Desktop).
+    /// "Local Music" heading above the system folders (Music, Videos, Desktop).
     LocalMusicRoot,
     /// A system folder of Windows: Music, Videos, Desktop.
     SystemFolder(usize),
-    /// "Música en Línea" heading above the cloud plugins.
+    /// "Online Music" heading above the cloud plugins.
     OnlineMusicRoot,
     /// A cloud plugin source (Deezer, YouTube, SoundCloud): its sub-entries (Search, Downloads…) are listed under it.
     OnlinePlugin(usize),
@@ -130,7 +130,7 @@ pub struct Inputs<'a> {
     pub folded: &'a HashSet<usize>,
     /// The lists of the library whose children are hidden (the user folded the branch).
     pub folded_lib: &'a HashSet<usize>,
-    /// The tree's root sections the user folded (History, Tags, Devices, Downloaded, Música Local, Música en Línea).
+    /// The tree's root sections the user folded (History, Tags, Devices, Downloaded, Local Music, Online Music).
     pub folded_sections: &'a HashSet<Entry>,
     /// Day → custom display name for a renamed history session.
     pub day_names: &'a HashMap<String, String>,
@@ -249,10 +249,10 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         }
         at += 1 + children;
     }
-    // ── Música Local: system folders (Music, Videos, Desktop) ──────────────────
+    // ── Local Music: system folders (Music, Videos, Desktop) ───────────────────
     if i.sections.local_music {
         let local_folded = i.folded_sections.contains(&Entry::LocalMusicRoot);
-        rows.push((Entry::LocalMusicRoot, if local_folded { "▸ Música Local" } else { "▾ Música Local" }.to_owned()));
+        rows.push((Entry::LocalMusicRoot, if local_folded { "▸ Local Music" } else { "▾ Local Music" }.to_owned()));
         if !local_folded {
             let system: Vec<usize> = i
                 .sources
@@ -264,7 +264,7 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             for n in &system {
                 rows.push((Entry::SystemFolder(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
             }
-            // Discos: devices and local volumes under their own heading.
+            // Disks: devices and local volumes under their own heading.
             let disks: Vec<usize> = i
                 .sources
                 .iter()
@@ -274,7 +274,7 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
                 .collect();
             if !disks.is_empty() {
                 let disks_folded = i.folded_sections.contains(&Entry::DevicesRoot);
-                rows.push((Entry::DevicesRoot, indent(1, if disks_folded { "▸ Discos" } else { "▾ Discos" })));
+                rows.push((Entry::DevicesRoot, indent(1, if disks_folded { "▸ Devices" } else { "▾ Devices" })));
                 if !disks_folded {
                     for n in &disks {
                         source_rows(&mut rows, i, *n, 2);
@@ -283,10 +283,10 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             }
         }
     }
-    // ── Música en Línea: cloud plugins (Deezer, YouTube, SoundCloud) with sub-entries ─
+    // ── Online Music: cloud plugins (Deezer, YouTube, SoundCloud) with sub-entries ─
     if i.sections.online_music {
         let online_folded = i.folded_sections.contains(&Entry::OnlineMusicRoot);
-        rows.push((Entry::OnlineMusicRoot, if online_folded { "▸ Música en Línea" } else { "▾ Música en Línea" }.to_owned()));
+        rows.push((Entry::OnlineMusicRoot, if online_folded { "▸ Online Music" } else { "▾ Online Music" }.to_owned()));
         if !online_folded {
             let online: Vec<usize> = i
                 .sources
@@ -298,8 +298,8 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             for n in &online {
                 rows.push((Entry::OnlinePlugin(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
                 // Sub-entries: Search and Downloads (and SoundCloud's example playlists).
-                rows.push((Entry::OnlineSearch(*n, 0), indent(2, "Búsqueda")));
-                rows.push((Entry::OnlineDownloads(*n, 0), indent(2, "Descargas")));
+                rows.push((Entry::OnlineSearch(*n, 0), indent(2, "Search")));
+                rows.push((Entry::OnlineDownloads(*n, 0), indent(2, "Downloads")));
                 // SoundCloud's example playlists (Major Lazer, Diplo …) come from the library plugin's lists.
                 if let Some(s) = i.sources.get(*n) {
                     if s.playlists.iter().any(|p| !p.is_folder) {
@@ -313,7 +313,7 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             }
         }
     }
-    // ── Favorites (carpetas fijadas) ─────────────────────────────────────────────
+    // ── Favorites (pinned folders) ───────────────────────────────────────────────
     let pinned: Vec<usize> = i
         .sources
         .iter()
@@ -322,7 +322,7 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         .map(|(n, _)| n)
         .collect();
     if i.sections.favorites {
-        rows.push((Entry::FavoritesRoot, "▸ Carpetas Favoritas".to_owned()));
+        rows.push((Entry::FavoritesRoot, "▸ Favorites".to_owned()));
         for n in &pinned {
             rows.push((Entry::Pinned(*n), indent(1, &format!("★ {}", i.sources[*n].name))));
         }
@@ -527,9 +527,9 @@ mod tests {
                 "▸ Library (read-only)",
                 "    ▸ Folder",
                 "        Inner",
-                "▾ Música Local",
-                "▾ Música en Línea",
-                "▸ Carpetas Favoritas",
+                "▾ Local Music",
+                "▾ Online Music",
+                "▸ Favorites",
                 "▾ Downloaded",
             ]
         );
@@ -634,11 +634,11 @@ mod tests {
         assert_eq!(labels[at + 2], "        All tracks");
         assert_eq!(entries[at + 3], Entry::SourceMissing(0));
         assert_eq!(labels[at + 3], "        Not in the Collection");
-        // The devices hang under Música Local, above it.
+        // The devices hang under Local Music, above it.
         let discs = labels
             .iter()
-            .position(|l| l == "    ▾ Discos")
-            .expect("the devices hang under Música Local");
+            .position(|l| l == "    ▾ Devices")
+            .expect("the devices hang under Local Music");
         assert!(discs < at);
         assert!(!labels.iter().any(|l| l == "    ▸ Explorer"));
     }
@@ -682,8 +682,8 @@ mod tests {
         });
         let at = labels
             .iter()
-            .position(|l| l == "    ▾ Discos")
-            .expect("the devices hang under Música Local");
+            .position(|l| l == "    ▾ Devices")
+            .expect("the devices hang under Local Music");
         assert_eq!(entries[at + 1], Entry::Source(0));
         assert_eq!(labels[at + 1], "        USB (vfat)");
         // The folder and the folder inside it.
@@ -732,8 +732,8 @@ mod tests {
         });
         let at = labels
             .iter()
-            .position(|l| l == "    ▾ Discos")
-            .expect("the devices hang under Música Local");
+            .position(|l| l == "    ▾ Devices")
+            .expect("the devices hang under Local Music");
         assert_eq!(entries[at + 1], Entry::Source(0));
         assert_eq!(labels[at + 1], "        ▸ C: (OS)");
         // Its folder, under it.
@@ -841,19 +841,19 @@ mod tests {
         assert_eq!(l[6], "    All Tracks");
         let at = l
             .iter()
-            .position(|x| x == "    ▾ Discos")
-            .expect("the devices hang under Música Local");
+            .position(|x| x == "    ▾ Devices")
+            .expect("the devices hang under Local Music");
         assert_eq!(
             &l[at..],
             [
-                "    ▾ Discos",
+                "    ▾ Devices",
                 "        USB (vfat)",
                 "            All tracks",
                 "            ▸ Set",
                 "                Inner",
                 "        SD",
-                "▾ Música en Línea",
-                "▸ Carpetas Favoritas",
+                "▾ Online Music",
+                "▸ Favorites",
                 "▾ Downloaded",
                 "▸ iTunes",
                 "    All tracks",

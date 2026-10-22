@@ -34,10 +34,10 @@ fn related_shown(p: &prefs::Prefs) -> bool {
 
 /// Chooses `t` (track panel, the deck-side callback) and loads it into the first deck that is not playing.
 pub(super) fn load_to_deck(app: &App, on_track: &dyn Fn(&Track), t: &Track) {
-    // Si la pista ya está en la colección y viene de un plugin (YouTube, Deezer…), avisar.
+    // A track already in the Collection that comes from a plugin (YouTube, Deezer…): say so instead of loading it twice.
     if t.id.is_some() && t.remote.is_some() {
         app.global::<BrowserState>()
-            .set_status("esta pista ya está en la Colección".into());
+            .set_status("this track is already in the Collection".into());
     }
     trackinfo::show(app, t);
     on_track(t);

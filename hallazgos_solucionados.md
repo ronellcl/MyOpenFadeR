@@ -385,5 +385,6 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 - **Los stems no se separan dos veces**: al recargar la misma pista (o un INSTANT DOUBLE) se reutilizan los stems que ya están en memoria si la caché encaja en frames y rejilla.
 - **Memory cues como barras anchas con bandera M**: se distinguen de los hot cues de un vistazo y usan el color `Theme.memory-cue` del tema.
 - **Salida de reloj MIDI**: PREFERENCIAS > CONTROLADOR > OTHERS > MIDI CLOCK OUT toma parte del nombre de un puerto de salida y manda 24 PPQN al tempo y beat de la mesa líder, START en su siguiente compás y STOP cuando no suena ninguna; si el aparato se desconecta, el hilo reabre el puerto solo.
-- **Tests**: los del navegador vuelven a pasar (árbol plegable, secciones Música Local / Música en Línea / Carpetas Favoritas y origen de la Colección); `cargo test --bin` queda en verde.
+- **El árbol habla un solo idioma**: las secciones y los mensajes del navegador pasan a inglés (Local Music, Devices, Online Music, Search, Downloads, Favorites, Downloaded), y las casillas de Preferencias llevan su traducción al español en la tabla de idioma; las carpetas del sistema se llaman Music / Videos / Desktop.
+- **Tests**: los del navegador vuelven a pasar (árbol plegable, secciones Local Music / Devices / Online Music / Favorites y origen de la Colección); `cargo test --bin` queda en verde.
 

@@ -232,9 +232,9 @@ pub fn collect(old: Vec<Source>, media_explorer: bool) -> Vec<Source> {
     // The system folders the user can browse: Music, Videos, Desktop. Read-only, like a volume's folders.
     let home = openfader::paths::home().unwrap_or_default();
     let system_folders: Vec<(&str, PathBuf)> = vec![
-        ("Música", home.join("Music")),
-        ("Vídeos", home.join("Videos")),
-        ("Escritorio", home.join("Desktop")),
+        ("Music", home.join("Music")),
+        ("Videos", home.join("Videos")),
+        ("Desktop", home.join("Desktop")),
     ];
     for (label, path) in system_folders {
         if path.is_dir() {
@@ -594,10 +594,10 @@ impl View {
                 "Devices: the disks of the machine: choose a device to open it and its window (eject, sync, backup, update collection …); the local disk is browsed by its folders"
             }
             Entry::LocalMusicRoot => {
-                "Música Local: folders of Windows (Music, Videos, Desktop) and disks: choose one to browse its files"
+                "Local Music: folders of Windows (Music, Videos, Desktop) and disks: choose one to browse its files"
             }
             Entry::OnlineMusicRoot => {
-                "Música en Línea: cloud plugins (Deezer, YouTube, SoundCloud): choose one to see Search, Downloads and its playlists"
+                "Online Music: cloud plugins (Deezer, YouTube, SoundCloud): choose one to see Search, Downloads and its playlists"
             }
             Entry::Source(_) => {
                 "Choose All tracks or a playlist; IMPORT TO COLLECTION (File and Track menus) adds what you choose to the Collection"

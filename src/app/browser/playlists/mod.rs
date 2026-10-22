@@ -160,8 +160,8 @@ impl View {
                 ("Favorites", p.view.media_favorites),
                 ("Downloaded", p.view.media_downloaded),
                 ("Devices", p.view.media_devices),
-                ("Música Local", p.view.media_local_music),
-                ("Música en Línea", p.view.media_online_music),
+                ("Local Music", p.view.media_local_music),
+                ("Online Music", p.view.media_online_music),
                 ("Explorer", p.view.media_explorer),
             ]
             .iter()

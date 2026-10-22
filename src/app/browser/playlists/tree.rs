@@ -264,7 +264,7 @@ impl View {
                     self.rebuild(app);
                 }
             }
-            // Root sections: click folds/unfolds their children (History, Tags, Devices, Downloaded, Música Local, Música en Línea).
+            // Root sections: click folds/unfolds their children (History, Tags, Devices, Downloaded, Local Music, Online Music).
             Entry::HistoryRoot | Entry::TagsRoot | Entry::DevicesRoot | Entry::DownloadedRoot | Entry::LocalMusicRoot | Entry::OnlineMusicRoot => {
                 if !self.folded_sections.remove(&e) {
                     self.folded_sections.insert(e);
@@ -332,10 +332,10 @@ impl View {
             Entry::Session => "Session history".to_owned(),
             Entry::Dupes => "Duplicate tracks".to_owned(),
             Entry::CueAnalysis => "CUE Analysis".to_owned(),
-            Entry::LocalMusicRoot => "Música Local".to_owned(),
-            Entry::OnlineMusicRoot => "Música en Línea".to_owned(),
-            Entry::DevicesRoot => "Discos".to_owned(),
-            Entry::FavoritesRoot => "Carpetas Favoritas".to_owned(),
+            Entry::LocalMusicRoot => "Local Music".to_owned(),
+            Entry::OnlineMusicRoot => "Online Music".to_owned(),
+            Entry::DevicesRoot => "Devices".to_owned(),
+            Entry::FavoritesRoot => "Favorites".to_owned(),
             Entry::DownloadedRoot => "Downloaded".to_owned(),
             Entry::SystemFolder(i) => self
                 .sources
