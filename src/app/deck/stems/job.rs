@@ -29,6 +29,47 @@ fn now_s() -> u64 {
     FIRST_TICK.elapsed().as_secs()
 }
 
+/// Whether the cached stems for `pcm` match this track's rate, length and grid quality: reusable without re-separation.
+fn compatible_stems(stems: &audio::Stems, pcm: &audio::Track16, fast: bool) -> bool {
+    let quality = openfader::stems::separate::grid(pcm.rate, Quality::Quality);
+    let speed = openfader::stems::separate::grid(pcm.rate, Quality::Speed);
+    stems.is_complete()
+        && stems.frames() == pcm.frames()
+        && (stems.grid() == quality || (fast && stems.grid() == speed))
+}
+
+/// Attach already-read stems to this deck's player when they match the current track/quality: no re-separation needed.
+pub(in crate::app::deck) fn stems_attach_completed(
+    dev: &Deck,
+    file: PathBuf,
+    pcm: Arc<audio::Track16>,
+    stems: Arc<audio::Stems>,
+) -> bool {
+    let enabled = prefs::with(|p| p.stems);
+    let same_file = dev
+        .loaded
+        .borrow()
+        .track
+        .as_ref()
+        .and_then(|t| t.file.as_ref())
+        .is_some_and(|f| *f == file);
+    let same_pcm = dev.with_player(|p| Arc::ptr_eq(&p.pcm(), &pcm)).unwrap_or(false);
+    let fast = prefs::with(|p| p.stems_fast);
+    let compatible = compatible_stems(&stems, &pcm, fast);
+    if !enabled || !same_file || !same_pcm || !compatible {
+        return false;
+    }
+    if !dev.attach_stems(&stems) {
+        return false;
+    }
+    let mut s = dev.stems.borrow_mut();
+    s.complete = true;
+    s.text = "100% READY".into();
+    drop(s);
+    dev.show_stems();
+    true
+}
+
 /// Every deck tick (`busy`: this deck has a job): after [`IDLE_S`] without a job on any deck, the engines are closed, off the
 /// UI thread (closing waits for a segment in flight). The next load opens them again ([`Deck::stems_warm`]).
 fn engines_tick(busy: bool) {
@@ -162,6 +203,13 @@ impl Deck {
         };
         match result {
             Ok(stems) => {
+                if let Some(stems) = stems {
+                    let ready = self.stems.borrow().ready;
+                    if !ready && !self.attach_stems(&stems) {
+                        self.stems_clear_job();
+                        return;
+                    }
+                }
                 {
                     let mut s = self.stems.borrow_mut();
                     (s.complete, s.text) = (true, "100% READY".into());
@@ -176,6 +224,7 @@ impl Deck {
                 self.double.set(None);
                 self.with_player(|p| p.set_stems(None).ok());
                 let mut s = self.stems.borrow_mut();
+                s.attached = None;
                 s.ready = false;
                 s.text = if e.starts_with("STEMS model") {
                     "NO MODEL".into()

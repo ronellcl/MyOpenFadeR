@@ -26,6 +26,7 @@ use crate::app::prefs;
 use openfader::audio::{BASS, DRUMS, INST, STEM_COUNT, VOCAL};
 use openfader::stems::Job;
 use slint::{ComponentHandle, ModelRc, VecModel};
+use std::sync::Arc;
 
 /// Player gains of VOCAL, INST, BASS, DRUMS from the mute buttons and the three isolator knobs (VOCAL, INST, DRUMS; 0..=1; the
 /// mixer shows them as INST, VOCAL, DRUMS, see `mixer::channel`).
@@ -113,6 +114,8 @@ pub(super) struct State {
     ready: bool,
     /// The separation finished: every frame has its stems (the stem waveform and INSTANT DOUBLES wait for it).
     complete: bool,
+    /// Attached stems ready for reuse: same track/quality/rate means no re-separation needed.
+    attached: Option<Arc<audio::Stems>>,
     /// Muted by the buttons / pads / controller (true = silent).
     mute: [bool; STEM_COUNT],
     /// The mixer's isolator knobs: VOCAL, INST, DRUMS.
@@ -131,6 +134,7 @@ impl Default for State {
             job: None,
             ready: false,
             complete: false,
+            attached: None,
             mute: [false; STEM_COUNT],
             iso: [1.0; 3],
             text: String::new(),
@@ -210,6 +214,7 @@ impl Deck {
         {
             let mut s = self.stems.borrow_mut();
             s.job = None;
+            s.attached = None;
             (s.ready, s.complete, s.focus) = (false, false, None);
             s.text.clear();
             if prefs::with(|p| p.stems_reset) {
