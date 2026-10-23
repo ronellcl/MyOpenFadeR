@@ -30,7 +30,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Companions (plugins, themes, mappings)
         run: |
-          git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Plugins.git extension/plugin
+          # The plugins of this fork: they build against this core's SDK (the upstream's main has moved on to a newer
+          # plugin API that this fork does not have yet).
+          git clone --depth 1 https://github.com/ronellcl/MyOpenFadeR-Plugins.git extension/plugin
           git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
           git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
       - name: System libraries

@@ -22,9 +22,11 @@ if [ "${1:-}" = --uninstall ]; then
 fi
 
 cd "$root"
-for pair in extension/plugin:OpenFadeR-Plugins extension/skin:OpenFadeR-Themes mappings:OpenFadeR-Map; do
-	[ -e "${pair%%:*}" ] || git clone --quiet "https://github.com/OpenRsG/${pair#*:}.git" "${pair%%:*}"
-done
+# The plugins of this fork build against this core's SDK; the themes and mappings are the upstream's (and the ones the
+# default repository list in src/catalog/list.rs names).
+[ -e extension/plugin ] || git clone --quiet https://github.com/ronellcl/MyOpenFadeR-Plugins.git extension/plugin
+[ -e extension/skin ] || git clone --quiet https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
+[ -e mappings ] || git clone --quiet https://github.com/OpenRsG/OpenFadeR-Map.git mappings
 extension/plugin/build.sh --quiet
 cargo build --release --quiet
 
