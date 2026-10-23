@@ -29,6 +29,22 @@ Todas las capturas de esta página salen de la aplicación en marcha, con una bi
 
 ## Qué añade esta versión
 
+La 0.4.0 reúne lo que esta rama ha añadido desde la 0.3.1:
+
+- **SYNC engancha de una vez.** Los candados de tempo y fase se toman juntos y la corrección se queda dentro de 1 ms, así que sincronizar dos mesas ya no da el tirón que se notaba.
+- **Cada pista vive una sola vez, en 16 bits.** Las mesas, la vista previa del navegador y el análisis en bloque decodifican directamente a muestras de 16 bits (10,6 MB por minuto de estéreo a 44,1 kHz) en vez de guardar una copia f32 de la pista entera, y la huella se calcula mientras se decodifica.
+- **El análisis lee a través de `audio::Frames`.** La rejilla, la onda, la tonalidad y la voz aceptan la pista de 16 bits de una mesa sin copiarla; una pista sin caché se analiza en el acto y se guarda como antes.
+- **La memoria vuelve al sistema.** En glibc el asignador devuelve los búferes de una pista descargada en vez de dejarlos en el heap (274 MB a 203 MB con dos pistas de 6 minutos, en la medición del original).
+- **Build para Raspberry Pi.** `Dockerfile.pi` compila un archivo de 64 bits para Pi 3, 4 y CM4 (Debian 13), con STEMS en la CPU. Ver [docs/raspberry-pi.md](docs/raspberry-pi.md).
+- **MIDI clock de salida.** PREFERENCIAS > CONTROLADOR > OTHERS > MIDI CLOCK OUT envía un reloj de 24 PPQN al tempo y al beat de la mesa líder, con START en su siguiente compás y STOP cuando ya no suena nada.
+- **Memory cues.** Los puntos de memoria se dibujan como barras anchas con una M, junto a los hot cues.
+- **Editar los detalles de una pista.** Un diálogo edita título, artista, álbum, género, comentario, valoración y color sin salir del navegador.
+- **Los stems se reutilizan.** Una pista que ya se separó conserva sus stems al volver a cargarla, y un nuevo camino de enganche arregla la primera carga.
+- **El navegador filtra por origen.** El filtro por origen, las carpetas fijadas y el aviso de duplicados van atados al árbol plegable; las etiquetas del árbol hablan un solo idioma (inglés, o español en las preferencias) y la columna PREVIEW muestra un fotograma fijo en vez de la onda.
+
+<details>
+<summary>Versiones anteriores (0.3.1 y anteriores)</summary>
+
 Esta versión lleva los cambios de esta rama sobre el 0.2.1 original: la interfaz
 en español, un instalador de Windows que no necesita nada más en la máquina,
 ninguna ventana de consola, un motor de vídeo que sigue el ritmo, YouTube con
@@ -54,9 +70,11 @@ escenario VDJ y una ventana que abre a pantalla completa.
 - **Historial con clic derecho.** Clic derecho en una fila de sesión para renombrarla (manteniendo la fecha como clave interna) o eliminarla.
 - **Related tracks con ancla automática.** Si no hay pista elegida al activar Related, toma la primera visible en lugar de mostrar vacío.
 
+</details>
+
 ## Descarga
 
-Coge el archivo de tu sistema en la [página de versiones](https://github.com/OpenRsG/OpenFadeR/releases): Linux (x86_64), Windows (x86_64) o macOS (Apple silicon). Cada uno trae la aplicación con sus temas, mapeos de controlador y plugins. Descomprímelo y ejecuta `openfader` (en macOS: botón derecho sobre `OpenFadeR.app` > Abrir la primera vez, la app no está firmada). Esto es una versión preliminar: cuenta lo que no funcione.
+Coge el archivo de tu sistema en la [página de versiones](https://github.com/ronellcl/MyOpenFadeR/releases): Linux (x86_64), Windows (x86_64) o macOS (Apple silicon). Cada uno trae la aplicación con sus temas, mapeos de controlador y plugins. Descomprímelo y ejecuta `openfader` (en macOS: botón derecho sobre `OpenFadeR.app` > Abrir la primera vez, la app no está firmada). Esto es una versión preliminar: cuenta lo que no funcione.
 
 En Windows hay además un instalador, `OpenFadeR-<versión>-windows-x86_64-setup.exe`: instala el programa para todos los usuarios (pide administrador) con los plugins, los temas, los mapeos de controlador, ffmpeg y un Python para los plugins de Python, añade accesos en el menú Inicio y en el escritorio y aparece en Agregar o quitar programas. Desinstalarlo deja tus ajustes, tu biblioteca y los complementos descargados en tu carpeta de usuario salvo que digas lo contrario. Ni el instalador ni la app están firmados, así que Windows SmartScreen pregunta la primera vez. Ver [packaging/windows](packaging/windows) para construirlo.
 

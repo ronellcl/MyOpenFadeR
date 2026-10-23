@@ -29,6 +29,22 @@ Every screenshot on this page comes from the running app, with a library of synt
 
 ## What this version adds
 
+0.4.0 gathers what this branch has added since 0.3.1:
+
+- **SYNC locks at once.** The tempo and phase locks are taken together and the correction stays within a millisecond, so syncing two decks no longer pulls the mix.
+- **Each track lives once, in 16 bits.** Decks, the browser preview and batch analysis decode straight to 16-bit samples (10.6 MB per minute of stereo at 44.1 kHz) instead of keeping an f32 copy of the whole track, and the fingerprint is computed while decoding.
+- **Analysis reads through `audio::Frames`.** Grid, waveform, key and voice analysis accept the deck's 16-bit track without copying it; a track with no cache is analysed on the spot and stored as before.
+- **The memory goes back to the system.** On glibc the allocator returns the buffers of an unloaded track instead of keeping them in the heap (274 MB to 203 MB with two six-minute tracks in the upstream measurement).
+- **A Raspberry Pi build.** `Dockerfile.pi` cross-compiles a 64-bit archive for the Pi 3, 4 and CM4 (Debian 13), with STEMS on the CPU. See [docs/raspberry-pi.md](docs/raspberry-pi.md).
+- **MIDI clock out.** PREFERENCES > CONTROLLER > OTHERS > MIDI CLOCK OUT sends a 24 PPQN clock at the lead deck's tempo and beat, with START on its next bar line and STOP when nothing plays.
+- **Memory cues.** Memory points are drawn as wide bars with an M flag, next to the hot cues.
+- **Edit track details.** A dialog edits title, artist, album, genre, comment, rating and colour without leaving the browser.
+- **Stems are reused.** A track that was already separated keeps its stems when it is loaded again, and a new attach path fixes the first load.
+- **The browser filters by origin.** The origin filter, the pinned folders and the duplicate notice are wired to the foldable tree; the tree labels speak one language (English, or Spanish in the preferences), and the PREVIEW column shows a still frame instead of the waveform.
+
+<details>
+<summary>Earlier releases (0.3.1 and before)</summary>
+
 This release carries the changes of this branch on top of the upstream 0.2.1: the
 interface in Spanish, a Windows installer that needs nothing else on the machine,
 no console windows, a video engine that keeps up with the music, YouTube with
@@ -54,9 +70,11 @@ and a window that opens full screen.
 - **History right-click.** Right-click a session row to rename it (keeping its date as the key) or delete it.
 - **Related tracks auto-anchor.** If no track is chosen when Related turns on, it anchors on the first visible track instead of showing nothing.
 
+</details>
+
 ## Download
 
-Get the archive for your system from the [releases page](https://github.com/OpenRsG/OpenFadeR/releases): Linux (x86_64), Windows (x86_64) or macOS (Apple silicon). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `OpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
+Get the archive for your system from the [releases page](https://github.com/ronellcl/MyOpenFadeR/releases): Linux (x86_64), Windows (x86_64) or macOS (Apple silicon). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `OpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
 
 On Windows there is also an installer, `OpenFadeR-<version>-windows-x86_64-setup.exe`: it installs the program for all users (it asks for administrator) with the plugins, themes, controller mappings, ffmpeg and a Python for the Python plugins, adds Start menu and desktop shortcuts and appears in Add/Remove Programs. Uninstalling leaves your settings, library and downloaded add-ons in your user folder unless you say otherwise. Neither it nor the app is signed, so Windows SmartScreen asks the first time. See [packaging/windows](packaging/windows) to build it.
 
