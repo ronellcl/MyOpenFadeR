@@ -45,6 +45,8 @@ COPY . .
 RUN for pair in "extension/plugin ronellcl/MyOpenFadeR-Plugins $PLUGINS_REF" "extension/skin OpenRsG/OpenFadeR-Themes $THEMES_REF" "mappings OpenRsG/OpenFadeR-Map $MAPPINGS_REF"; do \
       set -- $pair; [ -e "$1/.git" ] || [ -n "$(ls -A "$1" 2>/dev/null)" ] || git clone --quiet --depth 1 --branch "$3" "https://github.com/$2.git" "$1"; \
     done
+# The fork's plugins pin the SDK to a released tag; patch it to this checkout's sdk/.
+RUN [ -e extension/plugin/.cargo/config.toml ] || { mkdir -p extension/plugin/.cargo && printf '[patch."https://github.com/OpenRsG/OpenFadeR"]\nopenfader-plugin = { path = "../../sdk" }\n' > extension/plugin/.cargo/config.toml; }
 
 # The native plugins (their own workspace), then the app without the GPU STEMS engine (no ONNX Runtime WebGPU build for ARM Linux).
 RUN --mount=type=cache,target=/usr/local/cargo/registry \

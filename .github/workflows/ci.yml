@@ -39,9 +39,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Companions (plugins, themes, mappings)
         run: |
-          # The plugins of this fork: they build against this core's SDK (the upstream's main has moved on to a newer
-          # plugin API that this fork does not have yet).
+          # The plugins of this fork: they are ahead of the released SDK tag and use the API this core's sdk/ has, so
+          # after cloning them the pin is patched to this checkout (their README's documented way). The upstream's
+          # plugins are not used: their mixxx plugin needs a newer plugin API this core does not have yet.
           git clone --depth 1 --branch "${{ inputs.plugins_ref || 'main' }}" https://github.com/ronellcl/MyOpenFadeR-Plugins.git extension/plugin
+          mkdir -p extension/plugin/.cargo
+          printf '[patch."https://github.com/OpenRsG/OpenFadeR"]\nopenfader-plugin = { path = "../../sdk" }\n' > extension/plugin/.cargo/config.toml
           git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
           git clone --depth 1 https://github.com/OpenRsG/OpenFadeR-Map.git mappings
       - name: System libraries

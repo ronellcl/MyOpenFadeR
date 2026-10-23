@@ -25,6 +25,11 @@ cd "$root"
 # The plugins of this fork build against this core's SDK; the themes and mappings are the upstream's (and the ones the
 # default repository list in src/catalog/list.rs names).
 [ -e extension/plugin ] || git clone --quiet https://github.com/ronellcl/MyOpenFadeR-Plugins.git extension/plugin
+# The plugins pin the SDK to a released tag; patch it to this checkout's sdk/ (they use the API it has).
+if [ ! -e extension/plugin/.cargo/config.toml ]; then
+	mkdir -p extension/plugin/.cargo
+	printf '[patch."https://github.com/OpenRsG/OpenFadeR"]\nopenfader-plugin = { path = "../../sdk" }\n' >extension/plugin/.cargo/config.toml
+fi
 [ -e extension/skin ] || git clone --quiet https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
 [ -e mappings ] || git clone --quiet https://github.com/OpenRsG/OpenFadeR-Map.git mappings
 extension/plugin/build.sh --quiet
