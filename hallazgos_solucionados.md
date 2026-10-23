@@ -388,3 +388,13 @@ Notas de entorno (preexistentes, no del trabajo hecho):
 - **El árbol habla un solo idioma**: las secciones y los mensajes del navegador pasan a inglés (Local Music, Devices, Online Music, Search, Downloads, Favorites, Downloaded), y las casillas de Preferencias llevan su traducción al español en la tabla de idioma; las carpetas del sistema se llaman Music / Videos / Desktop.
 - **Tests**: los del navegador vuelven a pasar (árbol plegable, secciones Local Music / Devices / Online Music / Favorites y origen de la Colección); `cargo test --bin` queda en verde.
 
+### De la séptima tanda (22/10/2026): SYNC y memoria - HECHO
+
+- **SYNC engancha de una vez**: los candados de tempo y fase se toman juntos y la corrección se queda dentro de 1 ms, sin el tirón que se notaba al sincronizar dos mesas (`6f43923`).
+- **Cada pista vive una sola vez, en 16 bits**: decks, preview del navegador y análisis en bloque decodifican directamente a `Track16` (10,6 MB por minuto de estéreo a 44,1 kHz) y ya no construyen una copia f32 de la pista entera; la huella se calcula en streaming mientras se decodifica (`695bcd3`).
+- **El análisis lee a través de `audio::Frames`**: `analyze`, grid, waveform, tonalidad y voz aceptan tanto el PCM f32 como el `Track16` de un deck, sin copiarlo; una pista sin caché se analiza en el acto y el resultado se guarda igual que antes.
+- **La memoria vuelve al sistema**: en glibc, `mallopt` fija el umbral de mmap y poda los arenas de los hilos, así que los buffers de una pista descargada no se quedan en el heap (medido por el original: 274 MB → 203 MB con dos pistas de 6 minutos).
+- **STEMS en CPU y build para Raspberry Pi**: el feature `stems-gpu` (WebGPU) es opcional; `--no-default-features --features app` compila STEMS solo con CPU, y el perfil `pi` + `Dockerfile.pi` producen el archivo aarch64 para Pi 3/4/CM4 (Debian 13). El perfil `dist` ya recorta los símbolos.
+- **Verificación**: release nuevo, «The War Song» cargada y reproducida (117,18 BPM, 9B, auto-gain, waveform, STEMS al 100 %), análisis fresco de esa pista sobre `Track16` (caché reescrita, sin errores) y las cinco vistas abiertas: SAMPLER, BEAT LAB, EDIT, VIDEO (BETA) y LIGHTING (Art-Net a 127.0.0.1 a 40 Hz).
+- **Tests**: `cargo test --bin openfader` 491 ok (1 ignorado); `cargo test --lib` 577 ok y los 13 fallos preexistentes de `plugin::` (`sh` en el PATH).
+

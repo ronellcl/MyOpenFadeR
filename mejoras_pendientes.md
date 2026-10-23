@@ -246,3 +246,21 @@ Lo cerrado:
 - Preview de vídeo en la columna PREVIEW (un fotograma en vez de la onda).
 - Aviso de duplicado al importar ("esta pista ya está en la Colección").
 - La estrella de la fila fijable con el clic (hoy se fija con el botón FAV y la estrella es solo la marca).
+
+## 15. Séptima tanda (22/10/2026): SYNC y memoria - HECHO
+
+Lo cerrado:
+
+| ID | Lo que se hizo | Commit |
+|----|----------------|--------|
+| SYNC-01 | SYNC toma los candados de tempo/fase juntos y se mantiene dentro de 1 ms | 6f43923 |
+| MEM-01 | Decodificación directa a `Track16` (decks, preview y análisis en bloque) y huella en streaming, sin copia f32 de la pista entera | 695bcd3 |
+| MEM-02 | Análisis genérico sobre `audio::Frames` (grid, waveform, tonalidad, voz, caché) para analizar un `Track16` sin copiarlo | 695bcd3 |
+| MEM-03 | `mallopt` en glibc, perfil `pi`, `Dockerfile.pi`, `stems-gpu` opcional (STEMS en CPU en ARM Linux) y `dist` sin símbolos | 695bcd3 |
+
+Notas:
+
+- El puerto se hizo sin la maquinaria de cancelación/bulk del original: se conserva el análisis local y el refactor mínimo sobre `Frames`/`Track16`.
+- `6f43923` y `695bcd3` están en local, sin push todavía.
+- Descartado por decisión del usuario: el preview de vídeo por fotograma (F5-2); `85131bd` no se revierte.
+- La versión, los instaladores y la release se tocan solo cuando se pidan.
