@@ -147,7 +147,7 @@ pub fn rows(p: &Prefs) -> Vec<Row> {
         Row::chips(
             "grid_source",
             "BEAT GRID AND CUES FROM",
-            &["THE CONNECTED LIBRARY", "OPENFADER ANALYSIS"],
+            &["THE CONNECTED LIBRARY", "MYOPENFADER ANALYSIS"],
             a.grid_source as usize,
         )
         .hint("your own edits win over both"),

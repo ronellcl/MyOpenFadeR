@@ -68,7 +68,7 @@ jobs:
           mkdir -p out
           case "${{ matrix.name }}" in
           linux)
-            d=openfader-$VERSION-linux-x86_64
+            d=MyOpenFadeR-$VERSION-linux-x86_64
             mkdir "$d"
             cp target/dist/openfader "$d/"
             cp -L target/dist/*.so* "$d/"
@@ -78,7 +78,7 @@ jobs:
             tar czf "out/$d.tar.gz" "$d"
             ;;
           windows)
-            d=openfader-$VERSION-windows-x86_64
+            d=MyOpenFadeR-$VERSION-windows-x86_64
             mkdir "$d"
             cp target/dist/openfader.exe "$d/"
             cp target/dist/*.dll "$d/"
@@ -89,7 +89,7 @@ jobs:
             7z a -tzip "out/$d.zip" "$d" > /dev/null
             ;;
           macos)
-            d=OpenFadeR.app
+            d=MyOpenFadeR.app
             mkdir -p "$d/Contents/MacOS" "$d/Contents/Resources"
             cp target/dist/openfader "$d/Contents/MacOS/"
             cp -L target/dist/*.dylib "$d/Contents/MacOS/"
@@ -101,8 +101,8 @@ jobs:
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-            <key>CFBundleName</key><string>OpenFadeR</string>
-            <key>CFBundleDisplayName</key><string>OpenFadeR</string>
+            <key>CFBundleName</key><string>MyOpenFadeR</string>
+            <key>CFBundleDisplayName</key><string>MyOpenFadeR</string>
             <key>CFBundleIdentifier</key><string>org.openrsg.openfader</string>
             <key>CFBundleExecutable</key><string>openfader</string>
             <key>CFBundleIconFile</key><string>openfader</string>
@@ -112,13 +112,13 @@ jobs:
             <key>LSMinimumSystemVersion</key><string>11.0</string>
             <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
             <key>NSHighResolutionCapable</key><true/>
-            <key>NSMicrophoneUsageDescription</key><string>OpenFadeR records from an audio input when you use REC or the microphone.</string>
+            <key>NSMicrophoneUsageDescription</key><string>MyOpenFadeR records from an audio input when you use REC or the microphone.</string>
           </dict>
           </plist>
           EOF
             # Ad-hoc signature (no developer identity): Apple silicon wants every program signed at least this way.
             codesign --force --deep -s - "$d"
-            ditto -c -k --keepParent "$d" "out/OpenFadeR-$VERSION-macos-arm64.zip"
+            ditto -c -k --keepParent "$d" "out/MyOpenFadeR-$VERSION-macos-arm64.zip"
             ;;
           esac
           ls -l out
@@ -139,13 +139,13 @@ jobs:
           ls
       - name: Smoke test of the packaged app (Linux, under Xvfb)
         if: matrix.name == 'linux'
-        run: xvfb-run -a -s "-screen 0 1600x1000x24" bash .github/smoke.sh unpacked/openfader-*/openfader smoke
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" bash .github/smoke.sh unpacked/MyOpenFadeR-*/openfader smoke
       - name: Smoke test of the packaged app
         if: matrix.name == 'windows'
-        run: bash .github/smoke.sh unpacked/openfader-*/openfader.exe smoke
+        run: bash .github/smoke.sh unpacked/MyOpenFadeR-*/openfader.exe smoke
       - name: Smoke test of the packaged app (macOS)
         if: matrix.name == 'macos'
-        run: bash .github/smoke.sh unpacked/OpenFadeR.app/Contents/MacOS/openfader smoke
+        run: bash .github/smoke.sh unpacked/MyOpenFadeR.app/Contents/MacOS/openfader smoke
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -176,8 +176,8 @@ jobs:
           body: |
             Archives (each holds the app with its themes, controller mappings and plugins, ready to run):
 
-            - **Linux** (x86_64): `openfader-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
-            - **Windows** (x86_64): `openfader-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
-            - **macOS** (Apple silicon): `OpenFadeR-<version>-macos-arm64.zip` holds `OpenFadeR.app`. It is **not signed or notarized**: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/OpenFadeR.app`.
+            - **Linux** (x86_64): `MyOpenFadeR-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
+            - **Windows** (x86_64): `MyOpenFadeR-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
+            - **macOS** (Apple silicon): `MyOpenFadeR-<version>-macos-arm64.zip` holds `MyOpenFadeR.app`. It is **not signed or notarized**: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/MyOpenFadeR.app`.
 
             Optional: `ffmpeg` on the PATH for video; `python` (3) for the Python plugins. Volume sliders of the audio page exist on Linux only: on Windows and macOS the volume is the system's.

@@ -1,4 +1,4 @@
-﻿; OpenFadeR for Windows: the program with its plugins, themes, mappings, ffmpeg and a Python for the Python plugins.
+﻿; MyOpenFadeR for Windows: the program with its plugins, themes, mappings, ffmpeg and a Python for the Python plugins.
 ;
 ; Compiled by build-installer.ps1, which stages the payload and passes:
 ;   -DPAYLOAD=<folder>   what ends up next to openfader.exe
@@ -15,10 +15,10 @@ Unicode true
 SetCompressor /SOLID lzma
 SetCompressorDictSize 64
 
-!define APP_NAME "OpenFadeR"
+!define APP_NAME "MyOpenFadeR"
 !define APP_EXE "openfader.exe"
 !define APP_PUBLISHER "OpenRsG"
-!define APP_URL "https://github.com/OpenRsG/OpenFadeR"
+!define APP_URL "https://github.com/ronellcl/MyOpenFadeR"
 
 !ifndef VERSION
   !define VERSION "0.1.0"
@@ -27,7 +27,7 @@ SetCompressorDictSize 64
   !error "PAYLOAD is not set: run build-installer.ps1 (it stages the payload and calls makensis)."
 !endif
 !ifndef OUTFILE
-  !define OUTFILE "OpenFadeR-${VERSION}-windows-x86_64-setup.exe"
+  !define OUTFILE "MyOpenFadeR-${VERSION}-windows-x86_64-setup.exe"
 !endif
 
 Name "${APP_NAME} ${VERSION}"
@@ -73,20 +73,20 @@ VIAddVersionKey "LegalCopyright" "GPL-3.0"
 !define MUI_FINISHPAGE_NOREBOOTSUPPORT
 
 ; Every text the wizard shows, in both languages (1034 Spanish, 1033 English: the ids those language files use).
-LangString RUN_TEXT 1034 "Abrir OpenFadeR"
-LangString RUN_TEXT 1033 "Run OpenFadeR"
-LangString SEC_APP 1034 "OpenFadeR (programa, plugins, temas, mapeos, ffmpeg y Python)"
-LangString SEC_APP 1033 "OpenFadeR (program, plugins, themes, mappings, ffmpeg and Python)"
+LangString RUN_TEXT 1034 "Abrir MyOpenFadeR"
+LangString RUN_TEXT 1033 "Run MyOpenFadeR"
+LangString SEC_APP 1034 "MyOpenFadeR (programa, plugins, temas, mapeos, ffmpeg y Python)"
+LangString SEC_APP 1033 "MyOpenFadeR (program, plugins, themes, mappings, ffmpeg and Python)"
 LangString SEC_APP_DESC 1034 "El programa y todo lo que necesita: plugins (yt-dlp, importadores de rekordbox/Serato/Traktor/VirtualDJ/iTunes/Engine, Beat FX), temas, mapeos de controladoras, ffmpeg y Python para los plugins."
 LangString SEC_APP_DESC 1033 "The program and everything it needs: plugins (yt-dlp, rekordbox/Serato/Traktor/VirtualDJ/iTunes/Engine importers, Beat FX), themes, controller mappings, ffmpeg and Python for the Python plugins."
 LangString SEC_DESKTOP 1034 "Acceso directo en el escritorio"
 LangString SEC_DESKTOP 1033 "Desktop shortcut"
-LangString SEC_DESKTOP_DESC 1034 "Un icono de OpenFadeR en el escritorio."
-LangString SEC_DESKTOP_DESC 1033 "An OpenFadeR icon on the desktop."
-LangString UNINST_SHORTCUT 1034 "Desinstalar OpenFadeR"
-LangString UNINST_SHORTCUT 1033 "Uninstall OpenFadeR"
-LangString IN_USE 1034 "OpenFadeR está abierto y no se puede cerrar. Ciérralo y pulsa Reintentar."
-LangString IN_USE 1033 "OpenFadeR is running and could not be closed. Close it and press Retry."
+LangString SEC_DESKTOP_DESC 1034 "Un icono de MyOpenFadeR en el escritorio."
+LangString SEC_DESKTOP_DESC 1033 "A MyOpenFadeR icon on the desktop."
+LangString UNINST_SHORTCUT 1034 "Desinstalar MyOpenFadeR"
+LangString UNINST_SHORTCUT 1033 "Uninstall MyOpenFadeR"
+LangString IN_USE 1034 "MyOpenFadeR está abierto y no se puede cerrar. Ciérralo y pulsa Reintentar."
+LangString IN_USE 1033 "MyOpenFadeR is running and could not be closed. Close it and press Retry."
 LangString UNINST_DATA 1034 "¿Borrar también tu configuración, biblioteca y add-ons descargados? Están en tu carpeta de usuario, no en la del programa.$\r$\n$\r$\nSí = borrar todo · No = conservar tu música y tus ajustes (recomendado)."
 LangString UNINST_DATA 1033 "Also delete your settings, library and downloaded add-ons? They live in your user folder, not in the program folder.$\r$\n$\r$\nYes = delete everything · No = keep your music and settings (recommended)."
 

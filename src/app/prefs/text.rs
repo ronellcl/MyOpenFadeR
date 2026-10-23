@@ -109,7 +109,7 @@ impl Prefs {
     /// The settings file text; `parse(to_text())` gives the same `Prefs`.
     pub fn to_text(&self) -> String {
         let mut s = String::from(
-            "# OpenFadeR settings, one `key = value` per line (rewritten on every change)\n",
+            "# MyOpenFadeR settings, one `key = value` per line (rewritten on every change)\n",
         );
         let mut line = |k: &str, v: &str| {
             s.push_str(k);

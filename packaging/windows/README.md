@@ -1,7 +1,7 @@
 # Windows installer
 
 `build-installer.ps1` stages everything the program finds next to `openfader.exe` and compiles `openfader.nsi` with
-[NSIS](https://nsis.sourceforge.io) into `dist\windows\OpenFadeR-<version>-windows-x86_64-setup.exe`.
+[NSIS](https://nsis.sourceforge.io) into `dist\windows\MyOpenFadeR-<version>-windows-x86_64-setup.exe`.
 
 ## What goes in
 
@@ -56,7 +56,7 @@ script is checked on a machine that cannot elevate:
 
 ```powershell
 .\packaging\windows\build-installer.ps1 -PerUser -SkipBuild -PythonDir ... -Makensis ...
-Start-Process .\dist\windows\OpenFadeR-0.1.0-windows-x86_64-setup-peruser.exe -ArgumentList /S -Wait
+Start-Process .\dist\windows\MyOpenFadeR-0.1.0-windows-x86_64-setup-peruser.exe -ArgumentList /S -Wait
 # ... start the app from %LOCALAPPDATA%\Programs\OpenFadeR and use it ...
 Start-Process "$env:LOCALAPPDATA\Programs\OpenFadeR\uninstall.exe" -ArgumentList /S -Wait
 ```

@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
-# OpenFadeR for Raspberry Pi 3 / 4 / CM4 (64-bit Raspberry Pi OS based on Debian 13 "trixie"), cross-compiled on any x86_64 machine:
+# MyOpenFadeR for Raspberry Pi 3 / 4 / CM4 (64-bit Raspberry Pi OS based on Debian 13 "trixie"), cross-compiled on any x86_64 machine:
 #
 #   docker buildx build -f Dockerfile.pi -o dist/pi .
 #
-# writes dist/pi/openfader-<version>-linux-aarch64-pi.tar.gz (the program with its plugins, themes and controller mappings, as a
+# writes dist/pi/MyOpenFadeR-<version>-linux-aarch64-pi.tar.gz (the program with its plugins, themes and controller mappings, as a
 # release archive) and the same folder unpacked. The cargo registry and both target folders live in BuildKit cache mounts: a
 # second build recompiles only what changed. Debian 13, as ONNX Runtime's ARM build (STEMS) needs glibc 2.38 and GCC 14's
 # libstdc++. See docs/raspberry-pi.md.
@@ -53,7 +53,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     extension/plugin/build.sh --quiet \
     && cargo build --locked --quiet --profile pi --no-default-features --features app \
     && v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1) \
-    && d=/out/openfader-$v-linux-aarch64-pi \
+    && d=/out/MyOpenFadeR-$v-linux-aarch64-pi \
     && mkdir -p "$d" \
     && cp target/$TARGET/pi/openfader "$d/" \
     && python3 .github/bundle.py "$d" \

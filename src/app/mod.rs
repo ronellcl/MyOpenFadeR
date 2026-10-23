@@ -148,7 +148,7 @@ pub fn run(
     );
     prefs::audio::wire(); // hands the AUDIO settings to the engine before the decks open the output
     let lib: Rc<dyn Library> = openfader::plugin::source::wrap(inner, plugins::notify(&app)).into(); // plugin sources join the tree, outside the store's overlay
-    app.set_window_title("OpenFadeR".into());
+    app.set_window_title("MyOpenFadeR".into());
     let selected = Rc::new(RefCell::new(None));
     let decks = deck::wire(&app, lib.clone(), selected.clone());
     fx::wire(&app, &decks);

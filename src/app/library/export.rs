@@ -32,7 +32,7 @@ struct Builtin {
 
 const BUILTIN: [Builtin; 3] = [
     Builtin {
-        label: "OpenFadeR JSON (.json)",
+        label: "MyOpenFadeR JSON (.json)",
         ext: "json",
         write: open_format::write_json,
     },

@@ -11,8 +11,8 @@ want to change. It saves you from building something that turns out not to fit.
 ## Setting up
 
 ```bash
-git clone https://github.com/OpenRsG/OpenFadeR.git
-cd OpenFadeR
+git clone https://github.com/ronellcl/MyOpenFadeR.git
+cd MyOpenFadeR
 ./start.sh        # clones the plugins, themes and mappings into place, builds and runs
 ```
 
@@ -41,7 +41,7 @@ visual. CI has to pass before review.
 ## Reporting bugs
 
 Include what you did, what happened, what you expected, and the versions of
-OpenFadeR and your OS. A minimal reproduction is worth more than a
+MyOpenFadeR and your OS. A minimal reproduction is worth more than a
 long description.
 
 ## Code of conduct

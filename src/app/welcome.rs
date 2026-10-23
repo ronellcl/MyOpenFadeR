@@ -58,10 +58,10 @@ pub fn show(app: &App) {
         });
     }
     let intro = if targets.is_empty() {
-        "Switch these on to get the most out of OpenFadeR.".to_owned()
+        "Switch these on to get the most out of MyOpenFadeR.".to_owned()
     } else {
         format!(
-            "These make OpenFadeR fully compatible with {}: its libraries, devices, effects and pad modes.",
+            "These make MyOpenFadeR fully compatible with {}: its libraries, devices, effects and pad modes.",
             targets.join(" and ")
         )
     };
@@ -106,7 +106,7 @@ fn accept(app: &App) {
     let needed = current().restart_needed();
     let restart = names.iter().any(|n| needed.contains(n));
     if restart {
-        done.push("restart OpenFadeR to load their effects and libraries".into());
+        done.push("restart MyOpenFadeR to load their effects and libraries".into());
     }
     s.set_done(format!("{}.", done.join("; ")).into());
     s.set_restart(restart);

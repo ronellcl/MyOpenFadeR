@@ -54,8 +54,8 @@ export { StemsModelState } // STEMS model download (ui/stems-model.slint, src/ap
 /// swaps the stage for the player panels of exportmode.slint. Everything is positioned by hand: the browser takes whatever height is left,
 /// and a layout would feed that back into the window's.
 export component App inherits Window {
-    /// Set by Rust once the library is open ("OpenFadeR — USB (device library) — <root>").
-    in property <string> window-title: "OpenFadeR";
+    /// Set by Rust once the library is open ("MyOpenFadeR — USB (device library) — <root>").
+    in property <string> window-title: "MyOpenFadeR";
     title: root.window-title;
     icon: @image-url("../assets/icon.png");
     preferred-width: 1100px;
@@ -297,7 +297,7 @@ export component App inherits Window {
             title: @tr("Help");
             MenuItem { title: @tr("Keyboard Shortcuts"); activated => { KeysState.help-visible = !KeysState.help-visible; } }
             MenuItem { title: @tr("Welcome"); activated => { WelcomeState.show(); } }
-            MenuItem { title: @tr("About OpenFadeR"); activated => { AboutState.visible = true; } }
+            MenuItem { title: @tr("About MyOpenFadeR"); activated => { AboutState.visible = true; } }
         }
     }
 
@@ -405,9 +405,9 @@ export component App inherits Window {
         width: root.width;
         height: Theme.h-status;
         background: Theme.bg-deep;
-        Text { x: Theme.space-lg; width: 70px; height: parent.height; text: "OpenFadeR"; vertical-alignment: center; color: Theme.text-dim; font-size: Theme.font-size; font-weight: Theme.weight-bold; }
+        Text { x: Theme.space-lg; width: 86px; height: parent.height; text: "MyOpenFadeR"; vertical-alignment: center; color: Theme.text-dim; font-size: Theme.font-size; font-weight: Theme.weight-bold; }
         if BrowserState.load-progress >= 0: Rectangle {
-            x: 90px;
+            x: 100px;
             y: (parent.height - self.height) / 2;
             width: 160px;
             height: 12px;
@@ -416,7 +416,7 @@ export component App inherits Window {
             Rectangle { x: 0; width: parent.width * BrowserState.load-progress; background: Theme.accent; border-radius: Theme.radius; }
         }
         Text {
-            x: BrowserState.load-progress >= 0 ? 260px : 90px;
+            x: BrowserState.load-progress >= 0 ? 270px : 100px;
             width: parent.width - self.x - prog.width - 92px;
             height: parent.height;
             text: BrowserState.load-progress >= 0 ? BrowserState.load-text : AutomixState.running ? AutomixState.status : BrowserState.status;

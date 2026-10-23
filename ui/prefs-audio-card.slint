@@ -86,7 +86,7 @@ component MuteButton inherits Rectangle {
     }
 }
 
-/// Green check: lit = OpenFadeR plays on this card; a click chooses it.
+/// Green check: lit = MyOpenFadeR plays on this card; a click chooses it.
 component SelectCheck inherits Rectangle {
     in property <bool> selected;
     callback clicked;
@@ -109,7 +109,7 @@ component SelectCheck inherits Rectangle {
     Tooltip {
         width: root.width;
         height: root.height;
-        text: root.selected ? "OpenFadeR plays on this device" : "Use this device for OpenFadeR";
+        text: root.selected ? "MyOpenFadeR plays on this device" : "Use this device for MyOpenFadeR";
         hovered: ta.has-hover && !ta.pressed;
     }
 }
@@ -355,7 +355,7 @@ export component AudioCardList inherits VerticalLayout {
         font-size: Theme.font-md;
         font-weight: Theme.weight-bold;
     }
-    Note { text: "The green check is where OpenFadeR plays. Choosing a card or port reopens the output on it."; }
+    Note { text: "The green check is where MyOpenFadeR plays. Choosing a card or port reopens the output on it."; }
     Rectangle {
         height: fl.height;
         fl := Flickable {

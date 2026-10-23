@@ -113,7 +113,7 @@ plugin or a repository means.
   hard caps (paths out of the target, absolute paths, symlinks, entry and size bombs are refused), and every `plugin.json`
   manifest key is known by name — unknown keys are reported, so a manifest cannot quietly mean something else.
 * **When the app tells you.** Installing a plugin from a repository that is not one of the shipped `OpenRsG/*` ones prints
-  this warning on stderr, naming the repository: `installing a third-party plugin. Plugins run inside OpenFadeR with your
+  this warning on stderr, naming the repository: `installing a third-party plugin. Plugins run inside MyOpenFadeR with your
   full user rights; install only repositories and authors you trust.`
 
 

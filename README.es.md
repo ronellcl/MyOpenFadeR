@@ -1,23 +1,23 @@
 <p align="center">
-  <img src="assets/openfader.png" alt="Logotipo de OpenFadeR" width="160">
+  <img src="assets/openfader.png" alt="Logotipo de MyOpenFadeR" width="160">
 </p>
 
-<h1 align="center">OpenFadeR</h1>
+<h1 align="center">MyOpenFadeR</h1>
 
 <p align="center">
-  <img src="docs/media/hero.png" alt="OpenFadeR con dos mesas mezclando, sincronizadas, con ondas, mezclador y navegador de pistas" width="100%">
+  <img src="docs/media/hero.png" alt="MyOpenFadeR con dos mesas mezclando, sincronizadas, con ondas, mezclador y navegador de pistas" width="100%">
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="Licencia: AGPL-3.0" src="https://img.shields.io/github/license/OpenRsG/OpenFadeR"></a>
-  <a href="https://github.com/OpenRsG/OpenFadeR/stargazers"><img alt="Estrellas" src="https://img.shields.io/github/stars/OpenRsG/OpenFadeR?style=flat"></a>
+  <a href="LICENSE"><img alt="Licencia: AGPL-3.0" src="https://img.shields.io/github/license/ronellcl/MyOpenFadeR"></a>
+  <a href="https://github.com/ronellcl/MyOpenFadeR/stargazers"><img alt="Estrellas" src="https://img.shields.io/github/stars/ronellcl/MyOpenFadeR?style=flat"></a>
 </p>
 
 <p align="center">
   <a href="README.md"><b>English</b></a> · <a href="README.es.md"><b>Español</b></a>
 </p>
 
-OpenFadeR es una aplicación de DJ libre para dos o cuatro mesas, escrita en Rust con [Slint](https://slint.dev). Analiza tus pistas, separa stems, mezcla con efectos y un sampler, y lee controladores MIDI de un conjunto creciente de archivos de mapeo. Los temas, los plugins y los mapeos de controlador se instalan desde repositorios de GitHub con un clic.
+MyOpenFadeR es un fork de [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): una aplicación de DJ libre para dos o cuatro mesas, escrita en Rust con [Slint](https://slint.dev). Analiza tus pistas, separa stems, mezcla con efectos y un sampler, y lee controladores MIDI de un conjunto creciente de archivos de mapeo. Los temas, los plugins y los mapeos de controlador se instalan desde repositorios de GitHub con un clic.
 
 <p align="center">
   <img src="docs/media/demo.webp" alt="Cargando dos pistas, sincronizándolas, moviendo el crossfader y cambiando de tema" width="100%">
@@ -52,7 +52,7 @@ imagen, el motor nativo de Deezer, pistas de la nube en la Colección, el
 escenario VDJ y una ventana que abre a pantalla completa.
 
 - **La interfaz en español.** Todos los menús, las páginas de preferencias y las etiquetas de los plugins están traducidos, y PREFERENCIAS > VISTA > IDIOMA elige Sistema, English o Español. Las preferencias que el original añadió últimos (la rejilla de beats en negrita, las marcas de hot cue grandes) también están traducidas.
-- **Un instalador de Windows que lo lleva todo.** `OpenFadeR-<versión>-windows-x86_64-setup.exe` instala el programa para todos los usuarios (pide administrador) con los plugins, los temas, los mapeos de controlador, un ffmpeg ligero, un Python para los plugins de Python y el programa yt-dlp: una máquina recién estrenada no necesita nada más. Ver [packaging/windows](packaging/windows).
+- **Un instalador de Windows que lo lleva todo.** `MyOpenFadeR-<versión>-windows-x86_64-setup.exe` instala el programa para todos los usuarios (pide administrador) con los plugins, los temas, los mapeos de controlador, un ffmpeg ligero, un Python para los plugins de Python y el programa yt-dlp: una máquina recién estrenada no necesita nada más. Ver [packaging/windows](packaging/windows).
 - **Ninguna ventana de consola.** Los plugins usan el intérprete que viaja con el programa, no el lanzador `py`, y todos los ayudantes (ffmpeg, ffprobe, los selectores de fichero) arrancan sin consola: ya no aparece una ventana de Windows Terminal sobre la aplicación.
 - **Vídeo que sigue el ritmo.** Un salto se pone en negro y vuelve con el frame correcto en vez de quedarse congelado en el último, y el ffmpeg que arranca para él es el build ligero (80 ms frente a dos segundos): un salto tarda medio segundo en vez de tres.
 - **YouTube con imagen.** El plugin de yt-dlp descarga H.264 + AAC (los formatos que muestra cualquier reproductor), la imagen llega a la pantalla de cada mesa y a la pantalla maestra, y el plugin se mantiene al día desde la copia que guarda en tu carpeta de usuario.
@@ -74,17 +74,17 @@ escenario VDJ y una ventana que abre a pantalla completa.
 
 ## Descarga
 
-Coge el archivo de tu sistema en la [página de versiones](https://github.com/ronellcl/MyOpenFadeR/releases): Linux (x86_64), Windows (x86_64) o macOS (Apple silicon). Cada uno trae la aplicación con sus temas, mapeos de controlador y plugins. Descomprímelo y ejecuta `openfader` (en macOS: botón derecho sobre `OpenFadeR.app` > Abrir la primera vez, la app no está firmada). Esto es una versión preliminar: cuenta lo que no funcione.
+Coge el archivo de tu sistema en la [página de versiones](https://github.com/ronellcl/MyOpenFadeR/releases): Linux (x86_64), Windows (x86_64) o macOS (Apple silicon). Cada uno trae la aplicación con sus temas, mapeos de controlador y plugins. Descomprímelo y ejecuta `openfader` (en macOS: botón derecho sobre `MyOpenFadeR.app` > Abrir la primera vez, la app no está firmada). Esto es una versión preliminar: cuenta lo que no funcione.
 
-En Windows hay además un instalador, `OpenFadeR-<versión>-windows-x86_64-setup.exe`: instala el programa para todos los usuarios (pide administrador) con los plugins, los temas, los mapeos de controlador, ffmpeg y un Python para los plugins de Python, añade accesos en el menú Inicio y en el escritorio y aparece en Agregar o quitar programas. Desinstalarlo deja tus ajustes, tu biblioteca y los complementos descargados en tu carpeta de usuario salvo que digas lo contrario. Ni el instalador ni la app están firmados, así que Windows SmartScreen pregunta la primera vez. Ver [packaging/windows](packaging/windows) para construirlo.
+En Windows hay además un instalador, `MyOpenFadeR-<versión>-windows-x86_64-setup.exe`: instala el programa para todos los usuarios (pide administrador) con los plugins, los temas, los mapeos de controlador, ffmpeg y un Python para los plugins de Python, añade accesos en el menú Inicio y en el escritorio y aparece en Agregar o quitar programas. Desinstalarlo deja tus ajustes, tu biblioteca y los complementos descargados en tu carpeta de usuario salvo que digas lo contrario. Ni el instalador ni la app están firmados, así que Windows SmartScreen pregunta la primera vez. Ver [packaging/windows](packaging/windows) para construirlo.
 
 ## Compilar desde el código
 
 Necesitas `git` y un [toolchain de Rust](https://rustup.rs).
 
 ```sh
-git clone https://github.com/OpenRsG/OpenFadeR.git
-cd OpenFadeR
+git clone https://github.com/ronellcl/MyOpenFadeR.git
+cd MyOpenFadeR
 ./start.sh ~/Music
 ```
 
@@ -242,7 +242,7 @@ La documentación escribe las carpetas de Linux; las demás siguen la convenció
 | Almacén, análisis, plugins descargados | `~/.local/share/openfader/` | `~/Library/Application Support/openfader/` | `%LOCALAPPDATA%\openfader\` |
 | Cachés (stems, modelos) | `~/.cache/openfader/` | `~/Library/Caches/openfader/` | `%LOCALAPPDATA%\openfader\cache\` |
 
-Los archivos de las versiones traen las carpetas incluidas junto al ejecutable (`OpenFadeR.app/Contents/Resources/` en macOS). Los dispositivos extraíbles se encuentran como palos USB montados por debajo de `/run/media` o `/media` (Linux), letras de unidad extraíbles (Windows) y volúmenes por debajo de `/Volumes` (macOS); la expulsión usa udisks, la petición de expulsión del propio volumen o `diskutil`. Solo Linux tiene los deslizadores de volumen por tarjeta en la página de audio (el mezclador ALSA, el servidor de sonido) y monta por su cuenta un palo enchufado (udisks): en Windows y macOS el volumen es el del sistema y el SO monta el palo. Los selectores de ficheros son zenity o kdialog en Linux, los diálogos de PowerShell en Windows y `osascript` en macOS.
+Los archivos de las versiones traen las carpetas incluidas junto al ejecutable (`MyOpenFadeR.app/Contents/Resources/` en macOS). Los dispositivos extraíbles se encuentran como palos USB montados por debajo de `/run/media` o `/media` (Linux), letras de unidad extraíbles (Windows) y volúmenes por debajo de `/Volumes` (macOS); la expulsión usa udisks, la petición de expulsión del propio volumen o `diskutil`. Solo Linux tiene los deslizadores de volumen por tarjeta en la página de audio (el mezclador ALSA, el servidor de sonido) y monta por su cuenta un palo enchufado (udisks): en Windows y macOS el volumen es el del sistema y el SO monta el palo. Los selectores de ficheros son zenity o kdialog en Linux, los diálogos de PowerShell en Windows y `osascript` en macOS.
 
 El comportamiento del audio, del MIDI y de las carpetas se ajusta con `OPENFADER_OUTPUT_DEVICE`, `OPENFADER_HP_CHANNELS`, `OPENFADER_CUE_DEVICE`, `OPENFADER_MIDI_PORT`, `OPENFADER_MIDI_LOG`, `OPENFADER_JOG_TICKS`, `OPENFADER_TEMPO_INVERT`, `OPENFADER_REC_DIR`, `OPENFADER_EXPORT_DIR`, `OPENFADER_PATH_MAP` (remapeo de rutas de audio, `desde=>hasta;…`) y `OPENFADER_DEVICE_ROOTS` (carpetas extra tratadas como dispositivos).
 
@@ -262,4 +262,4 @@ Los informes de errores, los archivos de mapeo, los temas y los plugins son bien
 
 ## Licencia
 
-AGPL-3.0, ver [LICENSE](LICENSE). Hecho por [OpenRsG](https://github.com/OpenRsG).
+AGPL-3.0, ver [LICENSE](LICENSE). [OpenFadeR](https://github.com/OpenRsG/OpenFadeR) original de [OpenRsG](https://github.com/OpenRsG); MyOpenFadeR lo mantiene [ronellcl](https://github.com/ronellcl).

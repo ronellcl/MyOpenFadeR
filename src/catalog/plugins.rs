@@ -131,7 +131,7 @@ fn warn_third_party(repo: &Repo, plugin: &str) {
         .any(|d| d.eq_ignore_ascii_case(&repo.to_string()));
     if !ours {
         eprintln!(
-            "plugin {plugin} from {repo}: installing a third-party plugin. Plugins run inside OpenFadeR with your full user rights; install only repositories and authors you trust."
+            "plugin {plugin} from {repo}: installing a third-party plugin. Plugins run inside MyOpenFadeR with your full user rights; install only repositories and authors you trust."
         );
     }
 }

@@ -98,7 +98,7 @@ pub(super) fn rows(p: &Prefs) -> Vec<Row> {
                 .unwrap_or(2),
         )
         .hint("length"),
-        Row::header("START-UP (OpenFadeR)"),
+        Row::header("START-UP (MyOpenFadeR)"),
         Row::chips(
             "range",
             "TEMPO RANGE",

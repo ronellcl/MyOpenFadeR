@@ -60,7 +60,7 @@ pub(super) fn rows(p: &Prefs) -> Vec<Row> {
         .hint("on connect"),
         Row::info(
             "MICROPHONE / TALK OVER",
-            "needs a microphone input: OpenFadeR has none",
+            "needs a microphone input: MyOpenFadeR has none",
         ),
     ]
 }

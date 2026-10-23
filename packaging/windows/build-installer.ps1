@@ -209,7 +209,7 @@ Write-Host ("payload: {0} plugins, {1:N1} MB in {2}" -f $count, ($size / 1MB), $
 
 # --- the installer --------------------------------------------------------------------------------------------------
 
-$name = "OpenFadeR-$Version-windows-x86_64-setup"
+$name = "MyOpenFadeR-$Version-windows-x86_64-setup"
 if ($PerUser) { $name += "-peruser" }
 $setup = Join-Path $OutDir "$name.exe"
 

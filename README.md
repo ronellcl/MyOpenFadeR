@@ -1,23 +1,23 @@
 <p align="center">
-  <img src="assets/openfader.png" alt="OpenFadeR logo" width="160">
+  <img src="assets/openfader.png" alt="MyOpenFadeR logo" width="160">
 </p>
 
-<h1 align="center">OpenFadeR</h1>
+<h1 align="center">MyOpenFadeR</h1>
 
 <p align="center">
-  <img src="docs/media/hero.png" alt="OpenFadeR with two decks playing, synced, with waveforms, mixer and track browser" width="100%">
+  <img src="docs/media/hero.png" alt="MyOpenFadeR with two decks playing, synced, with waveforms, mixer and track browser" width="100%">
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/github/license/OpenRsG/OpenFadeR"></a>
-  <a href="https://github.com/OpenRsG/OpenFadeR/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/OpenRsG/OpenFadeR?style=flat"></a>
+  <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/github/license/ronellcl/MyOpenFadeR"></a>
+  <a href="https://github.com/ronellcl/MyOpenFadeR/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/ronellcl/MyOpenFadeR?style=flat"></a>
 </p>
 
 <p align="center">
   <a href="README.md"><b>English</b></a> · <a href="README.es.md"><b>Español</b></a>
 </p>
 
-OpenFadeR is an open-source DJ application for two or four decks, written in Rust with [Slint](https://slint.dev). It analyses your tracks, separates stems, mixes with effects and a sampler, and reads MIDI controllers from a growing set of mapping files. Themes, plugins and controller mappings install from GitHub repositories with one click.
+MyOpenFadeR is a fork of [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): an open-source DJ application for two or four decks, written in Rust with [Slint](https://slint.dev). It analyses your tracks, separates stems, mixes with effects and a sampler, and reads MIDI controllers from a growing set of mapping files. Themes, plugins and controller mappings install from GitHub repositories with one click.
 
 <p align="center">
   <img src="docs/media/demo.webp" alt="Loading two tracks, syncing them, moving the crossfader and switching themes" width="100%">
@@ -52,7 +52,7 @@ picture, the native Deezer engine, cloud tracks in the Collection, the VDJ stage
 and a window that opens full screen.
 
 - **The interface in Spanish.** Every menu, preference page and plugin label is translated, and PREFERENCES > VIEW > LANGUAGE chooses System, English or Spanish. The preferences the upstream added last (the bold beat grid, the large hot cue markers) are translated too.
-- **A Windows installer that carries everything.** `OpenFadeR-<version>-windows-x86_64-setup.exe` installs the program for all users (it asks for administrator) with the plugins, the themes, the controller mappings, a light ffmpeg, a Python for the Python plugins and the yt-dlp program: a fresh machine needs nothing else. See [packaging/windows](packaging/windows).
+- **A Windows installer that carries everything.** `MyOpenFadeR-<version>-windows-x86_64-setup.exe` installs the program for all users (it asks for administrator) with the plugins, the themes, the controller mappings, a light ffmpeg, a Python for the Python plugins and the yt-dlp program: a fresh machine needs nothing else. See [packaging/windows](packaging/windows).
 - **No console windows.** The plugins run the interpreter that travels with the program, not the `py` launcher, and every helper (ffmpeg, ffprobe, the file pickers) starts without a console: no Windows Terminal window pops up over the app any more.
 - **Video that keeps up.** A seek goes black and comes back with the right frame instead of freezing on the last one, and the ffmpeg that starts for it is the light build (80 ms against two seconds): a jump takes half a second instead of three.
 - **YouTube with picture.** The yt-dlp plugin downloads H.264 + AAC (the formats every player shows), the picture lands on the deck's own screen and on the master screen, and the plugin keeps itself up to date from the copy it holds in your user folder.
@@ -74,17 +74,17 @@ and a window that opens full screen.
 
 ## Download
 
-Get the archive for your system from the [releases page](https://github.com/ronellcl/MyOpenFadeR/releases): Linux (x86_64), Windows (x86_64) or macOS (Apple silicon). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `OpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
+Get the archive for your system from the [releases page](https://github.com/ronellcl/MyOpenFadeR/releases): Linux (x86_64), Windows (x86_64) or macOS (Apple silicon). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `MyOpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
 
-On Windows there is also an installer, `OpenFadeR-<version>-windows-x86_64-setup.exe`: it installs the program for all users (it asks for administrator) with the plugins, themes, controller mappings, ffmpeg and a Python for the Python plugins, adds Start menu and desktop shortcuts and appears in Add/Remove Programs. Uninstalling leaves your settings, library and downloaded add-ons in your user folder unless you say otherwise. Neither it nor the app is signed, so Windows SmartScreen asks the first time. See [packaging/windows](packaging/windows) to build it.
+On Windows there is also an installer, `MyOpenFadeR-<version>-windows-x86_64-setup.exe`: it installs the program for all users (it asks for administrator) with the plugins, themes, controller mappings, ffmpeg and a Python for the Python plugins, adds Start menu and desktop shortcuts and appears in Add/Remove Programs. Uninstalling leaves your settings, library and downloaded add-ons in your user folder unless you say otherwise. Neither it nor the app is signed, so Windows SmartScreen asks the first time. See [packaging/windows](packaging/windows) to build it.
 
 ## Build from source
 
 You need `git` and a [Rust toolchain](https://rustup.rs).
 
 ```sh
-git clone https://github.com/OpenRsG/OpenFadeR.git
-cd OpenFadeR
+git clone https://github.com/ronellcl/MyOpenFadeR.git
+cd MyOpenFadeR
 ./start.sh ~/Music
 ```
 
@@ -245,7 +245,7 @@ The docs write the Linux folders; the others follow their system's convention (`
 | Store, analysis, downloaded plugin files | `~/.local/share/openfader/` | `~/Library/Application Support/openfader/` | `%LOCALAPPDATA%\openfader\` |
 | Caches (stems, models) | `~/.cache/openfader/` | `~/Library/Caches/openfader/` | `%LOCALAPPDATA%\openfader\cache\` |
 
-The release archives hold the bundled folders next to the executable (`OpenFadeR.app/Contents/Resources/` on macOS). Removable devices are found as USB sticks mounted below `/run/media` or `/media` (Linux), removable drive letters (Windows) and volumes below `/Volumes` (macOS); ejecting uses udisks, the volume's own eject request, or `diskutil`. Linux alone has the per-card volume sliders on the audio page (ALSA mixer, the sound server) and mounts a plugged stick itself (udisks): on Windows and macOS the volume is the system's and the OS mounts the stick. File choosers are zenity or kdialog on Linux, PowerShell's dialogs on Windows and `osascript` on macOS.
+The release archives hold the bundled folders next to the executable (`MyOpenFadeR.app/Contents/Resources/` on macOS). Removable devices are found as USB sticks mounted below `/run/media` or `/media` (Linux), removable drive letters (Windows) and volumes below `/Volumes` (macOS); ejecting uses udisks, the volume's own eject request, or `diskutil`. Linux alone has the per-card volume sliders on the audio page (ALSA mixer, the sound server) and mounts a plugged stick itself (udisks): on Windows and macOS the volume is the system's and the OS mounts the stick. File choosers are zenity or kdialog on Linux, PowerShell's dialogs on Windows and `osascript` on macOS.
 
 Audio, MIDI and folder behaviour can be set with `OPENFADER_OUTPUT_DEVICE`, `OPENFADER_HP_CHANNELS`, `OPENFADER_CUE_DEVICE`, `OPENFADER_MIDI_PORT`, `OPENFADER_MIDI_LOG`, `OPENFADER_JOG_TICKS`, `OPENFADER_TEMPO_INVERT`, `OPENFADER_REC_DIR`, `OPENFADER_EXPORT_DIR`, `OPENFADER_PATH_MAP` (audio path remap, `from=>to;…`) and `OPENFADER_DEVICE_ROOTS` (extra folders treated as devices).
 
@@ -265,4 +265,4 @@ Bug reports, mapping files, themes and plugins are all welcome. Read [CONTRIBUTI
 
 ## License
 
-AGPL-3.0, see [LICENSE](LICENSE). Made by [OpenRsG](https://github.com/OpenRsG).
+AGPL-3.0, see [LICENSE](LICENSE). Original [OpenFadeR](https://github.com/OpenRsG/OpenFadeR) by [OpenRsG](https://github.com/OpenRsG); MyOpenFadeR is maintained by [ronellcl](https://github.com/ronellcl).

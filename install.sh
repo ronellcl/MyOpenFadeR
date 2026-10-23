@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds OpenFadeR from this checkout and installs it for the current user (Linux):
+# Builds MyOpenFadeR from this checkout and installs it for the current user (Linux):
 #   ~/.local/lib/openfader/   the program with its bundled plugins, themes and controller mappings (as in a release archive)
 #   ~/.local/bin/openfader    the command
 #   ~/.local/share/applications/openfader.desktop   the menu entry, with its icon in ~/.local/share/icons
@@ -43,7 +43,7 @@ fi
 cat >"$apps/openfader.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=OpenFadeR
+Name=MyOpenFadeR
 Comment=DJ software
 Exec=$lib/openfader %F
 Icon=openfader
@@ -57,5 +57,5 @@ if [ ! -e "$config/repositories.json" ]; then
 	printf '[\n  "%s",\n  "%s",\n  "%s"\n]\n' "${repos[@]}" >"$config/repositories.json"
 	echo "repositories: ${repos[*]}"
 fi
-echo "installed: run 'openfader' or pick OpenFadeR in the application menu"
+echo "installed: run 'openfader' or pick MyOpenFadeR in the application menu"
 case ":$PATH:" in *":$bin:"*) ;; *) echo "note: $bin is not on your PATH" ;; esac

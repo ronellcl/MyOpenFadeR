@@ -11,7 +11,7 @@
 
 Please do not open a public issue for security problems.
 
-Use [GitHub's private vulnerability reporting](https://github.com/OpenRsG/OpenFadeR/security/advisories/new) (Security >
+Use [GitHub's private vulnerability reporting](https://github.com/ronellcl/MyOpenFadeR/security/advisories/new) (Security >
 Report a vulnerability). Include what you found, how to reproduce it, and what an attacker
 could do with it.
 

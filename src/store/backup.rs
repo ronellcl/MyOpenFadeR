@@ -27,7 +27,7 @@ const MUSIC_INDEX: &str = "music.tsv";
 /// A zip error in the backup's wording.
 fn zip_error(e: zip::Error) -> String {
     match e {
-        zip::Error::NotZip => "not a OpenFadeR backup zip".into(),
+        zip::Error::NotZip => "not a MyOpenFadeR backup zip".into(),
         zip::Error::Crc(name) => format!("{name}: checksum mismatch, the backup is damaged"),
         zip::Error::Other(m) => m,
     }
@@ -54,7 +54,7 @@ pub struct Restored {
 }
 
 impl Store {
-    /// Writes `<dir>/OpenFadeR-backup-<stamp>.zip` (never over an existing file) with this store and `settings` (the settings
+    /// Writes `<dir>/MyOpenFadeR-backup-<stamp>.zip` (never over an existing file) with this store and `settings` (the settings
     /// file, when it exists); `music` files are copied to `<dir>/MUSIC_DIR/<n>/<name>` and listed in the zip.
     pub fn backup(
         &self,
@@ -64,12 +64,12 @@ impl Store {
         stamp: &str,
     ) -> R<Backup> {
         at(std::fs::create_dir_all(dir), dir)?;
-        let mut zip = dir.join(format!("OpenFadeR-backup-{stamp}.zip"));
+        let mut zip = dir.join(format!("MyOpenFadeR-backup-{stamp}.zip"));
         for n in 2.. {
             if !zip.exists() {
                 break;
             }
-            zip = dir.join(format!("OpenFadeR-backup-{stamp}-{n}.zip"));
+            zip = dir.join(format!("MyOpenFadeR-backup-{stamp}-{n}.zip"));
         }
         let snapshot = dir.join(format!(".store-{}.tmp", std::process::id()));
         let _ = std::fs::remove_file(&snapshot);
@@ -282,7 +282,7 @@ mod tests {
                 .zip
                 .file_name()
                 .unwrap(),
-            "OpenFadeR-backup-t-2.zip"
+            "MyOpenFadeR-backup-t-2.zip"
         );
 
         // The library changes after the backup; the music file is lost.

@@ -8,7 +8,7 @@ use super::SLOTS;
 
 pub const PORT: u16 = 5568;
 pub const PRIORITY: u8 = 100;
-const SOURCE: &[u8] = b"OpenFadeR";
+const SOURCE: &[u8] = b"MyOpenFadeR";
 
 fn flags_len(n: usize) -> [u8; 2] {
     (0x7000 | n as u16).to_be_bytes()
@@ -56,8 +56,8 @@ mod tests {
         assert_eq!(p[22..38], cid);
         assert_eq!(p[38..40], [0x72, 0x58], "framing flags+length 600");
         assert_eq!(p[40..44], [0, 0, 0, 2]);
-        assert_eq!(&p[44..53], b"OpenFadeR");
-        assert!(p[53..108].iter().all(|&b| b == 0));
+        assert_eq!(&p[44..55], b"MyOpenFadeR");
+        assert!(p[55..108].iter().all(|&b| b == 0));
         assert_eq!((p[108], p[111]), (PRIORITY, 5), "priority, sequence");
         assert_eq!(p[113..115], [0, 3], "0-based universe 2 is wire universe 3");
         assert_eq!(p[115..117], [0x72, 0x0b], "DMP flags+length 523");

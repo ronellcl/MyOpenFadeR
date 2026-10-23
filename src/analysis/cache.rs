@@ -329,7 +329,7 @@ pub fn remember_fingerprint(t: &Track, print: &str) {
     }
 }
 
-/// Preferences > Analysis "Beat grid and cues from OpenFadeR analysis": drops the library's grid, phrases and cues from `a`
+/// Preferences > Analysis "Beat grid and cues from MyOpenFadeR analysis": drops the library's grid, phrases and cues from `a`
 /// and puts `ours` (the stored analysis, `None` = not analysed yet) in their place. With no analysis yet the grid stays empty
 /// so the analysis a LOAD runs fills it. The library's waveform and key stay where `ours` has none; the caller puts the
 /// user's own edits back on top ([`crate::store::apply`]).

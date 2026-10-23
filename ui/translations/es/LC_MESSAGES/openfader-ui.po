@@ -1,9 +1,9 @@
-# Spanish translation of OpenFadeR's UI strings (ui/translations, X-04).
+# Spanish translation of MyOpenFadeR's UI strings (ui/translations, X-04).
 # English is the source language and never leaves the source code: every msgid here is
 # the literal an @tr() in ui/*.slint shows when no translation is selected.
 msgid ""
 msgstr ""
-"Project-Id-Version: OpenFadeR\n"
+"Project-Id-Version: MyOpenFadeR\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -303,6 +303,6 @@ msgid "Welcome"
 msgstr "Bienvenida"
 
 msgctxt "App"
-msgid "About OpenFadeR"
-msgstr "Acerca de OpenFadeR"
+msgid "About MyOpenFadeR"
+msgstr "Acerca de MyOpenFadeR"
 
