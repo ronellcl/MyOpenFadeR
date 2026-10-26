@@ -449,10 +449,13 @@ parche necesita `src/store/mod.rs`, el browser o `ui/studio`, se parte y se mand
 - **C4 hecho en código:** `fx_tempo_master` persistido, fuente CH/MST/TAP, texto `CHn`/`MST`/`TAP`,
   `iso-part` para los botones de stem y EQ que sigue procesando en STEM ISO. `cargo test --bin
   openfader app::fx` → 12; `app::mixer` → 28; `app::deck::stems` → 7; `app::prefs` → 63.
-- **C4 revisión visual parcial:** con la app a pantalla completa, el panel FX se capturó y muestra
-  `MST` en la fuente de una unidad asignada a MASTER y `~MST 120.00 BPM` sin recortes. Un intento
-  a 1000×760 no enfocó la app y la captura se descartó; faltan 2V/4V, VDJ/vídeo, skins y español.
-  El código compila (`cargo build --release`) y las pruebas pasan.
+- **C4 revisión visual:** a pantalla completa se capturaron 2H, 2V, 4H y 4V con el panel FX
+  abierto; la fuente muestra `MST`/`~MST 120.00 BPM` sin recortes. También se revisaron
+  Catppuccin Mocha, Catppuccin Latte y VDJ, en español e inglés, sin clipping ni panics. Las
+  capturas están en `/tmp/opencode/matrix/` (fuera del repo). A 1000×760 se capturó la vista
+  principal; abrir el panel FX en esa ventana sigue pendiente. Faltan vídeo, STEM ISO, menú
+  contextual, EXPORT de 2 players y split. El código compila (`cargo build --release`) y las
+  pruebas pasan.
 - **C2/C3 pendientes.** No se tocaron store, browser, `ui/studio` ni `ui/app.slint`.
 
 ### 17.4 Fase 2 — CI y empaquetado
@@ -671,7 +674,7 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | Alcance de fase 1 aprobado; C1, C5 y C4 iniciados | Hecho |
 | 26/10/2026 | C1: reproducción con 1 MiB de stack | Descartado; no reproduce |
 | 26/10/2026 | C5: SYNC audible y MASTER fijado | Hecho; 15 pruebas |
-| 26/10/2026 | C4: Beat FX CH/MST/TAP y stems conservan EQ | Hecho en código; visual parcial (1920, pendiente 1000/VDJ) |
+| 26/10/2026 | C4: Beat FX CH/MST/TAP y stems conservan EQ | Hecho en código; matriz full-screen 2H/2V/4H/4V, 3 skins y 2 idiomas revisada; 1000 y casos con datos pendientes |
 | Pendiente | Rama `backport/fase-1`: C2/C3 y pruebas completas | En curso |
 | Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
 | Pendiente | Commit grande de fase 1 y merge a `main` | Pendiente |
