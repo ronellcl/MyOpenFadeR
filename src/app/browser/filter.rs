@@ -37,16 +37,20 @@ pub enum Origin {
     YouTube,
     /// Deezer tracks (remote tracks from the deezer plugin).
     Deezer,
+    /// Tracks whose file is on a mounted device or a local volume (whatever their source or Collection membership).
+    Devices,
 }
 
 impl Origin {
-    /// Whether the track passes: matches the origin filter.
-    pub fn keeps(self, t: &Track) -> bool {
+    /// Whether the track passes: matches the origin filter. `on_device` says whether its file lives on a mounted
+    /// device or local volume (computed once per refresh by the caller).
+    pub fn keeps(self, t: &Track, on_device: bool) -> bool {
         match self {
             Origin::All => true,
             Origin::Collection => t.remote.is_none(),
             Origin::YouTube => t.remote.as_ref().is_some_and(|r| r.plugin == "yt-dlp"),
             Origin::Deezer => t.remote.as_ref().is_some_and(|r| r.plugin == "deezer"),
+            Origin::Devices => on_device,
         }
     }
 }
@@ -72,7 +76,7 @@ pub struct Filter {
     pub min_rating: u8,
     /// Only the audio, only the video, or everything.
     pub media: Media,
-    /// Only tracks from this origin: everything, only the Collection, only YouTube, only Deezer.
+    /// Only tracks from this origin: everything, only the Collection, only YouTube, only Deezer, only devices.
     pub origin: Origin,
 }
 
@@ -97,7 +101,7 @@ pub fn passes(t: &Track, x: &Facts, f: &Filter, r: &Reference, look: &Look) -> b
     if !f.media.keeps(t) {
         return false;
     }
-    if !f.origin.keeps(t) {
+    if !f.origin.keeps(t, x.on_device) {
         return false;
     }
     if (f.bpm_min > 0.0 || f.bpm_max > 0.0)
@@ -327,6 +331,30 @@ mod tests {
         assert!(!passes(&song, &dz, &r));
         assert!(!passes(&youtube, &dz, &r));
         assert!(passes(&deezer, &dz, &r));
+    }
+
+    #[test]
+    fn the_origin_filter_keeps_tracks_on_a_device() {
+        let song = Track {
+            title: "usb".into(),
+            file: Some(PathBuf::from("/media/usb/song.mp3")),
+            ..Track::default()
+        };
+        let r = Reference::default();
+        let devices = Filter {
+            origin: Origin::Devices,
+            ..Default::default()
+        };
+        let mut facts = Facts::of(&song);
+        assert!(!super::passes(&song, &facts, &devices, &r, &Look::now()));
+        facts.on_device = true;
+        assert!(super::passes(&song, &facts, &devices, &r, &Look::now()));
+        // A local file keeps counting as the Collection whatever volume it is on.
+        let collection = Filter {
+            origin: Origin::Collection,
+            ..Default::default()
+        };
+        assert!(super::passes(&song, &facts, &collection, &r, &Look::now()));
     }
 
     #[test]

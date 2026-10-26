@@ -6,8 +6,26 @@ use super::{
     table::{self, Facts, Look, Reference},
     App, BrowserState, Home, View,
 };
-use openfader::{library::Track, store};
+use openfader::{device, library::Track, store};
 use slint::{ComponentHandle, Model};
+use std::path::PathBuf;
+
+/// Whether the track's file lies on one of the device / local volume roots (case-insensitive on Windows drive letters).
+fn on_device(t: &Track, roots: &[PathBuf]) -> bool {
+    let Some(file) = t.file.as_deref() else {
+        return false;
+    };
+    roots.iter().any(|r| {
+        #[cfg(windows)]
+        let hit = file
+            .to_string_lossy()
+            .to_lowercase()
+            .starts_with(&r.to_string_lossy().to_lowercase());
+        #[cfg(not(windows))]
+        let hit = file.starts_with(r);
+        hit
+    })
+}
 
 impl View {
     /// Rebuilds `list` from the current source and refreshes the rows.
@@ -126,12 +144,23 @@ impl View {
         } else {
             self.query.to_lowercase()
         };
+        // The "Devices" origin needs the mounted volumes: ask only when that filter is on (the scan probes the OS).
+        let device_roots: Vec<PathBuf> = if self.filter.origin == filter::Origin::Devices {
+            device::scan()
+                .into_iter()
+                .map(|d| d.mount)
+                .chain(device::local_disks().into_iter().map(|l| l.mount))
+                .collect()
+        } else {
+            Vec::new()
+        };
         let facts: Vec<Facts> = self
             .list
             .iter()
             .enumerate()
             .map(|(i, t)| Facts {
                 origin: self.origins.get(i).cloned().unwrap_or_default(),
+                on_device: on_device(t, &device_roots),
                 ..Facts::of(t)
             })
             .collect();

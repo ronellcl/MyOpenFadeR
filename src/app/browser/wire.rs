@@ -263,6 +263,7 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
                 1 => Origin::Collection,
                 2 => Origin::YouTube,
                 3 => Origin::Deezer,
+                4 => Origin::Devices,
                 _ => Origin::All,
             },
         };
@@ -277,6 +278,7 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
             1 => Origin::Collection,
             2 => Origin::YouTube,
             3 => Origin::Deezer,
+            4 => Origin::Devices,
             _ => Origin::All,
         };
         v.refresh(&app);

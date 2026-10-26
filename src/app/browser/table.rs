@@ -55,6 +55,8 @@ pub struct Facts {
     pub format: Format,
     /// Where the row comes from (the search results only).
     pub origin: String,
+    /// Its file lives on a mounted device or local volume (the "Devices" origin filter).
+    pub on_device: bool,
 }
 
 /// The media a track is: what the FORMAT column shows.
@@ -91,6 +93,7 @@ impl Facts {
                 .is_some_and(openfader::plugin::source::is_downloaded),
             format: Format::of(t),
             origin: String::new(),
+            on_device: false,
         }
     }
 }
