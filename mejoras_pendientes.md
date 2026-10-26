@@ -6,6 +6,9 @@ haciendo de a uno, compilando en release al cerrar cada tanda.
 > Recordatorio: la app **solo** debe ejecutarse en **release** (`start.sh` línea 14:
 > `cargo run --release`). El build debug sirve para compilar/`cargo test`, no para correr la GUI.
 
+> Última revisión: **26/10/2026**, contra `main` (`d485250`, 0.4.1). Todas las tandas de abajo
+> están cerradas y `hallazgos.md` no tiene nada sin resolver; lo único abierto está en **§16**.
+
 ## 1. Terminales que se abren solas — ARREGLADO
 - **Síntoma:** cada vez que se carga un tema de la nube (deezer/youtube) o un vídeo se abre
   una ventana de terminal (a veces se cierra sola, a veces no).
@@ -184,16 +187,10 @@ Todo lo de esta tanda está detallado en [hallazgos_solucionados.md](hallazgos_s
 | 18 | El README no contaba esta versión y solo estaba en inglés | ARREGLADO — `DOC-01` (`975576a`, con `README.es.md`) |
 | 19 | **Instalador de Windows** y **release en GitHub** | HECHO — `PACK-01` (`525689b`), release `v0.2.2` |
 
-**Queda a decisión del usuario** (nada abierto por avería):
+**Queda a decisión del usuario** (nada abierto por avería): los tres puntos de entonces —acortar
+el salto de vídeo, publicar la release de plugins y quitar la línea `$excluded` del empaquetado—
+siguen igual y están reunidos en **§16**.
 
-- Acortar más el salto de vídeo: el motor nativo de Deezer ya está en `main` de `plugins-repo` y
-  viaja en el instalador; si el motor se considera terminado, la línea `$excluded` del script de
-  empaquetado puede desaparecer (ahora no excluye nada).
-- El salto de vídeo se puede bajar de ~460 ms a ~150 ms con dos cambios posibles, ya medidos:
-  re-codificar el vídeo descargado con keyframes cada segundo (`-g 30`, a costa de una descarga más
-  lenta) o hacer el salto en dos fases (el keyframe al instante, el frame exacto después).
-- Publicar el yt-dlp 1.2.4 y el motor de Deezer en el repositorio `MyOpenFadeR-Plugins` (el
-  `main` ya los tiene; falta decide si se abre una *release* con el binario de yt-dlp adjunto).
 ## 12. Tercera tanda (21/10/2026): el browser - HECHO
 
 Lo cerrado, con su commit:
@@ -208,12 +205,20 @@ Lo cerrado, con su commit:
 | BR-06 | Carpetas fijadas (botón FAV, sección "Favorites", pin por etiqueta de volumen + ruta relativa) y casillas para ocultar las secciones | f61921c |
 | BR-07 | Búsqueda unificada (Colección + índice de las fijadas + fuentes leídas) con columna ORIGIN, sin disparar las búsquedas en línea | 6b26d39 |
 
-### Lo que queda (de la fase 5 del plan)
+### Fase 5 — cerrada en la sexta tanda (22/10/2026)
 
-- Filtro por origen en la barra (All / Colección / YouTube / Deezer / Dispositivos).
-- Preview de vídeo en la columna PREVIEW (un fotograma en vez de la onda).
-- Aviso de duplicado al importar ("esta pista ya está en la Colección").
-- La estrella de la fila fijable con el clic (hoy se fija con el botón FAV y la estrella es solo la marca).
+| ID | Lo que se hizo | Commit |
+|----|----------------|--------|
+| F5-1 | Filtro por origen en la barra: ALL / COLLECTION / YOUTUBE / DEEZER (`Origin` en `src/app/browser/filter.rs`, el botón cicla en `ui/browser.slint`) | f7ead3d |
+| F5-2 | Preview de vídeo en la columna PREVIEW: un fotograma en vez de la onda (`src/app/browser/strip.rs`) | 85131bd |
+| F5-3 | Aviso de duplicado al importar: *"this track is already in the Collection"* | f7ead3d |
+| F5-4 | La estrella de una carpeta fijada se pulsa desde su fila: fija y quita sin seleccionarla antes | f7ead3d, 432a1c5 |
+
+El detalle está en [hallazgos_solucionados.md](hallazgos_solucionados.md), sexta tanda.
+
+**Del plan solo quedó fuera el origen "Devices":** `Origin` tiene `All`/`Collection`/`YouTube`/
+`Deezer`, así que una pista de un USB o del disco local que no esté en la Colección no se puede
+aislar con el filtro (sí aparece en la tabla y llega por la búsqueda unificada).
 
 ## 13. Cuarta tanda (21/10/2026): los volúmenes - HECHO
 
@@ -227,7 +232,7 @@ Lo cerrado:
 | BR-11 | El instalador de Windows se compila otra vez (NSIS 3.11) y sube a la release v0.3.1, ya publicada | f1a0901 |
 | BR-12 | Las carpetas fijadas se reindexan cuando el volumen se reconecta (ya no hay que fijarlas otra vez para que la búsqueda las encuentre) | a50a361 |
 
-Sigue pendiente lo de la fase 5 (arriba).
+Lo de la fase 5 se cerró en la sexta tanda (arriba).
 
 ## 14. Quinta tanda (21/10/2026): el navegador - HECHO
 
@@ -239,13 +244,6 @@ Lo cerrado:
 | BR-14 | Secciones del árbol plegables (History, Tags, Devices, Downloaded, Música Local, Música en Línea) | 38f1bf4 |
 | BR-15 | History: renombrar sesión manteniendo fecha y eliminar sesión con clic derecho | 38f1bf4 |
 | BR-16 | Related tracks: auto-ancla al primer track visible si no hay selección | 38f1bf4 |
-
-## Fase 5 (pendiente)
-
-- Filtro por origen en la barra (All / Colección / YouTube / Deezer / Dispositivos).
-- Preview de vídeo en la columna PREVIEW (un fotograma en vez de la onda).
-- Aviso de duplicado al importar ("esta pista ya está en la Colección").
-- La estrella de la fila fijable con el clic (hoy se fija con el botón FAV y la estrella es solo la marca).
 
 ## 15. Séptima tanda (22/10/2026): SYNC y memoria - HECHO
 
@@ -261,6 +259,26 @@ Lo cerrado:
 Notas:
 
 - El puerto se hizo sin la maquinaria de cancelación/bulk del original: se conserva el análisis local y el refactor mínimo sobre `Frames`/`Track16`.
-- `6f43923` y `695bcd3` están en local, sin push todavía.
-- Descartado por decisión del usuario: el preview de vídeo por fotograma (F5-2); `85131bd` no se revierte.
+- `6f43923` y `695bcd3` ya están en `origin/main` (salieron en 0.4.0), no solo en local.
+- El preview de vídeo por fotograma (F5-2) **sí se implementó** (`85131bd`) y sigue en el código; la nota anterior lo daba por descartado y no era exacta. Se queda como está salvo que se decida otra cosa.
 - La versión, los instaladores y la release se tocan solo cuando se pidan.
+
+## 16. Lo que queda abierto (revisado el 26/10/2026)
+
+Revisado contra el código de `main` (`d485250`, versión 0.4.1). **`hallazgos.md` está cerrado
+entero**: los 30 hallazgos figuran resueltos en [hallazgos_solucionados.md](hallazgos_solucionados.md).
+Lo que sigue es decisión, no avería:
+
+1. **Origen "Devices" en el filtro del navegador** — el único punto de la fase 5 que no se hizo
+   (ver arriba); hoy el filtro solo distingue Colección / YouTube / Deezer.
+2. **Salto de vídeo: de ~460 ms a ~150 ms** — dos caminos ya medidos: re-codificar lo descargado
+   con keyframes cada segundo (`-g 30`, a costa de una descarga más lenta) o el salto en dos fases
+   (el keyframe al instante y el frame exacto después).
+3. **Release de `MyOpenFadeR-Plugins`** — publicar yt-dlp 1.2.4 y el motor de Deezer (el `main` ya
+   los tiene; falta decidir si la release lleva el binario de yt-dlp adjunto).
+4. **Empaquetado de Windows** — la línea `$excluded` puede desaparecer si el motor de Deezer se da
+   por terminado (hoy no excluye nada).
+5. **Diálogos nativos en Windows** — el selector de archivos de la app y el diálogo del ARL del
+   plugin deezer usan PowerShell con `CREATE_NO_WINDOW` porque sin consola no muestran nada; en
+   Windows 11 puede asomar la pestaña del terminal un momento. Pasarlos a un diálogo nativo (FFI)
+   lo quita del todo (ver §1).
