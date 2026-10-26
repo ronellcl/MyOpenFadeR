@@ -27,6 +27,16 @@ maps = [f for f in sorted((root / "mappings").iterdir()) if f.suffix in (".xml",
 for f in maps:
     shutil.copy(f, dest / "mappings" / f.name)
 
-print(f"bundled {plugins} plugins, {len(themes)} themes, {len(maps)} mappings into {dest}")
+# `tools/` (static ffmpeg and ffprobe, fetched by .github/fetch_tools.py) goes beside the program or, in a macOS
+# bundle, in Resources: src/main.rs looks in both. A source checkout that has not fetched them still packages; the
+# release workflow does fetch them, so the archives carry their own decoder.
+tools = 0
+if (root / "tools").is_dir():
+    shutil.copytree(root / "tools", dest / "tools")
+    tools = len(list((dest / "tools").iterdir()))
+else:
+    print("warning: no tools/ (ffmpeg and ffprobe) to bundle", file=sys.stderr)
+
+print(f"bundled {plugins} plugins, {len(themes)} themes, {len(maps)} mappings, {tools} tools into {dest}")
 if not (plugins and themes and maps):
     sys.exit("a companion repository is missing or empty")

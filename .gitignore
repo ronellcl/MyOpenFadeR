@@ -4,6 +4,10 @@
 /sdk/examples/*/*.so
 /.local
 /dist/
+# Static ffmpeg/ffprobe fetched for a package by .github/fetch_tools.py (never commit binaries).
+/tools/
+__pycache__/
+*.pyc
 
 # The companion repositories, cloned in place by start.sh: OpenFadeR-Plugins, OpenFadeR-Themes, OpenFadeR-Map.
 /extension/

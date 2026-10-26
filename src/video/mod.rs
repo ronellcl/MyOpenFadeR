@@ -1,8 +1,9 @@
 //! VIDEO: a deck can hold a video file (mp4 / mov / m4v) as its track. The audio goes through
 //! the normal [`crate::audio::decode`] path; the pictures are decoded here, off the UI thread, by an `ffmpeg` child
 //! process that streams raw RGB frames over a pipe (no FFmpeg library is linked: the binaries `ffmpeg` / `ffprobe`
-//! must be on `PATH`). Each deck's picture follows its audible playhead, so tempo, pause, seek, loops, reverse and
-//! scratching need no special cases: the picture is whatever frame the playhead is on.
+//! travel in the release's `tools/` folder, which the program puts first in `PATH`, or must be on `PATH` in a source
+//! checkout that did not fetch them). Each deck's picture follows its audible playhead, so tempo, pause, seek, loops,
+//! reverse and scratching need no special cases: the picture is whatever frame the playhead is on.
 //!
 //! The panel has a master output that can go full screen, a VIDEO CROSSFADER that can be synced to the audio one,
 //! and brightness that follows the channel fader. Implemented: the crossfader transition

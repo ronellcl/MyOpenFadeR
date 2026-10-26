@@ -59,6 +59,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     && d=/out/MyOpenFadeR-$v-linux-aarch64-pi \
     && mkdir -p "$d" \
     && cp target/$TARGET/pi/openfader "$d/" \
+    && OPENFADER_FFMPEG_TARGET=linux-arm64 python3 .github/fetch_tools.py tools \
     && python3 .github/bundle.py "$d" \
     && cp LICENSE README.md "$d/" && cp assets/icon.png "$d/openfader.png" \
     && tar -C /out -czf "$d.tar.gz" "$(basename "$d")"

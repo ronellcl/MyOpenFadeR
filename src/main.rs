@@ -15,7 +15,8 @@ fn own_folder() -> Option<PathBuf> {
 
 /// The tools shipped beside the program first in `PATH`: `tools/` (ffmpeg and ffprobe) and `python/` (the interpreter of
 /// the Python plugins). The program and the processes it starts (the video decoder, a plugin calling yt-dlp) find them by
-/// name without the installer changing the system `PATH`.
+/// name without the installer changing the system `PATH`. A macOS app bundle keeps them under `Resources/`, like the
+/// plugins and themes.
 fn bundled_tools_first_in_path() {
     let Some(dir) = std::env::current_exe()
         .ok()
@@ -23,7 +24,14 @@ fn bundled_tools_first_in_path() {
     else {
         return;
     };
-    let mut dirs = vec![dir.join("tools"), dir.join("python"), dir];
+    let resources = dir.join("Resources");
+    let mut dirs = vec![
+        dir.join("tools"),
+        resources.join("tools"),
+        dir.join("python"),
+        resources.join("python"),
+        dir,
+    ];
     dirs.extend(std::env::split_paths(
         &std::env::var_os("PATH").unwrap_or_default(),
     ));

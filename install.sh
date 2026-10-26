@@ -39,6 +39,12 @@ cargo build --release --quiet
 mkdir -p "$lib" "$bin" "$apps" "$icons"
 cp target/release/openfader "$lib/"
 cp -L target/release/*.so* "$lib/" 2>/dev/null || true # ONNX Runtime / WebGPU for STEMS, found next to the program
+# The installed program carries its own ffmpeg/ffprobe (tools/, first in PATH), as a release archive does.
+if [ ! -d tools ]; then
+	if [ -d target/release/tools ]; then cp -a target/release/tools tools
+	else python3 .github/fetch_tools.py tools || echo "warning: no static ffmpeg; video needs an ffmpeg on PATH" >&2
+	fi
+fi
 python3 .github/bundle.py "$lib"
 ln -sf "$lib/openfader" "$bin/openfader"
 cp assets/icon.png "$icons/openfader.png"

@@ -74,7 +74,7 @@ and a window that opens full screen.
 
 ## Download
 
-Get the archive for your system from the [releases page](https://github.com/ronellcl/MyOpenFadeR/releases): Linux (x86_64), Windows (x86_64) or macOS (Apple silicon). Each holds the app with its themes, controller mappings and plugins. Unpack it and run `openfader` (macOS: right-click `MyOpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
+Get the archive for your system from the [releases page](https://github.com/ronellcl/MyOpenFadeR/releases): Linux (x86_64), Windows (x86_64) or macOS (Apple silicon). Each holds the app with its themes, controller mappings, plugins and its own static `ffmpeg`/`ffprobe` (in `tools/`, first in its `PATH`): video, mp3 export and the yt-dlp video merge need nothing installed. Unpack it and run `openfader` (macOS: right-click `MyOpenFadeR.app` > Open the first time, the app is not signed). This is a pre-release: please report what does not work.
 
 On Windows there is also an installer, `MyOpenFadeR-<version>-windows-x86_64-setup.exe`: it installs the program for all users (it asks for administrator) with the plugins, themes, controller mappings, ffmpeg and a Python for the Python plugins, adds Start menu and desktop shortcuts and appears in Add/Remove Programs. Uninstalling leaves your settings, library and downloaded add-ons in your user folder unless you say otherwise. Neither it nor the app is signed, so Windows SmartScreen asks the first time. See [packaging/windows](packaging/windows) to build it.
 
@@ -92,7 +92,13 @@ The first run clones the plugins, themes and mappings next to the code, builds e
 
 `start.sh` without a path opens the Collection as you left it; every connected library and folder syncs at start and whenever it changes, and `$XDG_MUSIC_DIR` (else `~/Music/OpenFadeR`) is always connected. To build only the core: `cargo build --release`.
 
-On Windows the video of a deck is decoded by an `ffmpeg` child process, and a seek starts it again: the full build of [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) (400 MB) takes two seconds to start and every jump waits for it, while the essentials build (100 MB) takes 80 ms. Put it in `target\release\tools\` and the program finds it first (that folder goes first in its PATH):
+The release archives carry their own `ffmpeg`/`ffprobe`; a source build can fetch the same static pair into `tools/` next to the binary (or use an `ffmpeg` from `PATH`):
+
+```sh
+python3 .github/fetch_tools.py target/release/tools
+```
+
+On Windows a seek starts `ffmpeg` again: a light build starts in 80 ms, while the full build of [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) (400 MB) takes two seconds and every jump waits for it. The static pair the release ships is the light one:
 
 ```powershell
 Expand-Archive ffmpeg-release-essentials.zip -DestinationPath C:\Tools\ffmpeg

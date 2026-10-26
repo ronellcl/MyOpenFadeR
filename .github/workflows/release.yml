@@ -66,6 +66,10 @@ jobs:
         env:
           CARGO_PROFILE_DIST_LTO: ${{ matrix.name == 'macos' && 'false' || 'thin' }}
         run: cargo build --profile dist
+      - name: Static ffmpeg and ffprobe
+        # The archives carry their own decoder (tools/, first in PATH): video, mp3 export and the yt-dlp merge work
+        # on a machine that never installed ffmpeg. Pinned by .github/fetch_tools.py.
+        run: python .github/fetch_tools.py
       - name: Package
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -185,4 +189,4 @@ jobs:
             - **Windows** (x86_64): `MyOpenFadeR-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
             - **macOS** (Apple silicon): `MyOpenFadeR-<version>-macos-arm64.zip` holds `MyOpenFadeR.app`. It is **not signed or notarized**: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/MyOpenFadeR.app`.
 
-            Optional: `ffmpeg` on the PATH for video; `python` (3) for the Python plugins. Volume sliders of the audio page exist on Linux only: on Windows and macOS the volume is the system's.
+            The archives include static `ffmpeg` and `ffprobe` (`tools/`) for video and mp3. Python 3 on the PATH is needed for the Python plugins (the Windows installer carries its own). Volume sliders of the audio page exist on Linux only: on Windows and macOS the volume is the system's.
