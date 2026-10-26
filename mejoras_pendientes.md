@@ -300,7 +300,9 @@ plugin ahora le pone `+x` al bajarlo y al encontrarlo, lo que también arregla l
 que ya tenían el binario mal. Y el descompresor de la app tiraba el modo de los zips: un
 `bin/deezer-engine` que la release trae en 755 quedaba en 644 y fallaba igual; ahora conserva el
 modo y, si un programa de plugin ya instalado no lo tiene, se le devuelve el `+x` antes de
-ejecutarlo.
+ejecutarlo. El catálogo, además, solo pedía el asset de release para las librerías: un plugin
+`command` como Deezer se instalaba con el `plugin.json` pero sin `bin/deezer-engine`; ahora el
+programa cuenta como archivo nativo y el asset se descarga.
 
 **Repositorios por defecto repuntados** (`chore/repo-urls`): `src/catalog/list.rs`, `install.sh`,
 `start.sh`, `Dockerfile.pi`, el About y la documentación usan ahora
