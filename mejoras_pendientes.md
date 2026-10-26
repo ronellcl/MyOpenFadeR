@@ -291,6 +291,14 @@ Lo que sigue es decisión, no avería:
    Windows 11 puede asomar la pestaña del terminal un momento. Pasarlos a un diálogo nativo (FFI)
    lo quita del todo (ver §1).
 
+**Deezer y yt-dlp: por qué fallaban** — eran dos averías distintas. `start.sh` compilaba los
+plugins sin el `[patch]` al `sdk/` de este checkout (que sí escriben `install.sh` y la imagen de
+la Pi), así que el motor de Deezer y los importadores no compilaban contra el tag viejo; ahora
+`start.sh` escribe el patch y el motor compila. Y el binario de yt-dlp que el plugin se descarga
+quedaba sin permiso de ejecución, con lo que toda llamada moría con *Permission denied*; el
+plugin ahora le pone `+x` al bajarlo y al encontrarlo, lo que también arregla las instalaciones
+que ya tenían el binario mal.
+
 **Repositorios por defecto repuntados** (`chore/repo-urls`): `src/catalog/list.rs`, `install.sh`,
 `start.sh`, `Dockerfile.pi`, el About y la documentación usan ahora
 `ronellcl/MyOpenFadeR-Plugins`, `ronellcl/MyOpenFadeR-Themes` y `ronellcl/MyOpenFadeR-Map`. Los
