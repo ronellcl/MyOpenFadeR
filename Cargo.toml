@@ -2,6 +2,7 @@
 name = "openfader"
 version = "0.4.1"
 edition = "2024"
+rust-version = "1.85"
 
 [features]
 default = ["app", "stems-gpu"]
@@ -80,3 +81,15 @@ lto = "fat"
 [profile.pi.package.openfader]
 codegen-units = 1
 strip = "symbols"
+
+[lints.clippy]
+correctness = "warn"
+suspicious = "warn"
+style = "warn"
+complexity = "warn"
+perf = "warn"
+undocumented_unsafe_blocks = "warn"
+multiple_unsafe_ops_per_block = "warn"
+
+[lints.rust]
+unexpected_cfgs = "warn"

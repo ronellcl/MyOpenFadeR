@@ -150,12 +150,14 @@ fn open_api(path: &Path) -> Result<&'static LibraryApi, String> {
         unsafe { Dylib::new(path) }.map_err(|e| format!("cannot load {}: {e}", path.display()))?;
     let api = {
         type Entry = unsafe extern "C" fn() -> *const LibraryApi;
+        // SAFETY: `LIBRARY_ENTRY` is the symbol the openfader-plugin library ABI guarantees.
         let entry = unsafe { lib.get::<Entry>(LIBRARY_ENTRY) }.map_err(|e| {
             format!(
                 "{} has no `openfader_library_v2` entry point ({e}); it was not built against library ABI {LIBRARY_ABI} of openfader-plugin",
                 path.display()
             )
         })?;
+        // SAFETY: the entry point was validated against library ABI {LIBRARY_ABI} above.
         unsafe { (*entry)().as_ref() }.ok_or("the entry point returned null")?
     };
     if api.abi != LIBRARY_ABI {

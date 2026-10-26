@@ -55,12 +55,14 @@ impl Stage for Instance {
 
     fn reset(&mut self) {
         if let Some(f) = self.f.reset {
+            // SAFETY: `p` is a live instance of this table; the library never unwinds out of `reset`.
             unsafe { f(self.p) };
         }
     }
 
     fn engage(&mut self) {
         if let Some(f) = self.f.engage {
+            // SAFETY: `p` is a live instance of this table; the library never unwinds out of `engage`.
             unsafe { f(self.p) };
         }
     }
@@ -68,6 +70,7 @@ impl Stage for Instance {
 
 impl Drop for Instance {
     fn drop(&mut self) {
+        // SAFETY: `p` is a live instance of this table; the library never unwinds out of `destroy`.
         unsafe { (self.f.destroy)(self.p) };
     }
 }
@@ -79,12 +82,14 @@ pub(super) fn open(path: &Path, plugin: &str) -> Result<Vec<Effect>, String> {
         .map_err(|e| format!("cannot load {}: {e}", path.display()))?;
     let effects = {
         type Entry = unsafe extern "C" fn() -> *const PluginInfo;
+        // SAFETY: `ENTRY` is the symbol the openfader-plugin ABI guarantees; the signature matches.
         let entry = unsafe { lib.get::<Entry>(ENTRY) }.map_err(|e| {
             format!(
                 "{} has no `openfader_plugin_v1` entry point ({e}); it was not built against ABI {ABI} of openfader-plugin",
                 path.display()
             )
         })?;
+        // SAFETY: the entry point was validated against ABI {ABI} above.
         unsafe { read(entry(), plugin) }?
     };
     // The effects call into the library for as long as the process lives.
@@ -97,6 +102,7 @@ pub(super) fn open(path: &Path, plugin: &str) -> Result<Vec<Effect>, String> {
 /// # Safety
 /// `info` is null or points to a [`PluginInfo`] whose `effects` and each table's `name` are valid.
 pub(super) unsafe fn read(info: *const PluginInfo, plugin: &str) -> Result<Vec<Effect>, String> {
+    // SAFETY: `info` was validated non-null above; `abi` match checked next.
     let info = unsafe { info.as_ref() }.ok_or("the entry point returned null")?;
     if info.abi != ABI {
         return Err(format!(
@@ -107,10 +113,14 @@ pub(super) unsafe fn read(info: *const PluginInfo, plugin: &str) -> Result<Vec<E
     if info.effects.is_null() || info.count == 0 {
         return Err("exports no effects".into());
     }
+    // SAFETY: `info.effects` and `info.count` were validated above; the slice bounds are sound.
     let tables = unsafe { std::slice::from_raw_parts(info.effects, info.count as usize) };
     tables
         .iter()
-        .map(|t| unsafe { from_vtable(plugin, t) })
+        .map(|t| {
+            // SAFETY: `vt` comes from the validated slice above; `from_vtable` checks name, slot, and functions.
+            unsafe { from_vtable(plugin, t) }
+        })
         .collect()
 }
 
@@ -122,6 +132,7 @@ pub(super) unsafe fn from_vtable(plugin: &str, vt: &EffectVTable) -> Result<Effe
     if vt.name.is_null() {
         return Err("an effect has no name".into());
     }
+    // SAFETY: `vt.name` is null or NUL-terminated (validated just above).
     let name = unsafe { CStr::from_ptr(vt.name) }
         .to_str()
         .map_err(|_| "an effect name is not UTF-8")?;
@@ -142,10 +153,12 @@ pub(super) unsafe fn from_vtable(plugin: &str, vt: &EffectVTable) -> Result<Effe
             "effect {name:?}: create, tick and destroy are required"
         ));
     };
+    // SAFETY: `create` comes from a validated vtable; PROBE_RATE is a supported sample rate.
     let probe = unsafe { create(PROBE_RATE) };
     if probe.is_null() {
         return Err(format!("effect {name:?}: create failed"));
     }
+    // SAFETY: `destroy` pairs with `create` from the same validated vtable.
     unsafe { destroy(probe) };
     let f = Fns {
         create,
