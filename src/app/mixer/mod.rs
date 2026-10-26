@@ -231,6 +231,8 @@ pub fn wire(app: &App, decks: Decks) {
     let m = mixer.clone();
     state.on_iso_knob(move |ch, part, v| m.set_iso_knob(ch as usize, part as usize, v));
     let m = mixer.clone();
+    state.on_iso_part(move |ch, part, v| m.set_part_level(ch as usize, part as usize, v));
+    let m = mixer.clone();
     state.on_bus_knob(move |knob, v| m.set_bus_knob(knob as usize, v));
     let m = mixer.clone();
     state.on_split_toggled(move || m.toggle_split());

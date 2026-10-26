@@ -343,7 +343,7 @@ el `Cargo.toml` del repo de plugins) se quedan como están.
 | Fase | Objetivo | Estado | Cierre |
 |---|---|---|---|
 | 0 | Preparar rama y baseline | Pendiente | `main` limpio, build release y tests de partida verdes |
-| 1 | Correcciones 0.2.5 de audio/UI | En validación | Tests + build release + smoke + revisión manual |
+| 1 | Correcciones 0.2.5 de audio/UI | En curso (C5/C4 hechos; C2/C3 pendientes) | Tests + build release + smoke + revisión manual |
 | 2 | Endurecer CI/empaquetado | Pendiente | Workflow valida el paquete antes de publicarlo |
 | 3 | Cimientos store/device/plugin | Pendiente | Migración v17→nueva con backup/rollback probado |
 | 4 | Browser/library/device features | Pendiente | Funciones nuevas sin perder fuentes ni i18n del fork |
@@ -367,15 +367,15 @@ Studio, temas ni la numeración nueva del store.
 | `121d080` | **No cherry-pick; dividir** | El núcleo de motor/deck/SYNC va ahora como C2/C3. Browser, store, library, sampler/BEAT LAB, MIDI layout, automix y loudness quedan para fase 2/3. Confirmado: no toca UI |
 | `c293a3c` | **No aplica** | El fork no tiene `src/audio/fx/prepare.rs`, ni `Exchange`/`Handoff`, ni el hilo `fx-prepare`; las etapas se construyen en el hilo de control. Portarlo exigiría importar el rediseño de FX de upstream. Confirmado: no toca UI |
 | `1d6c7ba` | **Sí hot cues; 4a visual opcional; no 4b** | Sí: `seek_on_beat`, fase escrita en el callback, `Plan::Beat` y tests de spam. El informe Slint separa 4a (visual: `DeckState.slots`, `Theme.deck-number`, badges, con defaults neutros y sin cambiar comportamiento) de 4b (Rust de slots y DECK 3/4). 4a solo si se aprueba; **no** entran `deck/slots.rs`, `ui/studio/*`, `ui/touch*` ni la vista DECK 3/4, que choca con la arquitectura 4-deck/VDJ del fork |
-| `10e977d` | **Portar si reproduce** | El fork tiene más overlays que upstream (`TrackEdit`, `PluginOverlays`, `DeviceOverlay`, `OfferBanner`, `ToastView`, `TipOverlay`), así que el riesgo de constructores anidados es mayor. Reproducir primero el stack con `ulimit -s 1024`; si no reproduce, no tocar `ui/app.slint` y no añadir el `ulimit` al smoke. Si reproduce, separar árboles y mantener el smoke con 1 MiB |
+| `10e977d` | **Descartado en este host** | El fork tiene más overlays que upstream (`TrackEdit`, `PluginOverlays`, `DeviceOverlay`, `OfferBanner`, `ToastView`, `TipOverlay`), pero el arranque release con `ulimit -s 1024` no reprodujo el stack overflow. No se toca `ui/app.slint` ni se añade el `ulimit` al smoke. Si aparece en Windows, reabrir C1 con esa reproducción |
 
 #### 17.3.2 Bloques de fase 1
 
 | Bloque | Qué se hace | Archivos principales | Depende de | Riesgo |
 |---|---|---|---|---|
-| **C1** | Reproducir con 1 MiB de stack; solo si falla, separar vistas/barra/overlays con `if true:` (`10e977d`) | `ui/app.slint`, `.github/smoke.sh`, `docs/code-structure.md` | — | Bajo |
-| **C5** | SYNC: solo el deck que suena lidera; un MASTER fijado se sigue; KEY SYNC no cambia | `src/app/deck/sync/master.rs`, `sync/mod.rs` | — | Bajo |
-| **C4** | Beat FX con fuente CH/MST/TAP; stems conservan EQ y no cambian el strip a STEM ISO | `src/app/fx/`, `src/app/deck/stems/mod.rs`, `src/app/mixer/`, `src/app/prefs/`, `ui/fx.slint`, `ui/mixer.slint` | — | Medio |
+| **C1** | **Descartado:** no reproduce el stack overflow con 1 MiB en Linux; no se toca `ui/app.slint` ni el smoke (`10e977d`) | — | — | Bajo |
+| **C5** | **Hecho:** SYNC solo lo lidera el deck que suena; un MASTER fijado se sigue; KEY SYNC no cambia | `src/app/deck/sync/master.rs`, `sync/mod.rs` | — | Bajo |
+| **C4** | **Hecho:** Beat FX con fuente CH/MST/TAP; stems conservan EQ y no cambian el strip a STEM ISO. Revisión visual pendiente | `src/app/fx/`, `src/app/deck/stems/mod.rs`, `src/app/mixer/`, `src/app/prefs/`, `ui/fx.slint`, `ui/mixer.slint` | — | Medio |
 | **C2** | Primitivas de transporte/reloj/loop de 0.2.5 (`latency_ms`, `steady`, `written_ms`, loops en 256 pasos, slip, catch-up consciente del loop) | `src/audio/player/{mod,clock,voice,tests}.rs`, `src/audio/transport.rs`, `src/app/deck/loops.rs` (solo cast a `f64`) | — | Medio |
 | **C3** | Timing de deck, loops, quantize, cues, slicer, sequencer y SYNC sobre C2 | `src/app/deck/*`, `src/app/deck/sync/*`, `src/app/midi/actions/*`, `midi/input.rs` (release de `Kind::Deck`) | C2 | Alto |
 | **C6** | Soft takeover MIDI para knobs/faders absolutos (`midi/pickup.rs`, pref, toast) | `src/app/midi/`, `src/app/prefs/controller/`, `src/app/toast.rs`, `src/app/mixer/mod.rs` | C4 (lectores `knob_at`/`iso_at`) | Alto, pero autocontenido |
@@ -439,6 +439,20 @@ parche necesita `src/store/mod.rs`, el browser o `ui/studio`, se parte y se mand
   `ui/studio/*` ni tocar la geometría del escenario VDJ.
 - Matriz visual mínima: 2H/2V/4H/4V, Classic/VDJ, vídeo on/off, tres skins y inglés/español;
   abrir Track, FX, mixer con STEM ISO, menú contextual, EXPORT de 2 players y split.
+
+#### 17.3.6 Estado de C1, C5 y C4 (26/10/2026)
+
+- **C1 descartado:** `target/release/openfader` arrancó 15 s con `ulimit -s 1024`, plugins y HOME
+  privados, sin `stack overflow` ni panic. No se modificaron `ui/app.slint` ni `.github/smoke.sh`.
+- **C5 hecho:** `leader_of` distingue SYNC de KEY SYNC, un deck audible no sigue a uno idle y el
+  MASTER fijado sigue siendo la excepción. `cargo test --bin openfader app::deck::sync` → 15 pasan.
+- **C4 hecho en código:** `fx_tempo_master` persistido, fuente CH/MST/TAP, texto `CHn`/`MST`/`TAP`,
+  `iso-part` para los botones de stem y EQ que sigue procesando en STEM ISO. `cargo test --bin
+  openfader app::fx` → 12; `app::mixer` → 28; `app::deck::stems` → 7; `app::prefs` → 63.
+- **C4 pendiente de revisión visual:** la sesión gráfica se bloqueó durante la prueba de captura y
+  no se pudo interactuar con el panel. El código compila (`cargo build --release`) y las pruebas
+  pasan, pero la matriz visual de §17.3.5 sigue pendiente antes de fusionar a `main`.
+- **C2/C3 pendientes.** No se tocaron store, browser, `ui/studio` ni `ui/app.slint`.
 
 ### 17.4 Fase 2 — CI y empaquetado
 
@@ -653,8 +667,12 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | Informes reconciliados; §17.3.5 fija contratos UI/Rust y §17.3.1 ajusta el veredicto | Hecho |
 | 26/10/2026 | F0a: identidad del store, rechazo read-only y `LOCAL_TABLES` | Hecho; ver §17.5.2 |
 | 26/10/2026 | F0a: pruebas store/lib/integración, build release y smokes | Hecho; vídeo falla también en `main` |
-| Pendiente | Aprobación del alcance de fase 1 y de F0b/F0c como precondición de fase 3 | Pendiente |
-| Pendiente | Rama `backport/fase-1`, implementación y pruebas | Pendiente |
+| 26/10/2026 | Alcance de fase 1 aprobado; C1, C5 y C4 iniciados | Hecho |
+| 26/10/2026 | C1: reproducción con 1 MiB de stack | Descartado; no reproduce |
+| 26/10/2026 | C5: SYNC audible y MASTER fijado | Hecho; 15 pruebas |
+| 26/10/2026 | C4: Beat FX CH/MST/TAP y stems conservan EQ | Hecho en código; revisión visual pendiente |
+| Pendiente | Rama `backport/fase-1`: C2/C3 y pruebas completas | En curso |
+| Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
 | Pendiente | Commit grande de fase 1 y merge a `main` | Pendiente |
 
 **Hallazgo crítico cerrado en F0a:** un backup de store de upstream v17–v23 ya no puede

@@ -8,6 +8,7 @@ use openfader::audio::{
     merge::PRESETS,
 };
 use slint::Model;
+use std::cell::Cell;
 
 /// A unit's assignment from a selector index (0..3 = CH1..CH4, 4 = MASTER): a channel the layout shows (the first
 /// `decks`) or MASTER, else `None`.
@@ -103,6 +104,30 @@ pub(in crate::app) fn tempo(master: i32, decks: [(bool, f32); DECKS]) -> Option<
         .map(|(_, bpm)| bpm)
 }
 
+/// The tempo a unit's source gives: CH (`master_tempo` false) the deck on the unit's channel `assign` (0..3) while it plays at a
+/// known tempo; MST, or CH on MASTER (4), the `master` tempo of [`tempo`]. `None` while there is nothing to follow.
+pub(super) fn follow(
+    assign: i32,
+    master_tempo: bool,
+    master: Option<f32>,
+    decks: [(bool, f32); DECKS],
+) -> Option<f32> {
+    match usize::try_from(assign).ok().filter(|&d| d < DECKS) {
+        Some(d) if !master_tempo => Some(decks[d])
+            .filter(|&(p, b)| p && b > 0.0)
+            .map(|(_, b)| b),
+        _ => master,
+    }
+}
+
+/// What a unit follows now: its source's tempo while that plays, else (the source paused) the one the unit had, so a tail keeps
+/// ringing at the tempo it started at. Only a unit that never had a tempo runs at the 120 BPM fallback.
+pub(super) fn held_tempo(last: &Cell<Option<f32>>, playing: Option<f32>) -> Option<f32> {
+    let t = playing.or(last.get());
+    last.set(t);
+    t
+}
+
 /// The PAD FX pads' colour (VIEW > Color): the RGB of the `Theme` token (accent, play, cue, danger, sampler) so the pads and the panels agree.
 pub(in crate::app) fn pad_fx_rgb(c: PadFxColor) -> [u8; 3] {
     match c {
@@ -114,11 +139,11 @@ pub(in crate::app) fn pad_fx_rgb(c: PadFxColor) -> [u8; 3] {
     }
 }
 
-/// The tempo a unit follows and whether it is only the fallback: `over` (TAP), else the decks' `master` tempo.
-pub(super) fn unit_bpm(over: Option<f32>, master: Option<f32>) -> (f32, bool) {
+/// The tempo a unit runs at and whether it is only the fallback: `over` (TAP), else the `followed` tempo of its CH / MST source.
+pub(super) fn unit_bpm(over: Option<f32>, followed: Option<f32>) -> (f32, bool) {
     (
-        over.or(master).unwrap_or(super::FALLBACK_BPM),
-        over.is_none() && master.is_none(),
+        over.or(followed).unwrap_or(super::FALLBACK_BPM),
+        over.is_none() && followed.is_none(),
     )
 }
 

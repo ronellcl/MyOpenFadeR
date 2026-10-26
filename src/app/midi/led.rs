@@ -76,7 +76,7 @@ pub struct Snap {
     fx_on: [[bool; 3]; 2],
     fx_effect: [[i32; 3]; 2],
     fx_release: [bool; 2],
-    /// The unit's tempo comes from TAP (else AUTO, the master deck's).
+    /// The unit's tempo comes from TAP (else its CH / MST source).
     fx_tapped: [bool; 2],
     /// Each unit's assignment: 0..3 CH1..CH4, 4 MASTER.
     fx_assign: [i32; 2],
