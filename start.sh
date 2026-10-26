@@ -10,5 +10,9 @@ for pair in extension/plugin:MyOpenFadeR-Plugins extension/skin:MyOpenFadeR-Them
 	dir="$root/${pair%%:*}"
 	[ -e "$dir" ] || git clone --quiet "https://github.com/ronellcl/${pair#*:}.git" "$dir"
 done
+# The plugins pin the SDK to a released tag; patch it to this checkout's sdk (they use the API it has).
+mkdir -p "$root/extension/plugin/.cargo"
+[ -e "$root/extension/plugin/.cargo/config.toml" ] ||
+	printf '[patch."https://github.com/OpenRsG/OpenFadeR"]\nopenfader-plugin = { path = "../../sdk" }\n' >"$root/extension/plugin/.cargo/config.toml"
 "$root/extension/plugin/build.sh" --quiet
 exec cargo run --release --quiet --manifest-path "$root/Cargo.toml" -- "$@"
