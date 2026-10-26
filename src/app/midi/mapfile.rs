@@ -1,4 +1,4 @@
-//! Our controller mapping files (`<controller>.xml`, the OpenFadeR-Map repository's files) in the mapping folders: each folder of
+//! Our controller mapping files (`<controller>.xml`, the MyOpenFadeR-Map repository's files) in the mapping folders: each folder of
 //! `$OPENFADER_MAPPINGS`, `<config>/openfader/mappings`, then `mappings/` next to the executable; a file in an earlier folder
 //! replaces one of the same name in a later one. One file per controller: a
 //! port-name match, a list of input controls (MIDI status + number → one of our [`ACTIONS`] with its deck and constant) and
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn every_checked_out_mapping_reads_back_to_the_same_file() {
-        // The OpenFadeR-Map checkout in `mappings/` (start.sh fetches it) or our clone beside the core.
+        // The MyOpenFadeR-Map checkout in `mappings/` (start.sh fetches it) or our clone beside the core.
         let roots = [mapfile_root()];
         for root in roots {
             let Ok(dir) = std::fs::read_dir(&root) else {

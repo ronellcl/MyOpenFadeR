@@ -174,7 +174,7 @@ La Colección es la base de datos propia de OpenFadeR. Las bibliotecas de otras 
 
 <p align="center"><img src="docs/media/themes-grid.jpg" alt="La misma vista en Catppuccin Mocha, Latte, Rek, So Pro, Dracula, Nord, Tokyo Night y Gruvbox Dark" width="100%"></p>
 
-La aplicación trae Catppuccin Mocha (el de serie) y Latte. El repositorio [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) añade once más, así que hay trece en total. Un tema puede cambiar colores, tipografías, tamaños e incluso el diseño, y se aplica al momento. PREFERENCIAS > TEMAS tiene un editor para cada token con vista previa en vivo, GUARDAR COMO, e importación.
+La aplicación trae Catppuccin Mocha (el de serie) y Latte. El repositorio [MyOpenFadeR-Themes](https://github.com/ronellcl/MyOpenFadeR-Themes) añade once más, así que hay trece en total. Un tema puede cambiar colores, tipografías, tamaños e incluso el diseño, y se aplica al momento. PREFERENCIAS > TEMAS tiene un editor para cada token con vista previa en vivo, GUARDAR COMO, e importación.
 
 <p align="center"><img src="docs/media/themes-gallery.png" alt="PREFERENCIAS, página TEMAS con la galería y GET THEMES" width="100%"></p>
 
@@ -184,9 +184,9 @@ Tres repositorios acompañantes alimentan la aplicación, y PREFERENCIAS los lis
 
 | Repositorio | Qué guarda | Dónde en la aplicación |
 | --- | --- | --- |
-| [OpenFadeR-Plugins](https://github.com/OpenRsG/OpenFadeR-Plugins) | plugins de biblioteca, dispositivo, efecto, acción y fuente (17 al escribir esto) | PREFERENCIAS > EXTENSIONES > GET PLUGINS |
-| [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) | temas | PREFERENCIAS > TEMAS > GET THEMES |
-| [OpenFadeR-Map](https://github.com/OpenRsG/OpenFadeR-Map) | mapeos de controladores MIDI (más de 170 archivos) | PREFERENCIAS > CONTROLADOR > GET MAPPINGS |
+| [MyOpenFadeR-Plugins](https://github.com/ronellcl/MyOpenFadeR-Plugins) | plugins de biblioteca, dispositivo, efecto, acción y fuente (17 al escribir esto) | PREFERENCIAS > EXTENSIONES > GET PLUGINS |
+| [MyOpenFadeR-Themes](https://github.com/ronellcl/MyOpenFadeR-Themes) | temas | PREFERENCIAS > TEMAS > GET THEMES |
+| [MyOpenFadeR-Map](https://github.com/ronellcl/MyOpenFadeR-Map) | mapeos de controladores MIDI (más de 170 archivos) | PREFERENCIAS > CONTROLADOR > GET MAPPINGS |
 
 INSTALL instala uno. Añade cualquier repositorio con su ruta de GitHub (`usuario/nombre`) y la aplicación también encuentra ahí sus plugins, temas o mapeos, así que compartir un tema es publicar un repositorio de GitHub.
 

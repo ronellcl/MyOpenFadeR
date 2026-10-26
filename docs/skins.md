@@ -23,7 +23,7 @@ the code say `skin`.
 | VDJ | dark | graphite, cyan and orange; the Virtual DJ stage: the FX panel and the master video screen in the strip under the decks, a screen in every deck, longer channel faders |
 | Ocean, High Contrast | dark | small examples that list only a few tokens |
 
-Except the two built-ins, they are the files of the [OpenFadeR-Themes](https://github.com/OpenRsG/OpenFadeR-Themes) repository:
+Except the two built-ins, they are the files of the [MyOpenFadeR-Themes](https://github.com/ronellcl/MyOpenFadeR-Themes) repository:
 copy them into `~/.config/openfader/extension/skin/`, or point `OPENFADER_SKINS` at a checkout of it.
 
 ## Choosing, customizing and sharing (PREFERENCES > THEMES)
@@ -62,7 +62,7 @@ editing a JSON file in a text editor is a live preview), and the gallery and the
 
 PREFERENCES > THEMES > **GET THEMES** lists the themes of your GitHub repositories, painted like the gallery, with one button each:
 **INSTALL**, **UPDATE** (you have a theme of that name of your own and the repository's differs) or **INSTALLED**, then **APPLY**. The
-repositories are one list shared with GET PLUGINS (`~/.config/openfader/repositories.json`; `OpenRsG/OpenFadeR-Themes` is in it on
+repositories are one list shared with GET PLUGINS (`~/.config/openfader/repositories.json`; `ronellcl/MyOpenFadeR-Themes` is in it on
 first run): type `owner/repo` and **ADD**, **x** removes one, **REFRESH** downloads them again. A repository's theme files are the
 `*.json` files at its top or at most two folders deep (outside plugin folders) that set at least one valid token, read from
 `https://github.com/<owner>/<repo>/archive/HEAD.zip`. Installing writes through the same store as IMPORT, so a built-in or bundled

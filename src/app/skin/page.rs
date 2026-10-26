@@ -568,7 +568,7 @@ mod tests {
         let skins = found();
         let cards = cards(&skins, &BUILTIN[1].to_uppercase());
         assert_eq!(cards.len(), names().len());
-        // The OpenFadeR-Themes checkout in `extension/skin/` (start.sh fetches it) adds its themes after the built-ins.
+        // The MyOpenFadeR-Themes checkout in `extension/skin/` (start.sh fetches it) adds its themes after the built-ins.
         let themes = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("extension/skin");
         let themes = themes.is_dir();
         assert!(

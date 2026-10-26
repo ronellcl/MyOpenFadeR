@@ -12,7 +12,7 @@ bin="${OPENFADER_PREFIX:-$HOME/.local}/bin"
 apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 icons="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
 config="${XDG_CONFIG_HOME:-$HOME/.config}/openfader"
-repos=(OpenRsG/OpenFadeR-Plugins OpenRsG/OpenFadeR-Themes OpenRsG/OpenFadeR-Map) # = src/catalog/list.rs DEFAULTS
+repos=(ronellcl/MyOpenFadeR-Plugins ronellcl/MyOpenFadeR-Themes ronellcl/MyOpenFadeR-Map) # = src/catalog/list.rs DEFAULTS
 
 if [ "${1:-}" = --uninstall ]; then
 	rm -f "$bin/openfader" "$apps/openfader.desktop" "$icons/openfader.png"
@@ -22,16 +22,16 @@ if [ "${1:-}" = --uninstall ]; then
 fi
 
 cd "$root"
-# The plugins of this fork build against this core's SDK; the themes and mappings are the upstream's (and the ones the
-# default repository list in src/catalog/list.rs names).
+# The plugins of this fork build against this core's SDK; the themes and mappings are this fork's own repositories (and
+# the ones the default repository list in src/catalog/list.rs names).
 [ -e extension/plugin ] || git clone --quiet https://github.com/ronellcl/MyOpenFadeR-Plugins.git extension/plugin
 # The plugins pin the SDK to a released tag; patch it to this checkout's sdk/ (they use the API it has).
 if [ ! -e extension/plugin/.cargo/config.toml ]; then
 	mkdir -p extension/plugin/.cargo
 	printf '[patch."https://github.com/OpenRsG/OpenFadeR"]\nopenfader-plugin = { path = "../../sdk" }\n' >extension/plugin/.cargo/config.toml
 fi
-[ -e extension/skin ] || git clone --quiet https://github.com/OpenRsG/OpenFadeR-Themes.git extension/skin
-[ -e mappings ] || git clone --quiet https://github.com/OpenRsG/OpenFadeR-Map.git mappings
+[ -e extension/skin ] || git clone --quiet https://github.com/ronellcl/MyOpenFadeR-Themes.git extension/skin
+[ -e mappings ] || git clone --quiet https://github.com/ronellcl/MyOpenFadeR-Map.git mappings
 extension/plugin/build.sh --quiet
 cargo build --release --quiet
 

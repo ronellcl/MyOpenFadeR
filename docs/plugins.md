@@ -17,7 +17,7 @@ A plugin adds to OpenFadeR without touching its code:
 A plugin can have sources, actions and events together (they share one program), and effects, knob modes and pad
 modes on top.
 
-Working examples in the [plugins repository](https://github.com/OpenRsG/OpenFadeR-Plugins) (checked out as `extension/plugin/`):
+Working examples in the [plugins repository](https://github.com/ronellcl/MyOpenFadeR-Plugins) (checked out as `extension/plugin/`):
 [`mix-log`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/mix-log) (a Lua plugin: events, actions, settings, files),
 [`yt-dlp`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/yt-dlp) (YouTube and SoundCloud search, playlists, downloads;
 Python and the `yt-dlp` program), [`now-playing`](https://github.com/OpenRsG/OpenFadeR-Plugins/tree/main/now-playing) (events,
@@ -55,8 +55,8 @@ the settings are kept in `~/.config/openfader/plugins.json`.
 ### Install from a repository
 
 PREFERENCES > EXTENSIONS > **GET PLUGINS** installs plugins in one click from GitHub repositories. The repository list is one list for
-plugins and themes (`~/.config/openfader/repositories.json`, a plain list of `owner/repo`); `OpenRsG/OpenFadeR-Plugins` and
-`OpenRsG/OpenFadeR-Themes` are in it on first run and can be removed with their **x**. Type `owner/repo` (or the GitHub address, with
+plugins and themes (`~/.config/openfader/repositories.json`, a plain list of `owner/repo`); `ronellcl/MyOpenFadeR-Plugins` and
+`ronellcl/MyOpenFadeR-Themes` are in it on first run and can be removed with their **x**. Type `owner/repo` (or the GitHub address, with
 or without `.git`) and **ADD**; **REFRESH** downloads the repositories again (the zips are cached in `~/.cache/openfader/repos/`,
 so the page opens without the network). Every plugin found shows as a card (name, version, description, repository) with one button:
 **INSTALL**, **UPDATE** (the repository's `version` differs from the installed one) or **INSTALLED**; **INSTALL ALL** does the rest. It
@@ -89,7 +89,7 @@ named and placed as the plugin's `plugin.json` says (`libmy_fx.so` beside `plugi
 that asset for the user's platform nothing is installed and the page says `no prebuilt <plugin> for <os>-<arch> yet`.
 
 **Checksums.** Attach a `SHA256SUMS` to your release (`sha256sum my-fx-*-x86_64.zip > SHA256SUMS`; one line per asset, plus
-`OpenFadeR-Plugins-HEAD.zip` for the repository archive) and everything the app downloads from the repository — the plugin's
+`MyOpenFadeR-Plugins-HEAD.zip` for the repository archive) and everything the app downloads from the repository — the plugin's
 own library asset and a native library's prebuilt zip — is verified against it before anything is installed. A file whose hash
 differs, or one the list does not name, is refused with its own error (it is the server's or the zip's, so refresh and try
 again if you know the repository just updated); a repository without a `SHA256SUMS` yet is reported on stderr and keeps
@@ -106,13 +106,13 @@ plugin or a repository means.
   and a badly built one can spoil the audio. The timeouts and the concurrency limits of [the protocol](#the-protocol) see that
   a *slow* or runaway plugin slows nothing but itself — protecting from a *hostile* one is your install choice.
 * **"GitHub as the registry".** There is no central index and no review: anyone may publish a repository and you add it to
-  `repositories.json`. The three repositories shipped on first run are `OpenRsG/*`; they are curated like the app itself.
+  `repositories.json`. The three repositories shipped on first run are `ronellcl/*`; they are curated like the app itself.
   Adding a repository is exactly as trusting as installing a single plugin from it: only add repositories you know.
 * **What the app checks on its own.** The download of a repository archive and of every plugin's release asset is verified
   against the repository's `SHA256SUMS` when it publishes one (see **Checksums** above), the zips are unpacked with
   hard caps (paths out of the target, absolute paths, symlinks, entry and size bombs are refused), and every `plugin.json`
   manifest key is known by name — unknown keys are reported, so a manifest cannot quietly mean something else.
-* **When the app tells you.** Installing a plugin from a repository that is not one of the shipped `OpenRsG/*` ones prints
+* **When the app tells you.** Installing a plugin from a repository that is not one of the shipped `ronellcl/*` ones prints
   this warning on stderr, naming the repository: `installing a third-party plugin. Plugins run inside MyOpenFadeR with your
   full user rights; install only repositories and authors you trust.`
 

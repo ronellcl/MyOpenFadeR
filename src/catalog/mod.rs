@@ -254,16 +254,16 @@ mod tests {
     #[test]
     fn repositories_are_read_from_owner_repo_or_the_github_address() {
         for ok in [
-            "OpenRsG/OpenFadeR-Plugins",
-            " OpenRsG/OpenFadeR-Plugins ",
-            "https://github.com/OpenRsG/OpenFadeR-Plugins",
-            "https://github.com/OpenRsG/OpenFadeR-Plugins/",
-            "https://github.com/OpenRsG/OpenFadeR-Plugins.git",
-            "http://www.github.com/OpenRsG/OpenFadeR-Plugins.git/",
-            "github.com/OpenRsG/OpenFadeR-Plugins",
+            "ronellcl/MyOpenFadeR-Plugins",
+            " ronellcl/MyOpenFadeR-Plugins ",
+            "https://github.com/ronellcl/MyOpenFadeR-Plugins",
+            "https://github.com/ronellcl/MyOpenFadeR-Plugins/",
+            "https://github.com/ronellcl/MyOpenFadeR-Plugins.git",
+            "http://www.github.com/ronellcl/MyOpenFadeR-Plugins.git/",
+            "github.com/ronellcl/MyOpenFadeR-Plugins",
         ] {
             let r = Repo::parse(ok).unwrap_or_else(|e| panic!("{ok}: {e}"));
-            assert_eq!(r.to_string(), "OpenRsG/OpenFadeR-Plugins", "{ok}");
+            assert_eq!(r.to_string(), "ronellcl/MyOpenFadeR-Plugins", "{ok}");
         }
         assert_eq!(Repo::parse("a/b.c_d").unwrap().name, "b.c_d");
         for bad in [

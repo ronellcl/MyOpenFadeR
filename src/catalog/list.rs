@@ -6,9 +6,9 @@ use std::path::PathBuf;
 
 /// Present on first run (removable).
 pub const DEFAULTS: [&str; 3] = [
-    "OpenRsG/OpenFadeR-Plugins",
-    "OpenRsG/OpenFadeR-Themes",
-    "OpenRsG/OpenFadeR-Map",
+    "ronellcl/MyOpenFadeR-Plugins",
+    "ronellcl/MyOpenFadeR-Themes",
+    "ronellcl/MyOpenFadeR-Map",
 ];
 
 fn file() -> Result<PathBuf, String> {

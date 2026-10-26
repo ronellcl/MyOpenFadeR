@@ -526,7 +526,7 @@ mod tests {
 
     #[test]
     fn the_checked_out_themes_load_without_a_note_and_are_complete() {
-        // The OpenFadeR-Themes checkout in `extension/skin/` (start.sh fetches it); nothing to check without it. Its CI runs this.
+        // The MyOpenFadeR-Themes checkout in `extension/skin/` (start.sh fetches it); nothing to check without it. Its CI runs this.
         let dir = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/extension/skin"));
         if !dir.is_dir() {
             return;

@@ -42,7 +42,7 @@ WORKDIR /src
 COPY . .
 # The companions, as the release workflow takes them (the plugins are this fork's, which build against this core's SDK);
 # checkouts already in the build context (a local working copy) win.
-RUN for pair in "extension/plugin ronellcl/MyOpenFadeR-Plugins $PLUGINS_REF" "extension/skin OpenRsG/OpenFadeR-Themes $THEMES_REF" "mappings OpenRsG/OpenFadeR-Map $MAPPINGS_REF"; do \
+RUN for pair in "extension/plugin ronellcl/MyOpenFadeR-Plugins $PLUGINS_REF" "extension/skin ronellcl/MyOpenFadeR-Themes $THEMES_REF" "mappings ronellcl/MyOpenFadeR-Map $MAPPINGS_REF"; do \
       set -- $pair; [ -e "$1/.git" ] || [ -n "$(ls -A "$1" 2>/dev/null)" ] || git clone --quiet --depth 1 --branch "$3" "https://github.com/$2.git" "$1"; \
     done
 # The fork's plugins pin the SDK to a released tag; patch it to this checkout's sdk/.

@@ -29,7 +29,7 @@ src/
     deck/            mod.rs = base: Deck (one type, instantiated per deck), snap/beat helpers, controller API; children = load, tick, frame (what moves every frame: the detail strip, platter, phase meter, paced by the window's rendering), transport, cue, sync, loops, slip, pads, cuelist, key, grid
                      ↔ ui/deck.slint + ui/pads.slint (global DeckState holding `[DeckView]`, callbacks take the deck index)
     fx/, sampler/, groove/, export.rs, analyze/, automix/, midi/   one feature each ↔ own .slint + global; callbacks wired with app::on! (one macro in app/mod.rs)
-                     midi/ reads our controller mapping files (`mappings/*.xml`, the OpenFadeR-Map repository; found through paths::search_path with OPENFADER_MAPPINGS)
+                     midi/ reads our controller mapping files (`mappings/*.xml`, the MyOpenFadeR-Map repository; found through paths::search_path with OPENFADER_MAPPINGS)
     plugins/         mod.rs = base: Plugins menu, action prompt, commands of actions and event replies, timer events ↔ ui/plugins.slint (PluginState); child manager (the plugin manager in PREFS > EXTENSIONS)
     drop/            files dragged in from the desktop ↔ FileDropState (ui/dnd.slint): plugins, themes, music; children = x11 (winit's file drops), wayland (our own wl_data_device on winit's connection)
     skin/            mod.rs = base: Skin, skin list, rescan, apply (restyles every window from skin files); children = file (parse / write), store (the user's skin folder), draft (theme editor's working copy), page (PREFS > THEMES ↔ ui/themes.slint, global ThemeState)
@@ -66,7 +66,7 @@ tests/
 - Library sources return `library::Track`/`Playlist` through `trait Library`. The UI never matches on a concrete source.
 - Machine-local paths, keys and user data are never in tracked files. USB tests read `OPENFADER_USB` and skip when it is unset. Keys come from env vars or the git-ignored `.local/` files.
 - Format claims are labelled inferred or ours in the doc comment of the child that implements them. The core names no third-party software; only plugins and mapping files may.
-- Repositories: core (`OpenFadeR`), `OpenFadeR-Plugins` (`extension/plugin/`), `OpenFadeR-Map` (`mappings/`), `OpenFadeR-Themes` (`extension/skin/`).
+- Repositories: core (`MyOpenFadeR`), `MyOpenFadeR-Plugins` (`extension/plugin/`), `MyOpenFadeR-Map` (`mappings/`), `MyOpenFadeR-Themes` (`extension/skin/`).
 
 ## Memory
 - A deck track, a browser preview track and a bulk-analysis track never exist as a full-length f32 buffer: `audio::decode_track16_cancellable` quantises each packet into one `Track16` buffer (reserved from the header's frame count) and hashes the audio fingerprint from the decoder's f32 frames (`analysis::fingerprint::Window`, so the fingerprint is the one `fingerprint::of` gives the f32 decode). Gain, auto cue, the fallback waveform and the analysis read that same `Arc<Track16>` through `audio::Frames`, which f32 slices implement too. Sampler, edit and groove stay on f32 `Pcm`.

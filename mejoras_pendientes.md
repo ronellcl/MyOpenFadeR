@@ -216,9 +216,9 @@ Lo cerrado, con su commit:
 
 El detalle está en [hallazgos_solucionados.md](hallazgos_solucionados.md), sexta tanda.
 
-**Del plan solo quedó fuera el origen "Devices":** `Origin` tiene `All`/`Collection`/`YouTube`/
-`Deezer`, así que una pista de un USB o del disco local que no esté en la Colección no se puede
-aislar con el filtro (sí aparece en la tabla y llega por la búsqueda unificada).
+**El origen "Devices" se añadió después** (`3fe48c5`): `Origin` tiene `All`/`Collection`/`YouTube`/
+`Deezer`/`Devices`, así que una pista de un USB o del disco local que no esté en la Colección también
+se puede aislar con el filtro.
 
 ## 13. Cuarta tanda (21/10/2026): los volúmenes - HECHO
 
@@ -265,20 +265,30 @@ Notas:
 
 ## 16. Lo que queda abierto (revisado el 26/10/2026)
 
-Revisado contra el código de `main` (`d485250`, versión 0.4.1). **`hallazgos.md` está cerrado
+Revisado contra el código de `main` (`3fe48c5`, versión 0.4.1). **`hallazgos.md` está cerrado
 entero**: los 30 hallazgos figuran resueltos en [hallazgos_solucionados.md](hallazgos_solucionados.md).
 Lo que sigue es decisión, no avería:
 
-1. **Origen "Devices" en el filtro del navegador** — el único punto de la fase 5 que no se hizo
-   (ver arriba); hoy el filtro solo distingue Colección / YouTube / Deezer.
+1. ~~**Origen "Devices" en el filtro del navegador**~~ — **hecho** (`3fe48c5`): el chip cicla
+   ALL / COLLECTION / YOUTUBE / DEEZER / DEVICES y `Origin::Devices` deja las pistas cuyo archivo
+   está en un volumen montado o en un disco local (también las que sí están en la Colección).
 2. **Salto de vídeo: de ~460 ms a ~150 ms** — dos caminos ya medidos: re-codificar lo descargado
    con keyframes cada segundo (`-g 30`, a costa de una descarga más lenta) o el salto en dos fases
    (el keyframe al instante y el frame exacto después).
 3. **Release de `MyOpenFadeR-Plugins`** — publicar yt-dlp 1.2.4 y el motor de Deezer (el `main` ya
-   los tiene; falta decidir si la release lleva el binario de yt-dlp adjunto).
+   los tiene; falta decidir si la release lleva el binario de yt-dlp adjunto). **Hace falta antes
+   de que GET PLUGINS pueda instalar nada**: los repositorios por defecto ya son de `ronellcl`,
+   pero el de plugins aún no tiene releases y la descarga busca el zip en `releases/latest`.
 4. **Empaquetado de Windows** — la línea `$excluded` puede desaparecer si el motor de Deezer se da
    por terminado (hoy no excluye nada).
 5. **Diálogos nativos en Windows** — el selector de archivos de la app y el diálogo del ARL del
    plugin deezer usan PowerShell con `CREATE_NO_WINDOW` porque sin consola no muestran nada; en
    Windows 11 puede asomar la pestaña del terminal un momento. Pasarlos a un diálogo nativo (FFI)
    lo quita del todo (ver §1).
+
+**Repositorios por defecto repuntados** (`chore/repo-urls`): `src/catalog/list.rs`, `install.sh`,
+`start.sh`, `Dockerfile.pi`, el About y la documentación usan ahora
+`ronellcl/MyOpenFadeR-Plugins`, `ronellcl/MyOpenFadeR-Themes` y `ronellcl/MyOpenFadeR-Map`. Los
+nombres reales de GitHub llevan mayúsculas y plural (`MyOpenFadeR-plugin` no existe). Los enlaces
+de atribución al OpenFadeR original y el `[patch]` del SDK (`OpenRsG/OpenFadeR`, que es lo que fija
+el `Cargo.toml` del repo de plugins) se quedan como están.
