@@ -26,6 +26,8 @@ const AHEAD: i64 = 45;
 const BACKFILL: i64 = 12;
 /// Frames read beyond the target while playing (hides the decode time of the next one).
 const PREFETCH: i64 = 2;
+/// A seek first shows the previous keyframe when it is at least this many seconds before the target.
+const ROUGH_MIN_GAP: f64 = 1.0;
 const MIN_RESTART: Duration = Duration::from_millis(60);
 const IDLE: Duration = Duration::from_millis(10);
 /// `show` value for "no picture" (before the start, past the end, no video).
@@ -91,6 +93,11 @@ impl Feed {
     /// ffmpeg decoding `path` from frame `from` on at `fps`, scaled to fit [`WIDTH`]×[`HEIGHT`] with black bars.
     fn spawn(path: &Path, from: i64, fps: f64) -> Result<Feed, String> {
         let ss = ((from as f64 - 0.5).max(0.0)) / fps; // half a frame early: the frame at `from` itself must not be cut off
+        Feed::spawn_at(path, ss, fps)
+    }
+
+    /// ffmpeg decoding `path` from `ss` seconds on (exactly: the caller passes a keyframe's own timestamp).
+    fn spawn_at(path: &Path, ss: f64, fps: f64) -> Result<Feed, String> {
         let vf = format!("fps={fps},scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black");
         let mut cmd = Command::new("ffmpeg");
         cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-ss", &format!("{ss:.4}"), "-i"])
@@ -150,6 +157,7 @@ impl Cache {
 fn run(sh: &Shared, path: &Path, info: Info) -> Result<(), String> {
     let (mut cache, mut feed, mut eof) = (Cache::default(), None::<Feed>, false);
     let mut published: Option<Option<i64>> = None; // what `frame` holds: Some(None) = black
+    let mut rough: Option<i64> = None; // the target whose keyframe is on screen, before its exact frame
     let mut restarted = Instant::now().checked_sub(MIN_RESTART).unwrap_or_else(Instant::now);
     while !sh.stop.load(Relaxed) {
         let target = sh.target.load(Relaxed);
@@ -160,11 +168,13 @@ fn run(sh: &Shared, path: &Path, info: Info) -> Result<(), String> {
             if published != Some(None) {
                 *sh.frame.lock() = None;
                 published = Some(None);
+                rough = None;
             }
         } else if let Some(f) = cache.get(want) {
-            if published != Some(Some(want)) {
+            if published != Some(Some(want)) || rough == Some(want) {
                 *sh.frame.lock() = Some(f.clone());
                 published = Some(Some(want));
+                rough = None;
             }
             if feed.is_some() && cache.end() < want + PREFETCH {
                 read_one(&mut feed, &mut cache, &mut eof);
@@ -180,19 +190,37 @@ fn run(sh: &Shared, path: &Path, info: Info) -> Result<(), String> {
             if published != Some(None) {
                 *sh.frame.lock() = None;
                 published = Some(None);
+                rough = None;
             }
             if restarted.elapsed() >= MIN_RESTART {
-                // Restart a little before the target.
+                // Restart a little before the target: this decoder reaches the exact frame.
                 let from = (target - BACKFILL).max(0);
                 drop(feed.take());
                 feed = Some(Feed::spawn(path, from, info.fps)?);
                 (cache, eof, restarted) = (Cache { first: from, frames: VecDeque::new() }, false, Instant::now());
+                // Two-phase seek: when the previous keyframe is far enough back, decode it now and show it while the
+                // decoder above gets to the target. Nearer the target, the exact frame arrives soon enough anyway.
+                if let Some(kf) = previous_keyframe(&info.keys, target as f64 / info.fps, ROUGH_MIN_GAP) {
+                    if let Ok(mut key) = Feed::spawn_at(path, kf, info.fps) {
+                        if let Some(f) = key.read().filter(|_| sh.target.load(Relaxed) == target) {
+                            *sh.frame.lock() = Some(f);
+                            published = Some(Some(target));
+                            rough = Some(target);
+                        }
+                    }
+                }
                 continue;
             }
         }
         thread::park_timeout(IDLE);
     }
     Ok(())
+}
+
+/// The last keyframe at or before `at` seconds, when it lies at least `min_gap` seconds before it.
+fn previous_keyframe(keys: &[f64], at: f64, min_gap: f64) -> Option<f64> {
+    let k = keys.iter().rev().copied().find(|k| *k <= at)?;
+    (at - k >= min_gap).then_some(k)
 }
 
 fn read_one(feed: &mut Option<Feed>, cache: &mut Cache, eof: &mut bool) {
@@ -202,5 +230,20 @@ fn read_one(feed: &mut Option<Feed>, cache: &mut Cache, eof: &mut bool) {
             *feed = None; // ends the child; the cache stays for loops and for holding the last frame
             *eof = true;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::previous_keyframe;
+
+    #[test]
+    fn a_seek_uses_the_previous_keyframe_only_when_it_is_far_enough_back() {
+        let keys = [0.0, 2.0, 4.0, 6.0];
+        assert_eq!(previous_keyframe(&keys, 5.9, 1.0), Some(4.0));
+        assert_eq!(previous_keyframe(&keys, 4.5, 1.0), None);
+        assert_eq!(previous_keyframe(&keys, 1.5, 1.0), Some(0.0));
+        assert_eq!(previous_keyframe(&keys, 1.0, 2.0), None);
+        assert_eq!(previous_keyframe(&[], 5.0, 1.0), None);
     }
 }

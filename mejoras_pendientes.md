@@ -272,9 +272,11 @@ Lo que sigue es decisión, no avería:
 1. ~~**Origen "Devices" en el filtro del navegador**~~ — **hecho** (`3fe48c5`): el chip cicla
    ALL / COLLECTION / YOUTUBE / DEEZER / DEVICES y `Origin::Devices` deja las pistas cuyo archivo
    está en un volumen montado o en un disco local (también las que sí están en la Colección).
-2. **Salto de vídeo: de ~460 ms a ~150 ms** — dos caminos ya medidos: re-codificar lo descargado
-   con keyframes cada segundo (`-g 30`, a costa de una descarga más lenta) o el salto en dos fases
-   (el keyframe al instante y el frame exacto después).
+2. ~~**Salto de vídeo: de ~460 ms a ~150 ms**~~ — **hecho en dos partes**: el core muestra el
+   keyframe anterior mientras llega el frame exacto (ffprobe lista los keyframes una vez;
+   `feature/video-seek`), y el plugin yt-dlp re-codifica con un keyframe por segundo lo que entra
+   en la Colección (`-g 30` + `-force_key_frames`, rama `feature/video-keyframes` del repo de
+   plugins). El `fetch` de la nube se deja sin re-codificar para no retrasar la primera reproducción.
 3. **Release de `MyOpenFadeR-Plugins`** — publicar yt-dlp 1.2.4 y el motor de Deezer (el `main` ya
    los tiene; falta decidir si la release lleva el binario de yt-dlp adjunto). **Hace falta antes
    de que GET PLUGINS pueda instalar nada**: los repositorios por defecto ya son de `ronellcl`,

@@ -85,7 +85,7 @@ impl Slot {
         };
         let next = match rx.try_recv() {
             Err(TryRecvError::Empty) => return,
-            Ok(Ok(info)) => Source::Ready(Stream::open(path.clone(), info), info),
+            Ok(Ok(info)) => Source::Ready(Stream::open(path.clone(), info.clone()), info),
             Ok(Err(e)) => Source::Failed(e),
             Err(TryRecvError::Disconnected) => Source::Failed("ffprobe stopped".into()),
         };
