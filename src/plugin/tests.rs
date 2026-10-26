@@ -209,6 +209,7 @@ done"#;
     assert!(e.starts_with("mute: no reply within"), "{e}");
     process::stop_all();
     #[cfg(unix)]
+    // SAFETY: `pid` is a child the test just started and `stop_all` killed; signal 0 only asks whether it still exists.
     assert_ne!(unsafe { libc::kill(a["pid"].as_i64().unwrap() as i32, 0) }, 0, "still running after stop_all");
 }
 
@@ -229,4 +230,17 @@ fn a_program_named_without_its_extension_is_found_with_it() {
     } else {
         assert_eq!(got, "bin/engine");
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_plugin_program_gets_its_execute_bit_back() {
+    use std::os::unix::fs::PermissionsExt;
+    let d = temp("mode");
+    let p = d.join("tool");
+    fs::write(&p, b"#!/bin/sh\n").unwrap();
+    fs::set_permissions(&p, fs::Permissions::from_mode(0o644)).unwrap();
+    ensure_executable(&p);
+    assert_eq!(fs::metadata(&p).unwrap().permissions().mode() & 0o777, 0o755);
+    let _ = fs::remove_dir_all(&d);
 }

@@ -42,6 +42,9 @@ struct Entry {
     local: u64,
     /// Made on Unix with the symlink file type in its attributes (the entry's data is the link target).
     symlink: bool,
+    /// Permission bits of a Unix-made entry (0 when the zip was made elsewhere).
+    #[cfg_attr(not(unix), allow(dead_code))]
+    mode: u32,
 }
 
 /// The central directory of a zip, with the file to read entries from.
@@ -103,6 +106,7 @@ impl Zip {
             let (nl, xl, cl) = (le16(&dir, p + 28), le16(&dir, p + 30), le16(&dir, p + 32));
             let name = dir.get(p + 46..p + 46 + nl).ok_or(Error::NotZip)?;
             let (made_by, attrs) = (le16(&dir, p + 4) >> 8, le32(&dir, p + 38) >> 16);
+            let mode = if made_by == 3 { attrs as u32 } else { 0 };
             entries.push(Entry {
                 name: String::from_utf8_lossy(name).into_owned(),
                 method: le16(&dir, p + 10) as u16,
@@ -110,7 +114,8 @@ impl Zip {
                 csize: le32(&dir, p + 20),
                 size: le32(&dir, p + 24),
                 local: le32(&dir, p + 42),
-                symlink: made_by == 3 && attrs & 0o170000 == 0o120000,
+                symlink: mode & 0o170000 == 0o120000,
+                mode,
             });
             p += 46 + nl + xl + cl;
         }
@@ -243,6 +248,19 @@ impl Zip {
             let mut cap = Cap { inner: out, left: budget };
             self.extract(&name, &mut cap)
                 .map_err(|e| format!("{name}: {e:?}"))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                // A plugin release asset carries the mode of its binary (755 for the Deezer engine and the other
+                // programs): without it the file lands as 644 and running it fails with "Permission denied".
+                let mode = self.find(&name).map_or(0, |e| e.mode & 0o777);
+                if mode != 0 {
+                    paths::at(
+                        std::fs::set_permissions(&dst, std::fs::Permissions::from_mode(mode)),
+                        &dst,
+                    )?;
+                }
+            }
             budget = cap.left;
         }
         Ok(())
@@ -364,6 +382,38 @@ mod tests {
         ));
         assert_eq!(crc32(b"123456789"), 0xCBF4_3926); // the standard check value
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    fn zip_with_mode(name: &str, data: &[u8], mode: u32) -> Vec<u8> {
+        let mut z = write(&[(name, data.to_vec())]);
+        let at = z
+            .windows(4)
+            .position(|w| w == b"PK\x01\x02")
+            .expect("a central directory header");
+        z[at + 5] = 3; // version made by: Unix (the high byte; the low one is already 20)
+        let attrs = (0o100000 | (mode & 0o777)) << 16;
+        z[at + 38..at + 42].copy_from_slice(&attrs.to_le_bytes());
+        z
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unpack_keeps_the_execute_bit_of_a_unix_entry() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("openfader-zip-mode-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("modes.zip");
+        std::fs::write(&path, zip_with_mode("tool", b"#!/bin/sh\n", 0o755)).unwrap();
+        let out = dir.join("out");
+        Zip::open(&path).unwrap().unpack("", &out, &[]).unwrap();
+        let mode = std::fs::metadata(out.join("tool"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o755);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

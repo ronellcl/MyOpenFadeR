@@ -555,7 +555,12 @@ impl Plugin {
         let (program, args) = command
             .split_first()
             .ok_or_else(|| format!("{name}: no command"))?;
-        let mut cmd = Command::new(self.resolve(program));
+        let exe = self.resolve(program);
+        #[cfg(unix)]
+        if Path::new(&exe).starts_with(&self.dir) {
+            ensure_executable(Path::new(&exe));
+        }
+        let mut cmd = Command::new(&exe);
         cmd.args(args.iter().map(|a| self.resolve(a)))
             .current_dir(&self.dir)
             .stdin(Stdio::piped())
@@ -628,6 +633,20 @@ impl Plugin {
     }
 }
 
+/// Gives a command program back its execute bit when an install extracted it as 644: releases carry the mode, but
+/// copies made before [`crate::zip::Zip::unpack`] kept it are out there. Only paths inside the plugin folder are
+/// touched; Windows has no such bit.
+#[cfg(unix)]
+fn ensure_executable(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    if let Ok(meta) = path.metadata() {
+        let mode = meta.permissions().mode();
+        if mode & 0o111 == 0 {
+            let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode | 0o111));
+        }
+    }
+}
+
 /// The Python interpreter for `*.py` scripts.
 ///
 /// The one that travels with the program (`python\` next to it, the folder the installer ships) comes first: the
@@ -664,7 +683,7 @@ fn on_path(name: &str) -> bool {
         .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
         .unwrap_or_default()
         .into_iter()
-        .chain(std::env::var_os("WINDIR").map(PathBuf::from).into_iter())
+        .chain(std::env::var_os("WINDIR").map(PathBuf::from))
         .any(|d| d.join(name).is_file())
 }
 
