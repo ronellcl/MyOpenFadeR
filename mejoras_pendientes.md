@@ -513,27 +513,35 @@ control, `replace_tables` vacía todas las tablas y solo rellena las que existen
 `folder_index` se pierde y las columnas cloud quedan a NULL, con un aviso de éxito. **Hay que
 cerrar este agujero antes de añadir cualquier tabla nueva.**
 
-Plan propuesto:
+**Implementado en F0a (26/10/2026):**
 
-- Nuevo `src/store/identity.rs` con `Kind::{Empty, Fork, Foreign}`.
-- `PRAGMA application_id` con `0x4D4F4644` (`MOFD`) en stores nuevos, y back-stamp en los stores
-  del fork existentes.
-- Sonda de firma para archivos sin marcar: fork ⇒ `collection.plugin` o `folder_index`; upstream ⇒
-  `track.title`, `health_failure`, `stage` o `saved_search`.
-- `check_openable()` antes de cualquier escritura; un store/backup `Foreign` se rechaza abriendo
-  **read-only** y con un mensaje accionable. Un conversor de stores es un proyecto aparte.
-- El zip de backup lleva un miembro `store.id`; un backup extranjero se rechaza antes de adjuntar
-  la base.
-- En `replace_tables`, conservar `LOCAL_TABLES = ["folder_index", "store_note"]`; si al backup le
-  falta una tabla que tiene el store actual, **fallar cerrado** en vez de vaciarla. Después de
-  restaurar: `reconcile()` + `PRAGMA foreign_key_check`.
-- Documentar el mapa de versiones y la regla de solo añadir en `docs/store-schema.md`.
+- `src/store/identity.rs` con `Kind::{Empty, Fork, Foreign}`, `inspect`, `inspect_conn`, `check`,
+  `check_conn`, `stamp`, `check_backup_id` y el mensaje `foreign()`.
+- `PRAGMA application_id = 0x4D4F4644` (`MOFD`, decimal 1297040964) en stores nuevos; los stores
+  del fork sin marca reciben el sello tras migrar.
+- Sonda de firma para archivos sin marcar: fork ⇒ `folder_index` o `collection.plugin`; upstream ⇒
+  `track.title`, `health_failure`, `stage` o `saved_search`. Un archivo sin firmas y con esquema
+  ≤ v15 se acepta como fork legado; con esquema > v15 se rechaza.
+- `Store::open_at` inspecciona **read-only** antes de abrir en read-write/WAL; `migrate` repite el
+  control antes de aplicar migraciones. Un store `Foreign` se rechaza sin escribir y `global()`
+  cae a memoria con el motivo en stderr.
+- El zip de backup lleva `store.id` (`MOFD`); `restore` rechaza un `store.id` ajeno y
+  `copy_tables_from` inspecciona el `store.db` extraído antes de `ATTACH`.
+- `replace_tables` conserva `LOCAL_TABLES = ["folder_index", "store_note"]` (y `collection_hwm`),
+  vacía el journal y **falla cerrado** si al backup le falta cualquier tabla no local que tiene el
+  store actual, listando las que faltan.
+- Después de restaurar se ejecuta `PRAGMA foreign_key_check`; `Restored.foreign_key_violations`
+  llega a la app y se avisa si el backup dejó referencias rotas.
+- `store_note` queda reservada en `LOCAL_TABLES`, pero **no se crea** en F0a. Fuera de F0a:
+  `reconcile()`, migraciones v18–v23, `backup_auto` y rollback (F0b/F0c). `docs/store-schema.md`
+  sigue pendiente para F0b/F0c.
 
 #### 17.5.3 Subfases F0–F5
 
 | Subfase | Contenido | Cierre |
 |---|---|---|
-| F0 | Identidad, `reconcile()`, migraciones v18–v23, `backup_auto`, rollback y preservación de tablas locales | Store fork v17→v23 sin pérdida; segundo arranque sin cambios; backup upstream rechazado; restaurar/rollback conserva `folder_index` y columnas cloud |
+| F0a | Identidad, rechazo read-only, `store.id` del zip, `LOCAL_TABLES`, fail closed y FK check | **Hecho el 26/10/2026**; ver §17.5.2 y pruebas en §17.5.5 |
+| F0b–F0c | `reconcile()`, migraciones v18–v23, `backup_auto`, rollback y `docs/store-schema.md` | Pendiente; no se añade ninguna tabla nueva antes de cerrar F0b/F0c |
 | F1 | Primitivas sin UI: `paths::{free_name,move_file,move_files,move_back}`, journal de movimientos, `Store::system` para historial, health, artwork, saved_search, print, import_undo | Todo probado headless; sin editar `src/app/**` ni `ui/**` |
 | F2 | Núcleo de library: inbox/stage, artwork, import report, loudness con límite por pico (activa el reset de gain), print/relocate | Funciona con el andamiaje de UI actual; las pistas cloud se saltan en print/health/artwork/inbox |
 | F3 | Device + SDK: `commit.rs` (journal de escritura), `Provider::{check,fix,players}`, plan/check/transfer/undo/format; adaptar `device/mod.rs`, no reemplazarlo | `cargo check --all-targets` en Linux; revisión Windows/macOS; formateo solo tras dry-run y confirmación |
@@ -572,9 +580,28 @@ wiring, transfer+undo.
 | Migración interrumpida | Reabrir converge; ninguna migración a medias |
 | Transfer con `fail_at` | Recupera dispositivo y biblioteca; backup previo presente |
 
-Aceptación: `cargo test` verde; `cargo check --all-targets` verde en Linux y revisión de targets
-Windows/macOS; las funciones del fork (pinned/local disks, cloud, español, skins, track-edit,
-vídeo) siguen pasando sus tests; `docs/store-schema.md` existe.
+**Evidencia F0a (26/10/2026):**
+
+- `cargo test --lib store::` → 51 pruebas pasan.
+- `cargo test --lib` → 624 pruebas pasan.
+- `cargo test --release --lib store::` → 51 pruebas pasan.
+- `cargo test --release --test store` → 3 pruebas pasan.
+- `cargo test --tests -- --skip frames_follow_the_playhead_through_seeks_loops_and_the_end` →
+  todo verde: 624 de librería, 506 del binario (1 ignorada) y todas las integraciones. La prueba
+  saltada también falla en `main` (`e2fc180`) en un worktree aparte; no es una regresión de F0a.
+- `cargo build --release` → correcto; solo los 3 avisos preexistentes.
+- Smoke real con `target/release/openfader`: proceso vivo, 22 plugins encontrados, captura con
+  `spectacle`, sin panic; `store.db` nuevo con `application_id=1297040964`, `user_version=17`.
+- Smoke de store extranjero: el proceso arranca en memoria, el hash del `store.db` no cambia, la
+  cabecera sigue `0/17` y el log contiene el rechazo accionable.
+- `.github/smoke.sh` falla solo en la captura con ImageMagick 7 de este host
+  (`import: missing an image filename`); la comprobación de proceso vivo, plugins y panic pasa. La
+  captura manual con `spectacle -b -n -a -o <archivo>` sí funciona.
+
+Aceptación completa de F0: `cargo test` verde; `cargo check --all-targets` verde en Linux y
+revisión de targets Windows/macOS; las funciones del fork (pinned/local disks, cloud, español,
+skins, track-edit, vídeo) siguen pasando sus tests; `docs/store-schema.md` existe. F0a cierra el
+vector de restauración, pero **no** la aceptación completa: faltan F0b/F0c.
 
 #### 17.5.6 Riesgos específicos
 
@@ -624,16 +651,17 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | Informe store/device/plugin recibido; F0–F5 incorporados a §17.5 | Hecho |
 | 26/10/2026 | Análisis Rust fase 1 y Slint UI | Hecho |
 | 26/10/2026 | Informes reconciliados; §17.3.5 fija contratos UI/Rust y §17.3.1 ajusta el veredicto | Hecho |
-| 26/10/2026 | F0a: identidad del store, rechazo read-only y `LOCAL_TABLES` | En curso |
-| Pendiente | Aprobación del alcance de fase 1 y de F0 como precondición de fase 3 | Pendiente |
+| 26/10/2026 | F0a: identidad del store, rechazo read-only y `LOCAL_TABLES` | Hecho; ver §17.5.2 |
+| 26/10/2026 | F0a: pruebas store/lib/integración, build release y smokes | Hecho; vídeo falla también en `main` |
+| Pendiente | Aprobación del alcance de fase 1 y de F0b/F0c como precondición de fase 3 | Pendiente |
 | Pendiente | Rama `backport/fase-1`, implementación y pruebas | Pendiente |
 | Pendiente | Commit grande de fase 1 y merge a `main` | Pendiente |
 
-**Hallazgo crítico en corrección (F0a):** hoy un backup de store de upstream v17–v23 puede
-restaurarse en el fork y borrar `folder_index` y las columnas cloud sin avisar. No se debe añadir
-ninguna tabla nueva antes de F0 (identidad + rechazo read-only + `LOCAL_TABLES`). F0a cubre solo
-la identidad, el rechazo read-only, la marca `store.id` del zip y la preservación de tablas
-locales; `reconcile()`, v18–v23, `backup_auto` y el rollback quedan en F0b/F0c.
+**Hallazgo crítico cerrado en F0a:** un backup de store de upstream v17–v23 ya no puede
+restaurarse en el fork: se rechaza por `application_id`/firmas antes de `ATTACH`, y un backup
+marcado como fork pero con tablas faltantes falla cerrado. `folder_index`, `store_note` (reservada)
+y `collection_hwm` se conservan. No se debe añadir ninguna tabla nueva antes de F0b/F0c
+(`reconcile()`, v18–v23, `backup_auto`, rollback y `docs/store-schema.md`).
 
 Decisiones abiertas:
 
@@ -642,5 +670,6 @@ Decisiones abiertas:
 2. Decidir si el endurecimiento de CI va en fase 1 o fase 2. Recomendación: fase 2.
 3. Decidir más adelante si se quiere updater adaptado al fork; no se implementa sin aprobación.
 4. Confirmar que no se tocará versión, tags, releases ni push durante las fases.
-5. Aprobar F0 (store: identidad, reconcile, v18–v23, backup/rollback) como bloque separado y
-   precondición de todas las funciones nuevas de biblioteca/dispositivo.
+5. Aprobar F0b/F0c (`reconcile()`, v18–v23, `backup_auto`, rollback y `docs/store-schema.md`)
+   como bloque separado y precondición de todas las funciones nuevas de biblioteca/dispositivo.
+   F0a (identidad, rechazo read-only, `store.id`, tablas locales y FK check) ya está hecho.

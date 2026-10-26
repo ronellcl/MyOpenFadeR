@@ -2,19 +2,20 @@
 //!
 //! A backup is a zip next to which an optional `MUSIC_DIR` folder holds the music files ("back up music files as well?", zip
 //! named with the date, music in `MUSIC_DIR`). Our zip holds `store.db` (a consistent copy made by
-//! `VACUUM INTO`: collection, playlists, cues, grids, ratings, tags, history, devices …), `settings.conf` (the settings
-//! file) and `music.tsv` (original path, tab, path relative to `MUSIC_DIR`). Restore copies every table of the backup's
-//! `store.db` over ours in one transaction (the backup must not be from a newer build) and puts music back where it was
-//! when nothing is there. Backups of other programs are not supported: that is a different database format.
+//! `VACUUM INTO`: collection, playlists, cues, grids, ratings, tags, history, devices …), `store.id` (the
+//! `MOFD` identity), `settings.conf` (the settings file) and `music.tsv` (original path, tab, path relative to
+//! `MUSIC_DIR`). Restore refuses a backup from another OpenFadeR build before attaching its database, copies every
+//! table of a MyOpenFadeR backup over ours in one transaction (the backup must not be from a newer build nor lack a
+//! table this build needs), keeps this computer's local tables, and puts music back where it was when nothing is there.
 //!
 //! The zip is written and read by [`crate::zip`], entries stored uncompressed.
 //! ponytail: no deflate on write (the entries are one SQLite file and two text files; `flate2` is already a dependency if backups
 //! get large) and no zip64.
 
-use super::{in_tx, Sql, Store, MIGRATIONS, R};
+use super::{identity, in_tx, Sql, Store, MIGRATIONS, R};
 use crate::paths::at;
 use crate::zip::{self, Zip};
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 
 /// Folder (beside the zip) holding the backed-up music.
@@ -22,7 +23,12 @@ pub const MUSIC_DIR: &str = "music-backup";
 
 const SETTINGS: &str = "settings.conf";
 const STORE: &str = "store.db";
+const STORE_ID: &str = "store.id";
 const MUSIC_INDEX: &str = "music.tsv";
+
+/// Tables that belong to this computer and survive a restore: the pinned-folder index is rebuilt from
+/// the sticks it names and a note describes this installation, so neither is the backup's to replace.
+const LOCAL_TABLES: &[&str] = &["folder_index", "store_note"];
 
 /// A zip error in the backup's wording.
 fn zip_error(e: zip::Error) -> String {
@@ -51,6 +57,9 @@ pub struct Restored {
     pub music: usize,
     pub music_present: usize,
     pub music_lost: usize,
+    /// Rows the restored data references but does not hold. Zero for a healthy backup; any other value is
+    /// reported instead of hidden, because the rows are already in place.
+    pub foreign_key_violations: usize,
 }
 
 impl Store {
@@ -73,10 +82,12 @@ impl Store {
         }
         let snapshot = dir.join(format!(".store-{}.tmp", std::process::id()));
         let _ = std::fs::remove_file(&snapshot);
+        // A store opened before the marker existed gets it here too, so the snapshot always carries it.
+        identity::stamp(&self.db())?;
         self.run("VACUUM INTO ?1", [snapshot.to_string_lossy()])?;
         let db = at(std::fs::read(&snapshot), &snapshot);
         let _ = std::fs::remove_file(&snapshot);
-        let mut entries = vec![(STORE, db?)];
+        let mut entries = vec![(STORE, db?), (STORE_ID, identity::BACKUP_ID.to_vec())];
         if let Some(s) = settings.filter(|s| s.is_file()) {
             entries.push((SETTINGS, at(std::fs::read(s), s)?));
         }
@@ -115,6 +126,10 @@ impl Store {
         let mut get = |n: &str| z.has(n).then(|| z.read(n).map_err(zip_error)).transpose();
         let db = get(STORE)?
             .ok_or("this zip holds no store.db (it is not a backup made by this program)")?;
+        let id = get(STORE_ID)?;
+        if let Some(id) = id {
+            identity::check_backup_id(&id)?;
+        }
         let (settings, index) = (get(SETTINGS)?, get(MUSIC_INDEX)?);
         // One file per restore: two stores restoring at once (the tests do) never share it.
         static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
@@ -130,6 +145,7 @@ impl Store {
             music: 0,
             music_present: 0,
             music_lost: 0,
+            foreign_key_violations: 0,
         };
         let base = zip.parent().unwrap_or(Path::new("")).join(MUSIC_DIR);
         let index = index
@@ -157,18 +173,33 @@ impl Store {
         // A backup from before the canonical columns holds rows still to be backfilled and edits under legacy keys; the
         // music is back by now, so their files can be read.
         self.system(|| super::rekey::backfill(&mut self.db()))?;
+        out.foreign_key_violations = self.foreign_key_violations()?;
         Ok(out)
+    }
+
+    /// Rows whose foreign keys point nowhere in this store. Runs after a restore, when the backup has already
+    /// replaced the data and the caller still needs to know whether the result is coherent.
+    fn foreign_key_violations(&self) -> R<usize> {
+        let db = self.db();
+        let mut st = db.prepare("PRAGMA foreign_key_check").s()?;
+        let mut rows = st.query([]).s()?;
+        let mut n = 0;
+        while rows.next().s()?.is_some() {
+            n += 1;
+        }
+        Ok(n)
     }
 
     /// Every table of the database file `other` replaces the same-named table here (matching columns only).
     fn copy_tables_from(&self, other: &Path) -> R<()> {
-        let theirs: i64 = Connection::open_with_flags(other, OpenFlags::SQLITE_OPEN_READ_ONLY)
-            .s()?
-            .pragma_query_value(None, "user_version", |r| r.get(0))
-            .map_err(|_| "the backup's store.db cannot be read".to_owned())?;
-        if theirs as usize > MIGRATIONS.len() {
+        let found = identity::check(other)?;
+        if !found.is_fork() {
+            return Err("the backup's store.db holds no MyOpenFadeR library".into());
+        }
+        if found.schema > MIGRATIONS.len() {
             return Err(format!(
-                "the backup is from a newer build (store schema v{theirs})"
+                "the backup is from a newer build (store schema v{})",
+                found.schema
             ));
         }
         let mut db = self.db();
@@ -210,14 +241,30 @@ fn columns(db: &Connection, schema: &str, table: &str) -> R<Vec<String>> {
 /// Empties every table of `main` and refills the ones `bak` also has from it, in one transaction.
 fn replace_tables(db: &mut Connection) -> R<()> {
     // The journal stays this store's own: it describes edits of the data being replaced, so it is emptied below.
+    // The high-water mark of ids only grows, and the local tables describe this computer, not the backup.
     let mine: Vec<String> = tables(db, "main")?
         .into_iter()
-        .filter(|t| !t.starts_with("journal") && t != "collection_hwm") // the high-water mark of ids only grows
+        .filter(|t| {
+            !t.starts_with("journal")
+                && t != "collection_hwm"
+                && !LOCAL_TABLES.contains(&t.as_str())
+        })
         .collect();
-    let shared: Vec<String> = tables(db, "bak")?
-        .into_iter()
-        .filter(|t| mine.contains(t))
+    let bak = tables(db, "bak")?;
+    let shared: Vec<String> = bak.iter().filter(|t| mine.contains(t)).cloned().collect();
+    // A same-build store has every table; a missing one would be silently emptied. Older backups may lack
+    // tables this build added, and are refused rather than turned into a half-empty store.
+    let missing: Vec<&str> = mine
+        .iter()
+        .map(String::as_str)
+        .filter(|t| !bak.iter().any(|b| b == t))
         .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "the backup is missing table(s) this build needs: {}; it was not restored",
+            missing.join(", ")
+        ));
+    }
     in_tx(db, true, |tx| {
         tx.execute("DELETE FROM main.journal", []).s()?;
         tx.execute("DELETE FROM main.journal_action WHERE id > 0", [])
@@ -233,6 +280,9 @@ fn replace_tables(db: &mut Connection) -> R<()> {
                 .map(|c| format!("\"{c}\""))
                 .collect::<Vec<_>>()
                 .join(", ");
+            if cols.is_empty() {
+                continue;
+            }
             tx.execute(
                 &format!("INSERT INTO main.\"{t}\"({cols}) SELECT {cols} FROM bak.\"{t}\""),
                 [],
@@ -249,7 +299,10 @@ fn replace_tables(db: &mut Connection) -> R<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::library::{Remote, Track};
     use crate::store::NodeKind;
+    use crate::store::index::Row_;
+    use rusqlite::Connection;
 
     #[test]
     fn backup_then_restore_brings_back_data_settings_and_music() {
@@ -320,6 +373,154 @@ mod tests {
         let b = s.backup(&d, None, &[], "t").unwrap();
         s.restore(&b.zip).unwrap();
         assert_eq!(s.connections().unwrap()[0].last_seq, 0);
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    fn index_row(path: &str) -> Row_ {
+        Row_ {
+            id: 0,
+            volume: "USB".into(),
+            path: path.into(),
+            title: "T".into(),
+            artist: "A".into(),
+            album: String::new(),
+            genre: String::new(),
+            bpm_x100: 12800,
+            length_s: 180,
+            key: "1A".into(),
+            size: 10,
+            mtime: 20,
+        }
+    }
+
+    #[test]
+    fn restore_keeps_the_local_folder_index() {
+        let d = std::env::temp_dir().join(format!("openfader-backup-index-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let s = Store::in_memory().unwrap();
+        s.index_put("USB", &[index_row("backup.mp3")]).unwrap();
+        s.set_rating("a|1", Some(5)).unwrap();
+        let b = s.backup(&d, None, &[], "t").unwrap();
+        s.index_put("USB", &[index_row("current.mp3")]).unwrap();
+        s.set_rating("a|1", Some(1)).unwrap();
+        let r = s.restore(&b.zip).unwrap();
+        assert_eq!(r.foreign_key_violations, 0);
+        assert_eq!(s.edits("a|1").unwrap().rating, Some(5));
+        let rows = s.index_rows("USB").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].path, "current.mp3");
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn restore_keeps_the_cloud_columns() {
+        let d = std::env::temp_dir().join(format!("openfader-backup-cloud-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let s = Store::in_memory().unwrap();
+        let cloud = Track {
+            title: "Cloud".into(),
+            artist: "A".into(),
+            remote: Some(Remote {
+                plugin: "p".into(),
+                source: "s".into(),
+                id: "r1".into(),
+            }),
+            ..Default::default()
+        };
+        s.collection_put(&[cloud], false).unwrap();
+        let b = s.backup(&d, None, &[], "t").unwrap();
+        s.run("DELETE FROM collection", []).unwrap();
+        assert!(s.collection_remotes().unwrap().is_empty());
+        s.restore(&b.zip).unwrap();
+        assert!(
+            s.collection_remotes()
+                .unwrap()
+                .contains(&("p".into(), "s".into(), "r1".into()))
+        );
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn restore_refuses_an_upstream_backup_before_writing() {
+        let d =
+            std::env::temp_dir().join(format!("openfader-backup-foreign-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let up = d.join("upstream.db");
+        let c = Connection::open(&up).unwrap();
+        c.execute_batch(
+            "CREATE TABLE track (key TEXT PRIMARY KEY, title TEXT);
+             CREATE TABLE collection (id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
+        c.pragma_update(None, "user_version", 17).unwrap();
+        drop(c);
+        let z = d.join("foreign.zip");
+        let entries = [
+            ("store.db", std::fs::read(&up).unwrap()),
+            ("store.id", super::super::identity::BACKUP_ID.to_vec()),
+        ];
+        std::fs::write(&z, crate::zip::write(&entries)).unwrap();
+
+        let s = Store::in_memory().unwrap();
+        s.set_rating("keep|1", Some(5)).unwrap();
+        let err = s.restore(&z).err().unwrap();
+        assert!(err.contains("another"), "{err}");
+        assert_eq!(s.edits("keep|1").unwrap().rating, Some(5));
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn restore_checks_store_id_but_accepts_an_old_backup_without_it() {
+        let d = std::env::temp_dir().join(format!("openfader-backup-id-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let s = Store::in_memory().unwrap();
+        s.set_rating("keep|1", Some(5)).unwrap();
+        let b = s.backup(&d, None, &[], "t").unwrap();
+        let mut z = crate::zip::Zip::open(&b.zip).unwrap();
+        let db = z.read("store.db").unwrap();
+        drop(z);
+
+        let wrong = d.join("wrong-id.zip");
+        let entries = [("store.db", db.clone()), ("store.id", b"NOPE".to_vec())];
+        std::fs::write(&wrong, crate::zip::write(&entries)).unwrap();
+        let err = s.restore(&wrong).err().unwrap();
+        assert!(err.contains("not made by MyOpenFadeR"), "{err}");
+        assert_eq!(s.edits("keep|1").unwrap().rating, Some(5));
+
+        let old = d.join("old.zip");
+        let entries = [("store.db", db)];
+        std::fs::write(&old, crate::zip::write(&entries)).unwrap();
+        s.restore(&old).unwrap();
+        assert_eq!(s.edits("keep|1").unwrap().rating, Some(5));
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
+    #[test]
+    fn restore_refuses_a_backup_missing_a_table_before_writing() {
+        let d = std::env::temp_dir().join(format!("openfader-backup-table-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let s = Store::in_memory().unwrap();
+        s.set_rating("keep|1", Some(5)).unwrap();
+        let b = s.backup(&d, None, &[], "t").unwrap();
+
+        let mut z = crate::zip::Zip::open(&b.zip).unwrap();
+        let db = z.read("store.db").unwrap();
+        drop(z);
+        let edited = d.join("edited.db");
+        std::fs::write(&edited, db).unwrap();
+        let c = Connection::open(&edited).unwrap();
+        c.execute("DROP TABLE gain", []).unwrap();
+        drop(c);
+        let bad = d.join("missing-table.zip");
+        let entries = [
+            ("store.db", std::fs::read(&edited).unwrap()),
+            ("store.id", super::super::identity::BACKUP_ID.to_vec()),
+        ];
+        std::fs::write(&bad, crate::zip::write(&entries)).unwrap();
+        let err = s.restore(&bad).err().unwrap();
+        assert!(err.contains("missing"), "{err}");
+        assert_eq!(s.edits("keep|1").unwrap().rating, Some(5));
         std::fs::remove_dir_all(&d).unwrap();
     }
 }

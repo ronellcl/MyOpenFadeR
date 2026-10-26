@@ -9,8 +9,9 @@
 //! exactly one, else `<file name>|<file size in bytes>` (edits made that way move to `t<id>` when the row is added, see
 //! [`Store::collection_put`]). A track without a file is keyed `meta|<title>|<artist>`.
 //!
-//! Schema versions: `PRAGMA user_version` counts the applied [`MIGRATIONS`]; opening a store written by
-//! a newer build fails instead of guessing.
+//! Schema versions: `PRAGMA user_version` counts the applied [`MIGRATIONS`] and `PRAGMA application_id`
+//! marks a MyOpenFadeR store (`MOFD`, see [`identity`]); opening a store written by upstream OpenFadeR,
+//! another program or a newer build fails instead of guessing.
 //!
 //! Base: [`Store`], [`key`], [`global`], migrations, and the statement helpers every child uses ([`exec`], [`column`],
 //! [`query_all`], [`query_opt`], [`scalar`], [`exists`], [`Store::run`], [`Store::insert`], [`Store::write`]) plus the cue
@@ -30,6 +31,7 @@ mod device;
 pub mod device_settings;
 mod gain;
 pub mod history;
+mod identity;
 pub mod index;
 mod journal;
 mod matching;
@@ -307,6 +309,9 @@ impl Store {
         if let Some(dir) = path.parent() {
             paths::at(std::fs::create_dir_all(dir), dir)?;
         }
+        // Read the header before opening read-write or touching the WAL: a foreign store must not be
+        // changed by the mere act of looking at it.
+        identity::check(path)?;
         let conn = paths::at(Connection::open(path), path)?;
         conn.busy_timeout(std::time::Duration::from_secs(5)).s()?;
         conn.pragma_update(None, "journal_mode", "WAL").s()?;
@@ -367,23 +372,23 @@ impl Store {
     }
 }
 
-/// Applies every migration the file has not seen; refuses a store newer than this build.
+/// Applies every migration the file has not seen; refuses a foreign store and a store newer than this build.
 fn migrate(conn: &mut Connection) -> R<()> {
-    let have: usize = conn
-        .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
-        .s()? as usize;
-    if have > MIGRATIONS.len() {
+    let found = identity::check_conn(conn)?;
+    if found.schema > MIGRATIONS.len() {
         return Err(format!(
-            "store.db is schema v{have}, newer than this build (v{})",
+            "store.db is schema v{}, newer than this build (v{})",
+            found.schema,
             MIGRATIONS.len()
         ));
     }
-    for (i, sql) in MIGRATIONS.iter().enumerate().skip(have) {
+    for (i, sql) in MIGRATIONS.iter().enumerate().skip(found.schema) {
         let tx = conn.transaction().s()?;
         tx.execute_batch(sql).s()?;
         tx.pragma_update(None, "user_version", i as i64 + 1).s()?;
         tx.commit().s()?;
     }
+    identity::stamp(conn)?;
     Ok(())
 }
 
@@ -508,6 +513,63 @@ mod tests {
             .unwrap();
         drop(c);
         assert!(Store::open_at(&path).err().unwrap().contains("newer"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_fork_store_is_stamped_and_reopens_with_data() {
+        let dir = std::env::temp_dir().join(format!("openfader-store-mark-{}", std::process::id()));
+        let path = dir.join("s.db");
+        Store::open_at(&path)
+            .unwrap()
+            .set_rating("a|1", Some(4))
+            .unwrap();
+        let c = Connection::open(&path).unwrap();
+        assert_eq!(
+            c.pragma_query_value(None, "application_id", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            i64::from(identity::APPLICATION_ID)
+        );
+        assert_eq!(
+            c.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            MIGRATIONS.len() as i64
+        );
+        drop(c);
+        let again = Store::open_at(&path).unwrap();
+        assert_eq!(again.edits("a|1").unwrap().rating, Some(4));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_upstream_store_is_refused_before_any_write() {
+        let dir =
+            std::env::temp_dir().join(format!("openfader-store-foreign-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for schema in [17, 23] {
+            let path = dir.join(format!("upstream-{schema}.db"));
+            let c = Connection::open(&path).unwrap();
+            c.execute_batch(
+                "CREATE TABLE track (key TEXT PRIMARY KEY, title TEXT);
+                 CREATE TABLE collection (id INTEGER PRIMARY KEY);",
+            )
+            .unwrap();
+            if schema >= 23 {
+                c.execute_batch("CREATE TABLE saved_search (id INTEGER PRIMARY KEY);")
+                    .unwrap();
+            }
+            c.pragma_update(None, "user_version", schema).unwrap();
+            drop(c);
+            let before = std::fs::read(&path).unwrap();
+            let err = Store::open_at(&path).err().unwrap();
+            assert!(err.contains("another"), "{err}");
+            assert_eq!(
+                std::fs::read(&path).unwrap(),
+                before,
+                "upstream v{schema} was written"
+            );
+        }
         std::fs::remove_dir_all(dir).unwrap();
     }
 

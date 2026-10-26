@@ -80,6 +80,7 @@ pub fn restore(c: &Rc<Ctx>, zip: PathBuf) {
             music,
             music_present,
             music_lost,
+            foreign_key_violations,
         }) => {
             if let Some(text) = settings.map(|s| String::from_utf8_lossy(&s).into_owned()) {
                 let (restored, _) = prefs::Prefs::parse(&text);
@@ -92,7 +93,12 @@ pub fn restore(c: &Rc<Ctx>, zip: PathBuf) {
             } else {
                 String::new()
             };
-            c.say(&format!("Collection was restored{files}"));
+            let broken = if foreign_key_violations > 0 {
+                format!(" · {foreign_key_violations} broken reference(s) in the backup")
+            } else {
+                String::new()
+            };
+            c.say(&format!("Collection was restored{files}{broken}"));
             c.reload(None);
         }
         Err(e) => c.say(&format!("restore failed: {e}")),
