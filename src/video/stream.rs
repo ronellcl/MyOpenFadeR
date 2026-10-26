@@ -235,7 +235,7 @@ fn read_one(feed: &mut Option<Feed>, cache: &mut Cache, eof: &mut bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::previous_keyframe;
+    use super::*;
 
     #[test]
     fn a_seek_uses_the_previous_keyframe_only_when_it_is_far_enough_back() {
@@ -245,5 +245,60 @@ mod tests {
         assert_eq!(previous_keyframe(&keys, 1.5, 1.0), Some(0.0));
         assert_eq!(previous_keyframe(&keys, 1.0, 2.0), None);
         assert_eq!(previous_keyframe(&[], 5.0, 1.0), None);
+    }
+
+    #[test]
+    fn a_seek_shows_the_previous_keyframe_before_the_exact_frame() {
+        // Video needs the ffmpeg binaries; the rest of the app works without them.
+        if Command::new("ffmpeg").arg("-version").stdout(Stdio::null()).stderr(Stdio::null()).status().is_err() {
+            return;
+        }
+        let path = std::env::temp_dir().join(format!("openfader-seek-{}.mp4", std::process::id()));
+        // One keyframe at the start: reaching 15 s means decoding fifteen seconds of pictures.
+        let made = Command::new("ffmpeg")
+            .args(["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi",
+                   "-i", "testsrc=size=320x180:rate=30", "-t", "20", "-c:v", "libx264",
+                   "-g", "600", "-keyint_min", "600", "-sc_threshold", "0", "-pix_fmt", "yuv420p"])
+            .arg(&path)
+            .status();
+        if !made.map(|s| s.success()).unwrap_or(false) {
+            let _ = std::fs::remove_file(&path);
+            return; // no libx264 in this build: nothing to measure
+        }
+        let info = super::super::probe::probe(&path).expect("probe the test clip");
+        assert_eq!(info.keys, [0.0], "the clip has one keyframe, at the start");
+        let stream = Stream::open(path.clone(), info.clone());
+        let target = (15.0 * info.fps) as i64;
+        stream.show(Some(target));
+        let started = Instant::now();
+        let first = {
+            let mut got = None;
+            while started.elapsed() < Duration::from_secs(3) {
+                if let Some(f) = stream.frame() {
+                    got = Some(f);
+                    break;
+                }
+                thread::sleep(Duration::from_millis(5));
+            }
+            got.expect("a first frame")
+        };
+        let first_at = started.elapsed();
+        let exact = {
+            let mut got = None;
+            while started.elapsed() < Duration::from_secs(5) {
+                if let Some(f) = stream.frame().filter(|f| !Arc::ptr_eq(f, &first)) {
+                    got = Some(f);
+                    break;
+                }
+                thread::sleep(Duration::from_millis(5));
+            }
+            got.expect("the exact frame")
+        };
+        let exact_at = started.elapsed();
+        assert!(first_at < exact_at, "the keyframe comes first ({first_at:?} < {exact_at:?})");
+        assert_ne!(first.rgb, exact.rgb, "the keyframe is not the exact frame");
+        assert!(stream.error().is_none(), "{}", stream.error().unwrap_or_default());
+        drop(stream);
+        let _ = std::fs::remove_file(&path);
     }
 }
