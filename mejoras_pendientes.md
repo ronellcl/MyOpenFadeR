@@ -297,7 +297,10 @@ la Pi), así que el motor de Deezer y los importadores no compilaban contra el t
 `start.sh` escribe el patch y el motor compila. Y el binario de yt-dlp que el plugin se descarga
 quedaba sin permiso de ejecución, con lo que toda llamada moría con *Permission denied*; el
 plugin ahora le pone `+x` al bajarlo y al encontrarlo, lo que también arregla las instalaciones
-que ya tenían el binario mal.
+que ya tenían el binario mal. Y el descompresor de la app tiraba el modo de los zips: un
+`bin/deezer-engine` que la release trae en 755 quedaba en 644 y fallaba igual; ahora conserva el
+modo y, si un programa de plugin ya instalado no lo tiene, se le devuelve el `+x` antes de
+ejecutarlo.
 
 **Repositorios por defecto repuntados** (`chore/repo-urls`): `src/catalog/list.rs`, `install.sh`,
 `start.sh`, `Dockerfile.pi`, el About y la documentación usan ahora
