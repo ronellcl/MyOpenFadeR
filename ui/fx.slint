@@ -218,7 +218,7 @@ component Unit inherits Rectangle {
                     FxLabel { text: "TEMPO"; }
                     Rectangle { width: 2px; }
                     Chip { text: "TAP"; font-size: Theme.font-xs; min-width: 32px; horizontal-stretch: 0; height: root.ctl-h; tooltip: "Tap the tempo"; clicked => { FxState.tapped(root.n); } }
-                    Chip { text: u.master-tempo ? "MST" : "CH"; font-size: Theme.font-xs; min-width: 38px; horizontal-stretch: 0; height: root.ctl-h; active: !u.tapped; tooltip: "Tempo source: CH follows the deck on the unit's channel, MST the master deck (click to switch; after TAP, click to return)"; clicked => { if (u.tapped) { FxState.auto-beat(root.n); } else { FxState.tempo-source(root.n); } } }
+                    Chip { text: (u.master-tempo || u.assign >= 4) ? "MST" : "CH"; font-size: Theme.font-xs; min-width: 38px; horizontal-stretch: 0; height: root.ctl-h; active: !u.tapped; tooltip: "Tempo source: CH follows the deck on the unit's channel, MST the master deck (click to switch; after TAP, click to return)"; clicked => { if (u.tapped) { FxState.auto-beat(root.n); } else { FxState.tempo-source(root.n); } } }
                     Chip {
                         text: "REL";
                         font-size: Theme.font-xs;
