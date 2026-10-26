@@ -55,7 +55,9 @@ pub fn scan(z: &mut Zip) -> Vec<Entry> {
     out
 }
 
-/// The native library files the plugin loads on this OS, as `plugin.json` names them (relative to the plugin folder).
+/// The native files the plugin needs on this OS, as `plugin.json` names them (relative to the plugin folder): the
+/// libraries it loads and, for a plugin that is a program, the program itself. A release asset carries them; the
+/// repository zip only has the manifest and the sources.
 pub fn natives(m: &Manifest) -> Vec<String> {
     let effects = match &m.effects {
         Some(Decls::Library(p)) => Some(p.to_string_lossy().into_owned()),
@@ -66,7 +68,20 @@ pub fn natives(m: &Manifest) -> Vec<String> {
         .as_ref()
         .and_then(|l| l.lib.file())
         .map(str::to_owned);
-    effects.into_iter().chain(library).collect()
+    // A bare name (`sh`, `python3`) is looked up on PATH and is not part of the plugin. Windows runs the program
+    // with its extension: the manifest names `bin/deezer-engine`, the file is `bin/deezer-engine.exe`.
+    let program = m
+        .command
+        .first()
+        .filter(|p| Path::new(p).is_relative() && (p.contains('/') || p.contains('\\')))
+        .map(|p| {
+            if cfg!(windows) && !p.to_ascii_lowercase().ends_with(".exe") {
+                format!("{p}.exe")
+            } else {
+                p.clone()
+            }
+        });
+    effects.into_iter().chain(library).chain(program).collect()
 }
 
 /// Lays the plugin out in `to`: its folder of the repository zip, and the native libraries the zip lacks from the release asset.
@@ -215,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn natives_are_the_libraries_this_os_loads() {
+    fn natives_are_the_libraries_and_programs_this_os_needs() {
         let m: Manifest = serde_json::from_str(
             r#"{"name": "fx", "effects": "libfx.so", "library": {"lib": {"linux": "liba.so", "windows": "a.dll", "macos": "liba.dylib"}}}"#,
         )
@@ -224,6 +239,13 @@ mod tests {
         assert_eq!(natives(&m), ["libfx.so".to_owned(), file.to_owned()]);
         let json: Manifest = serde_json::from_str(r#"{"name": "j", "effects": [{"name": "A", "slot": "mic", "chain": [{"block": "gain"}]}]}"#).unwrap();
         assert!(natives(&json).is_empty());
+        let program: Manifest =
+            serde_json::from_str(r#"{"name": "d", "command": ["bin/engine"]}"#).unwrap();
+        let want = if cfg!(windows) { "bin/engine.exe" } else { "bin/engine" };
+        assert_eq!(natives(&program), [want.to_owned()]);
+        let shell: Manifest =
+            serde_json::from_str(r#"{"name": "s", "command": ["sh", "run.sh"]}"#).unwrap();
+        assert!(natives(&shell).is_empty(), "a program from PATH is not an asset");
     }
 
     #[test]
