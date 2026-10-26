@@ -277,12 +277,15 @@ Lo que sigue es decisión, no avería:
    `feature/video-seek`), y el plugin yt-dlp re-codifica con un keyframe por segundo lo que entra
    en la Colección (`-g 30` + `-force_key_frames`, rama `feature/video-keyframes` del repo de
    plugins). El `fetch` de la nube se deja sin re-codificar para no retrasar la primera reproducción.
-3. **Release de `MyOpenFadeR-Plugins`** — publicar yt-dlp 1.2.4 y el motor de Deezer (el `main` ya
-   los tiene; falta decidir si la release lleva el binario de yt-dlp adjunto). **Hace falta antes
-   de que GET PLUGINS pueda instalar nada**: los repositorios por defecto ya son de `ronellcl`,
-   pero el de plugins aún no tiene releases y la descarga busca el zip en `releases/latest`.
-4. **Empaquetado de Windows** — la línea `$excluded` puede desaparecer si el motor de Deezer se da
-   por terminado (hoy no excluye nada).
+3. **Release de `MyOpenFadeR-Plugins`** — publicar los binarios nativos (el motor de Deezer, los
+   importadores, los efectos) para que GET PLUGINS pueda instalarlos: los repositorios por defecto
+   ya son de `ronellcl`, pero el de plugins aún no tiene releases y la descarga del binario busca
+   el zip en `releases/latest`. El plugin yt-dlp es un `script`, así que se instala desde el zip del
+   repositorio y no necesita asset propio; el instalador de Windows ya lleva su binario. No hace
+   falta adjuntarlo a la release.
+4. ~~**Empaquetado de Windows**~~ — **ya hecho** (`5289290`): no queda línea `$excluded`;
+   `build-installer.ps1` compila el motor de Deezer y lo mete en `deezer\bin`. Solo falta compilar
+   el instalador en Windows cuando se pida.
 5. **Diálogos nativos en Windows** — el selector de archivos de la app y el diálogo del ARL del
    plugin deezer usan PowerShell con `CREATE_NO_WINDOW` porque sin consola no muestran nada; en
    Windows 11 puede asomar la pestaña del terminal un momento. Pasarlos a un diálogo nativo (FFI)
