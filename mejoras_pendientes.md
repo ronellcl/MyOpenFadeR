@@ -265,7 +265,7 @@ Notas:
 
 ## 16. Lo que queda abierto (revisado el 26/10/2026)
 
-Revisado contra el código de `main` (`3fe48c5`, versión 0.4.1). **`hallazgos.md` está cerrado
+Revisado contra el código de `main` (`7ee52c8`, versión 0.4.1). **`hallazgos.md` está cerrado
 entero**: los 30 hallazgos figuran resueltos en [hallazgos_solucionados.md](hallazgos_solucionados.md).
 Lo que sigue es decisión, no avería:
 
