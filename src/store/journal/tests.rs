@@ -51,6 +51,42 @@ fn playlist_delete_restores_node_and_entries() {
 }
 
 #[test]
+fn reload_tag_is_one_undo_step() {
+    let s = Store::in_memory().unwrap();
+    let dir = std::env::temp_dir().join(format!("openfader-reload-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("a.mp3");
+    std::fs::write(&file, b"a").unwrap();
+    let old = Track {
+        title: "Old".into(),
+        artist: "A".into(),
+        file: Some(file),
+        ..Track::default()
+    };
+    s.system(|| s.collection_put(&[old.clone()], true))
+        .unwrap();
+    let fresh = Track {
+        title: "New".into(),
+        ..old
+    };
+    s.action("Reload Tag (discard edits)", || {
+        s.collection_put(&[fresh], true)
+    })
+    .unwrap();
+    assert_eq!(s.collection_tracks().unwrap()[0].title, "New");
+    assert_eq!(
+        s.undo_label().unwrap().as_deref(),
+        Some("Reload Tag (discard edits)")
+    );
+    s.undo().unwrap();
+    assert_eq!(s.collection_tracks().unwrap()[0].title, "Old");
+    s.redo().unwrap();
+    assert_eq!(s.collection_tracks().unwrap()[0].title, "New");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
 fn blob_columns_survive_undo() {
     let s = Store::in_memory().unwrap();
     let beat = |t| crate::analysis::Beat {

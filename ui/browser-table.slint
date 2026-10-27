@@ -273,7 +273,7 @@ export component TrackTable inherits Rectangle {
                 if root.list-view: MenuItem { text: "Remove from list"; activated => { BrowserState.list-remove(); menu.close(); } }
                 MenuItem { text: "Analyze track"; activated => { LibraryState.action("track-analyze"); menu.close(); } }
                 MenuItem { text: "Analysis lock"; activated => { LibraryState.action("track-lock"); menu.close(); } }
-                MenuItem { text: "Reload tag"; activated => { LibraryState.action("track-reload-tag"); menu.close(); } }
+                MenuItem { text: "Reload tag (discard edits)"; activated => { LibraryState.action("track-reload-tag-discard"); menu.close(); } }
                 MenuItem { text: "Show in file manager"; activated => { LibraryState.action("track-show"); menu.close(); } }
                 MenuItem { text: "Relocate…"; activated => { LibraryState.action("track-relocate"); menu.close(); } }
                 MenuItem { text: "Auto relocate"; activated => { LibraryState.action("track-auto-relocate"); menu.close(); } }

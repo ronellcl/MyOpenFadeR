@@ -103,6 +103,10 @@ msgid "Reload Tag"
 msgstr "Recargar etiquetas"
 
 msgctxt "App"
+msgid "Reload Tag (discard edits)"
+msgstr "Recargar etiquetas (descartar ediciones)"
+
+msgctxt "App"
 msgid "Show in File Manager"
 msgstr "Mostrar en el explorador de archivos"
 

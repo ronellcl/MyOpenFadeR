@@ -1,5 +1,5 @@
 //! The Track menu on the track chosen in the browser: Import To Collection, Analyze Track, Analysis Lock,
-//! Reload Tag, Show in file manager, Relocate, Auto Relocate, Remove from Collection.
+//! Reload Tag (discard edits), Show in file manager, Relocate, Auto Relocate, Remove from Collection.
 
 use super::{Ask, Confirm, Ctx, missing, show_in_folder};
 use crate::app::browser;
@@ -23,7 +23,8 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
             c.analyze(vec![t], true);
         }
         "track-lock" => lock(c, &t),
-        "track-reload-tag" => reload_tag(c, &t),
+        // `track-reload-tag` stays for bindings made before the explicit "discard edits" label.
+        "track-reload-tag" | "track-reload-tag-discard" => reload_tag(c, &t),
         "track-show" => match &t.file {
             Some(f) => show_in_folder(f),
             None => c.say("this track has no file"),
@@ -104,13 +105,19 @@ fn retagged(t: &Track, fresh: Track) -> Track {
     }
 }
 
-/// Reload Tag: the file's tags replace what the track shows (a Collection row shadows the source's, which stays untouched).
+/// Reload Tag (discard edits): the file's tags and analysis fields replace the Collection row, so text edited in the app
+/// is discarded; fields the file lacks keep the row's values. One [`Store::action`] makes the reload one undo step.
 fn reload_tag(c: &Rc<Ctx>, t: &Track) {
     let Some(file) = t.file.as_deref().filter(|f| f.is_file()) else {
         return c.say("the file is missing: relocate it first");
     };
     let merged = retagged(t, folder::read_track(file));
-    match c.store.collection_put(&[merged], true) {
+    let done = c
+        .store
+        .action("Reload Tag (discard edits)", || {
+            c.store.collection_put(&[merged], true)
+        });
+    match done {
         Ok(_) => {
             c.say(&format!("tags of “{}” reloaded", t.title));
             c.reload(None);
