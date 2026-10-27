@@ -710,6 +710,7 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | C7: hot cues exactos (`seek_on_beat`) y tests de spam | Hecho (`a955cc3`); 642 librería + 523 binario |
 | 26/10/2026 | Merge de C6/C7 a `main` local | Hecho; sin push |
 | 26/10/2026 | C8: “Reload Tag (discard edits)” undoable, menú y español | Hecho (`0c5fd8a`); 523 binario + prueba de undo; smoke y menú revisados |
+| 26/10/2026 | Merge de C8 a `main` local | Hecho; sin push |
 | Pendiente | Matriz visual con datos | Pendiente |
 | Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
 
