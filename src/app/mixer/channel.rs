@@ -1,7 +1,7 @@
 //! One channel strip: knobs, EQ / STEM mode, CFX type, fader, CUE and crossfader assignment, pushed to the deck's player.
 
 use super::{
-    auto_db, crossfade_gains, cue_gain, curve, gain, map, side_gain, Mixer, MixerState, DECKS,
+    App, auto_db, crossfade_gains, cue_gain, curve, gain, map, side_gain, Mixer, MixerState, DECKS,
 };
 use crate::app::{ChannelView, prefs::controller::EqType};
 use openfader::audio::{
@@ -26,6 +26,28 @@ fn eq_dbs(row: &ChannelView, eq: EqType, low_cut: bool) -> [f32; 3] {
     let db = |band| map::eq_db(row.knobs.row_data(band).unwrap_or(map::CENTRE), eq);
     let low = if low_cut { EQ_KILL_DB } else { db(map::LOW) };
     [low, db(map::MID), db(map::HI)]
+}
+
+/// Knob `knob` of channel `ch` as the strip shows it, 0..1: in STEM mode HI / MID / LOW show the ISO gains ([`Mixer::set_knob`]).
+pub(in crate::app) fn knob_at(app: &App, ch: i32, knob: usize) -> Option<f32> {
+    let row = app
+        .global::<MixerState>()
+        .get_channels()
+        .row_data(usize::try_from(ch).ok()?)?;
+    if row.iso && (map::HI..=map::LOW).contains(&knob) {
+        row.iso_knobs.row_data(knob - map::HI)
+    } else {
+        row.knobs.row_data(knob)
+    }
+}
+
+/// STEM ISOLATOR `part` (0 VOCAL, 1 INST, 2 DRUMS) of channel `ch` as the strip holds it, 0..1, whatever the channel's mode.
+pub(in crate::app) fn iso_at(app: &App, ch: i32, part: usize) -> Option<f32> {
+    let row = app
+        .global::<MixerState>()
+        .get_channels()
+        .row_data(usize::try_from(ch).ok()?)?;
+    row.iso_knobs.row_data(*SLOT.get(part)?)
 }
 
 impl Mixer {

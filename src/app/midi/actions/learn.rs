@@ -1,7 +1,10 @@
 //! The actions MIDI LEARN offers and midi.map accepts.
 
 use super::{Action, App, JogMode, Kind, jog, knob, press, rel};
-use crate::app::{BrowserState, DeckState, FxSlot, FxState, GrooveState, KeysState, MixerState};
+use crate::app::{
+    BrowserState, DeckState, FxSlot, FxState, GrooveState, KeysState, MixerState,
+    mixer::{iso_at, knob_at},
+};
 use openfader::audio::fx::BEATS;
 use slint::{ComponentHandle, Model};
 use std::sync::LazyLock;
@@ -47,6 +50,25 @@ fn iso_knob<const P: i32>(a: &App, ch: i32, v: f32) {
     a.global::<MixerState>().invoke_iso_knob(ch, P, v);
 }
 
+fn mix_knob_at<const K: i32>(a: &App, ch: i32) -> Option<f32> {
+    knob_at(a, ch, K as usize)
+}
+fn bus_knob_at<const K: i32>(a: &App, _: i32) -> Option<f32> {
+    a.global::<MixerState>()
+        .get_bus()
+        .knobs
+        .row_data(K as usize)
+}
+fn iso_knob_at<const P: usize>(a: &App, ch: i32) -> Option<f32> {
+    iso_at(a, ch, P)
+}
+fn fader_at(a: &App, ch: i32) -> Option<f32> {
+    a.global::<MixerState>()
+        .get_channels()
+        .row_data(ch as usize)
+        .map(|c| c.fader)
+}
+
 /// Unit `u`'s BEAT target slot.
 fn fx_target(a: &App, u: i32) -> i32 {
     let units = a.global::<FxState>().get_units();
@@ -64,6 +86,24 @@ fn fx_slot(a: &App, u: i32, i: i32) -> Option<FxSlot> {
 fn fx_level<const S: i32>(a: &App, u: i32, v: f32) {
     a.global::<FxState>().invoke_level_edited(u, S, v);
 }
+fn fx_level_at<const S: i32>(a: &App, u: i32) -> Option<f32> {
+    fx_slot(a, u, S).map(|s| s.level)
+}
+fn fx_target_level_at(a: &App, u: i32) -> Option<f32> {
+    fx_slot(a, u, fx_target(a, u)).map(|s| s.level)
+}
+/// MERGE FX build-up, or with `VOLUME` the sample volume, of the unit in the deck column.
+fn merge_at<const VOLUME: bool>(a: &App, u: i32) -> Option<f32> {
+    let unit = a
+        .global::<FxState>()
+        .get_units()
+        .row_data(u.max(0) as usize)?;
+    Some(if VOLUME {
+        unit.merge_volume
+    } else {
+        unit.merge_knob
+    })
+}
 
 /// Some controllers' tempo faders report 0 at the top (the + end: rate = 1 − v/8192;
 /// not checked on this hardware). `OPENFADER_TEMPO_INVERT=1` flips it.
@@ -72,6 +112,17 @@ fn tempo_hw(a: &App, d: i32, v: f32) {
         LazyLock::new(|| std::env::var_os("OPENFADER_TEMPO_INVERT").is_some());
     a.global::<DeckState>()
         .invoke_tempo(d, if *FLIP { v } else { 1.0 - v });
+}
+/// The tempo fader's position on screen; `None` while SYNC follows the master (the fader is ignored then).
+fn tempo_at(a: &App, d: i32) -> Option<f32> {
+    let decks = a.global::<DeckState>();
+    let v = decks.get_decks().row_data(d as usize)?;
+    (!(v.synced && decks.get_master() != d)).then_some(v.tempo)
+}
+fn tempo_hw_at(a: &App, d: i32) -> Option<f32> {
+    static FLIP: LazyLock<bool> =
+        LazyLock::new(|| std::env::var_os("OPENFADER_TEMPO_INVERT").is_some());
+    tempo_at(a, d).map(|v| if *FLIP { v } else { 1.0 - v })
 }
 
 pub(super) const TABLE: &[Action] = &[
@@ -139,9 +190,9 @@ pub(super) const TABLE: &[Action] = &[
         crate::app::prefs::update(|p| p.active_part_solo = !p.active_part_solo)
     }),
     press_cb!("iso-toggle", MixerState::invoke_iso_toggled),
-    knob("iso-vocal", iso_knob::<0>),
-    knob("iso-inst", iso_knob::<1>),
-    knob("iso-drums", iso_knob::<2>),
+    knob("iso-vocal", iso_knob::<0>).read_by(iso_knob_at::<0>),
+    knob("iso-inst", iso_knob::<1>).read_by(iso_knob_at::<1>),
+    knob("iso-drums", iso_knob::<2>).read_by(iso_knob_at::<2>),
     // BEAT LAB: DRUM SWAP GAIN of the deck (the channel nibble).
     knob_cb!("drum-gain", GrooveState::invoke_master_edited),
     // FX: the deck column is the Beat FX unit (A = FX1, B = FX2); without a slot number the unit's BEAT target slot.
@@ -162,29 +213,31 @@ pub(super) const TABLE: &[Action] = &[
         let k = a.global::<KeysState>();
         k.set_help_visible(!k.get_help_visible());
     }),
-    knob_cb!("tempo", DeckState::invoke_tempo),
-    knob("tempo-hw", tempo_hw),
-    knob_cb!("fader", MixerState::invoke_fader),
+    knob_cb!("tempo", DeckState::invoke_tempo).read_by(tempo_at),
+    knob("tempo-hw", tempo_hw).read_by(tempo_hw_at),
+    knob_cb!("fader", MixerState::invoke_fader).read_by(fader_at),
     knob("crossfader", |a, _, v| {
         let m = a.global::<MixerState>();
         m.set_crossfader(v);
         m.invoke_crossfade(v);
-    }),
-    knob("trim", mix_knob::<0>),
-    knob("eq-hi", mix_knob::<1>),
-    knob("eq-mid", mix_knob::<2>),
-    knob("eq-low", mix_knob::<3>),
-    knob("filter", mix_knob::<4>),
-    knob("master", bus_knob::<0>),
-    knob("hp-mix", bus_knob::<1>),
-    knob("hp-level", bus_knob::<2>),
+    })
+    .read_by(|a, _| Some(a.global::<MixerState>().get_crossfader())),
+    knob("trim", mix_knob::<0>).read_by(mix_knob_at::<0>),
+    knob("eq-hi", mix_knob::<1>).read_by(mix_knob_at::<1>),
+    knob("eq-mid", mix_knob::<2>).read_by(mix_knob_at::<2>),
+    knob("eq-low", mix_knob::<3>).read_by(mix_knob_at::<3>),
+    knob("filter", mix_knob::<4>).read_by(mix_knob_at::<4>),
+    knob("master", bus_knob::<0>).read_by(bus_knob_at::<0>),
+    knob("hp-mix", bus_knob::<1>).read_by(bus_knob_at::<1>),
+    knob("hp-level", bus_knob::<2>).read_by(bus_knob_at::<2>),
     knob("fx-level", |a, u, v| {
         a.global::<FxState>()
             .invoke_level_edited(u, fx_target(a, u), v)
-    }),
-    knob("fx-level-1", fx_level::<0>),
-    knob("fx-level-2", fx_level::<1>),
-    knob("fx-level-3", fx_level::<2>),
+    })
+    .read_by(fx_target_level_at),
+    knob("fx-level-1", fx_level::<0>).read_by(fx_level_at::<0>),
+    knob("fx-level-2", fx_level::<1>).read_by(fx_level_at::<1>),
+    knob("fx-level-3", fx_level::<2>).read_by(fx_level_at::<2>),
     // An absolute BEAT knob: its travel spans the beat list.
     knob("fx-beat", |a, u, v| {
         let s = a.global::<FxState>();
@@ -198,8 +251,8 @@ pub(super) const TABLE: &[Action] = &[
     rel("fx-beat-rel", true, |a, u, t| {
         a.global::<FxState>().invoke_beat_step(u, t.signum())
     }),
-    knob_cb!("merge-knob", FxState::invoke_merge_knob),
-    knob_cb!("merge-volume", FxState::invoke_merge_volume),
+    knob_cb!("merge-knob", FxState::invoke_merge_knob).read_by(merge_at::<false>),
+    knob_cb!("merge-volume", FxState::invoke_merge_volume).read_by(merge_at::<true>),
     // Relative CC centred on 64 (jog wheels) / two's complement (encoders).
     jog("jog", false, JogMode::Scratch),
     jog("jog-2c", true, JogMode::Scratch),

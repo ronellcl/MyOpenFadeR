@@ -3,7 +3,9 @@
 use super::jog::Jog;
 use super::led::Leds;
 use super::Ev;
-use super::{decode, hotplug, layer, learn, lights, prefs_audio, usermap, Guard, Midi};
+use super::{
+    decode, hotplug, layer, learn, lights, pickup::Pickup, prefs_audio, usermap, Guard, Midi,
+};
 use crate::app::deck::{Decks, DECKS};
 use crate::app::{App, MidiState};
 use slint::{ComponentHandle, Timer, TimerMode};
@@ -43,6 +45,7 @@ pub fn wire(app: &App, decks: Decks) -> Guard {
         file_names: RefCell::default(),
         captured: Cell::new(None),
         msb: RefCell::default(),
+        pickup: Pickup::new(),
         jog: RefCell::new(std::array::from_fn(|_| Jog::new(ticks))),
         jog_factor: Cell::new(crate::app::prefs::with(|p| p.controller.jog_factor())),
         vinyl: Cell::new([true; DECKS]),

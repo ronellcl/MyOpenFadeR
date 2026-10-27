@@ -343,7 +343,7 @@ el `Cargo.toml` del repo de plugins) se quedan como están.
 | Fase | Objetivo | Estado | Cierre |
 |---|---|---|---|
 | 0 | Preparar rama y baseline | Pendiente | `main` limpio, build release y tests de partida verdes |
-| 1 | Correcciones 0.2.5 de audio/UI | En curso (C5/C4/C2/C3 hechos; visual y C6/C7/C8 pendientes) | Tests + build release + smoke + revisión manual |
+| 1 | Correcciones 0.2.5 de audio/UI | En curso (C2–C6 hechos; visual y C7/C8 pendientes) | Tests + build release + smoke + revisión manual |
 | 2 | Endurecer CI/empaquetado | Pendiente | Workflow valida el paquete antes de publicarlo |
 | 3 | Cimientos store/device/plugin | Pendiente | Migración v17→nueva con backup/rollback probado |
 | 4 | Browser/library/device features | Pendiente | Funciones nuevas sin perder fuentes ni i18n del fork |
@@ -378,7 +378,7 @@ Studio, temas ni la numeración nueva del store.
 | **C4** | **Hecho:** Beat FX con fuente CH/MST/TAP; stems conservan EQ y no cambian el strip a STEM ISO. Revisión visual pendiente | `src/app/fx/`, `src/app/deck/stems/mod.rs`, `src/app/mixer/`, `src/app/prefs/`, `ui/fx.slint`, `ui/mixer.slint` | — | Medio |
 | **C2** | **Hecho:** `latency_ms`, `steady`, `written_ms`, loops a 1/256 ms, slip y catch-up consciente del loop | `src/audio/player/{mod,clock,voice,tests}.rs`, `src/audio/transport.rs`, `src/app/deck/loops.rs` | — | Medio |
 | **C3** | **Hecho:** timing de deck, loops, quantize, cues, slicer, sequencer y SYNC sobre C2 | `src/app/deck/*`, `src/app/deck/sync/*`, `src/app/midi/actions/*`, `midi/input.rs` (release de `Kind::Deck`) | C2 | Alto |
-| **C6** | Soft takeover MIDI para knobs/faders absolutos (`midi/pickup.rs`, pref, toast) | `src/app/midi/`, `src/app/prefs/controller/`, `src/app/toast.rs`, `src/app/mixer/mod.rs` | C4 (lectores `knob_at`/`iso_at`) | Alto, pero autocontenido |
+| **C6** | **Hecho:** soft takeover MIDI para knobs/faders absolutos (`midi/pickup.rs`, pref, toast) | `src/app/midi/`, `src/app/prefs/controller/`, `src/app/toast.rs`, `src/app/mixer/mod.rs` | C4 (lectores `knob_at`/`iso_at`) | Alto, pero autocontenido |
 | **C7** | Hot cues exactos al pulsar rápido (`seek_on_beat`) | `src/audio/player/{mod,voice,tests}.rs`, `audio/player/hotcue_tests.rs`, `audio/transport.rs`, `deck/quantize.rs` | C2 + C3 | Medio |
 | **C8** | “Reload Tag (discard edits)” sin overrides de texto: refresca análisis/BPM/key desde el archivo y descarta el texto editado, dentro de `Store::action` | `src/app/library/track.rs`, `ui/app.slint`, `ui/browser-table.slint`, `es.po` | — | Bajo, opcional |
 
@@ -465,11 +465,14 @@ parche necesita `src/store/mod.rs`, el browser o `ui/studio`, se parte y se mand
   principal; abrir el panel FX en esa ventana sigue pendiente. Faltan vídeo, STEM ISO, menú
   contextual, EXPORT de 2 players y split. El código compila (`cargo build --release`) y las
   pruebas pasan.
-- **Pendiente de fase 1:** C6 (soft takeover), C7 (hot cues exactos) y C8 opcional; completar
-  la matriz visual con datos (1000×760 con FX, vídeo, STEM ISO, menú contextual, EXPORT y split).
-  No se tocaron store, browser, `ui/studio` ni `ui/app.slint`.
+- **C6 hecho en la rama tardía:** soft takeover de knobs/faders absolutos con `pickup.rs`,
+  lectores `knob_at`/`iso_at`, preferencia `soft_takeover` y toast de dirección. `cargo test --bin
+  openfader app::midi` → 62; suite del binario → 523 y release → 523; smoke release vivo.
+- **Pendiente de fase 1:** C7 (hot cues exactos) y C8 opcional; completar la matriz visual con
+  datos (1000×760 con FX, vídeo, STEM ISO, menú contextual, EXPORT y split). No se tocaron store,
+  browser, `ui/studio` ni `ui/app.slint`.
 - **Commits del núcleo:** `9adb8d2` (C5/C4), `ba97780` (MST en MASTER), `99b1777` (matriz visual)
-  y `bc1c9cb` (C2/C3).
+  y `bc1c9cb` (C2/C3). C6 va en `backport/fase-1-tardia`.
 
 ### 17.4 Fase 2 — CI y empaquetado
 
@@ -691,8 +694,10 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | C2: reloj/latencia/loops de 1/256 ms/slip | Hecho; 82 pruebas de player y 634 de librería |
 | 26/10/2026 | C3: loops/quantize/cues/slicer/sequencer/SYNC | Hecho; 522 pruebas de binario en debug y release |
 | 26/10/2026 | Commit de C2/C3 (`bc1c9cb`) y smoke release | Hecho |
-| Pendiente | Merge de C1–C5 a `main` | En curso |
-| Pendiente | Rama tardía: C6/C7/C8 y matriz visual con datos | Pendiente |
+| 26/10/2026 | Merge de C1–C5 a `main` | Hecho |
+| 26/10/2026 | C6: soft takeover MIDI, preferencia y toast | Hecho en `backport/fase-1-tardia`; 62 pruebas MIDI + release |
+| Pendiente | C7: hot cues exactos (`seek_on_beat`) | Pendiente |
+| Pendiente | C8 opcional y matriz visual con datos | Pendiente |
 | Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
 
 **Hallazgo crítico cerrado en F0a:** un backup de store de upstream v17–v23 ya no puede

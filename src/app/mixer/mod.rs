@@ -33,6 +33,7 @@ mod curve;
 mod map;
 mod rec;
 mod vu;
+pub(in crate::app) use channel::{iso_at, knob_at};
 
 use super::{
     App, BusView, ChannelView, DeckState, MixerState,
