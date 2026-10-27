@@ -199,12 +199,12 @@ impl Deck {
             .then(|| autocue::nearest(&a.cues))
             .flatten();
         analysis::auto::fill(&mut a); // phrases from the grid + 3-band waveform when the library has none
-                                      // session-only automatic cues (none without a grid or when the track has cues)
-        let auto_cues = a.cues.is_empty() && {
-            let auto = analysis::auto::cues(&a);
-            a.cues.extend(auto);
-            !a.cues.is_empty()
-        };
+        // session-only automatic cues (none without a grid, when the track has cues, or when the user deleted them all)
+        let edited_cues = pcm.is_none()
+            && store::global()
+                .edits(&store::key(t))
+                .is_ok_and(|e| e.cues.is_some());
+        let auto_cues = add_auto_cues(&mut a, edited_cues);
         let duration = if t.length_s > 0 {
             t.length_s as u32 * 1000
         } else {
@@ -232,11 +232,15 @@ impl Deck {
         self.gate.set(None);
         self.plugin_held.set(None);
         self.jog_cue.set(false);
+        self.slicer_reset();
         self.stems_clear();
         let mut pending = None;
         if let Some(player) = &self.player {
             let mut player = player.borrow_mut();
             player.load(audio::Pcm::default());
+            if self.rev_slip.take() {
+                player.set_slip(false); // the slip REVERSE engaged itself does not outlive the track
+            }
             player.set_rate(1.0);
             player.set_key_shift(0.0);
             player.seek(cue_ms);
@@ -521,4 +525,39 @@ fn summary(
     .chain(notes.iter().cloned())
     .collect::<Vec<_>>()
     .join(" · ")
+}
+/// Puts the automatic cues ([`analysis::auto::cues`]) on a track without cues; `edited`: the user's own cue list is the empty
+/// one (all deleted), which stays. Whether any were added.
+fn add_auto_cues(a: &mut analysis::Analysis, edited: bool) -> bool {
+    if !a.cues.is_empty() || edited {
+        return false;
+    }
+    let auto = analysis::auto::cues(a);
+    a.cues.extend(auto);
+    !a.cues.is_empty()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn beat(time_ms: u32) -> analysis::Beat {
+        analysis::Beat {
+            time_ms,
+            bpm_x100: 12000,
+            bar_pos: 1,
+        }
+    }
+
+    #[test]
+    fn automatic_cues_do_not_come_back_after_the_user_deleted_all_cues() {
+        let mut a = analysis::Analysis {
+            beats: (0..8).map(|i| beat(i * 500)).collect(),
+            ..Default::default()
+        };
+        assert!(!add_auto_cues(&mut a.clone(), true));
+        assert!(a.cues.is_empty());
+        assert!(add_auto_cues(&mut a, false), "a track never edited gets them");
+        assert!(!a.cues.is_empty());
+    }
 }

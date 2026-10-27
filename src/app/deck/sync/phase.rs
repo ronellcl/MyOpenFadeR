@@ -41,6 +41,20 @@ fn wrap(x: f64) -> f64 {
     (x + 0.5).rem_euclid(1.0) - 0.5
 }
 
+/// A loop can drive beat phase only if wrapping preserves the follower's fractional beat.
+pub(super) fn loop_preserves_phase(master: &[Beat], loop_: Option<(u32, u32)>, k: f64) -> bool {
+    let Some((s, e)) = loop_ else { return true };
+    let Some(start) = beat_at(master, s as f64) else {
+        return false;
+    };
+    let Some(end) = beat_at(master, e as f64) else {
+        return false;
+    };
+    let beats = ((end - start) * k).round();
+    // Loop endpoints are rounded to integer milliseconds; allow their combined rounding error.
+    beats >= 1.0 && ms_at(master, start + beats / k).is_some_and(|at| (at - e as f64).abs() <= 1.0)
+}
+
 /// Beat-phase error of the follower at `own_pos` against the master at `master_pos` (ms, track time)
 /// in the follower's beats (positive = ahead), and the position (ms) where it would be aligned.
 pub fn align(
@@ -86,17 +100,19 @@ fn nudge_for(err_ms: f64) -> f32 {
 }
 
 /// Where a paused follower at `own_pos` starts so it sits on its nearest beat plus the master's current
-/// beat phase (called as the master crosses a beat: the phase is then a few ms).
+/// beat phase (called as the master crosses a beat: the phase is then a few ms). `ahead_ms`: track ms the follower plays
+/// before the start is heard (the output latency times its rate), which the master has moved on by as well.
 pub fn start_ms(
     own: &[Beat],
     own_pos: f64,
     master: &[Beat],
     master_pos: f64,
     k: f64,
+    ahead_ms: f64,
 ) -> Option<u32> {
     let b = beat_at(own, own_pos)?.round();
     Some(
-        ms_at(own, b + wrap(beat_at(master, master_pos)? * k))?
+        (ms_at(own, b + wrap(beat_at(master, master_pos)? * k))? + ahead_ms)
             .max(0.0)
             .round() as u32,
     )
@@ -193,6 +209,25 @@ mod tests {
     }
 
     #[test]
+    fn loop_phase_requires_whole_follower_beats() {
+        let master = grid(0, 120, 64);
+        for end in [16, 31, 63, 125, 250, 625, 750] {
+            assert!(!loop_preserves_phase(&master, Some((0, end)), 1.0));
+        }
+        for end in [500, 1000, 2000, 4000] {
+            assert!(loop_preserves_phase(&master, Some((0, end)), 1.0));
+        }
+        assert!(loop_preserves_phase(&master, None, 1.0));
+        assert!(loop_preserves_phase(&master, Some((0, 250)), 2.0));
+        assert!(!loop_preserves_phase(&master, Some((0, 125)), 2.0));
+        assert!(!loop_preserves_phase(&master, Some((0, 500)), 0.5));
+        assert!(loop_preserves_phase(&master, Some((0, 1000)), 0.5));
+        assert!(loop_preserves_phase(&master, Some((0, 501)), 1.0));
+        assert!(!loop_preserves_phase(&master, Some((0, 502)), 1.0));
+        assert!(!loop_preserves_phase(&[], Some((0, 500)), 1.0));
+    }
+
+    #[test]
     fn error_in_ms_uses_the_effective_tempo() {
         assert!((error_ms(0.1, 120.0) - 50.0).abs() < 1e-9);
         assert!((error_ms(-0.5, 60.0) + 500.0).abs() < 1e-9);
@@ -234,12 +269,14 @@ mod tests {
     fn quantized_start_sits_on_a_beat_plus_the_masters_phase() {
         let (own, master) = (grid(100, 120, 64), grid(0, 150, 64));
         // paused at 2090 ms (beat 3.98 → beat 4 = 2100 ms); master just past a beat (1200 ms + 20 ms = phase .05)
-        assert_eq!(start_ms(&own, 2090.0, &master, 1220.0, 1.0), Some(2125));
+        assert_eq!(start_ms(&own, 2090.0, &master, 1220.0, 1.0, 0.0), Some(2125));
         // master phase .9 → 0.1 beat before the own beat
-        assert_eq!(start_ms(&own, 2090.0, &master, 1160.0, 1.0), Some(2050));
+        assert_eq!(start_ms(&own, 2090.0, &master, 1160.0, 1.0, 0.0), Some(2050));
         // never before the track start
-        assert_eq!(start_ms(&own, 0.0, &master, 1000.0, 1.0), Some(0));
-        assert_eq!(start_ms(&[], 0.0, &master, 0.0, 1.0), None);
+        assert_eq!(start_ms(&own, 0.0, &master, 1000.0, 1.0, 0.0), Some(0));
+        assert_eq!(start_ms(&[], 0.0, &master, 0.0, 1.0, 0.0), None);
+        // heard 30 ms after it is made: the start is 30 ms further on, where the master will be by then
+        assert_eq!(start_ms(&own, 2090.0, &master, 1220.0, 1.0, 30.0), Some(2155));
     }
 
     #[test]

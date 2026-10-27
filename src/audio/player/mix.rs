@@ -625,7 +625,7 @@ mod tests {
             sh.rate.store((1.0 + 0.05 * k as f64).to_bits(), Relaxed);
             sh.t.set_shift(2.0);
             sh.cfx.set_knob(-0.4);
-            sh.set_loop(Some((500, 900)));
+            sh.set_loop(Some((500.0, 900.0)));
         }
         let mut mix = Mix::new(44100, 2, Plan::stereo(), None, &shared, &bus);
         let mut out = vec![0f32; 2 * 512];

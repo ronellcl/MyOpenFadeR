@@ -343,7 +343,7 @@ el `Cargo.toml` del repo de plugins) se quedan como están.
 | Fase | Objetivo | Estado | Cierre |
 |---|---|---|---|
 | 0 | Preparar rama y baseline | Pendiente | `main` limpio, build release y tests de partida verdes |
-| 1 | Correcciones 0.2.5 de audio/UI | En curso (C5/C4 hechos; C2/C3 pendientes) | Tests + build release + smoke + revisión manual |
+| 1 | Correcciones 0.2.5 de audio/UI | En curso (C5/C4/C2/C3 hechos; visual y C6/C7/C8 pendientes) | Tests + build release + smoke + revisión manual |
 | 2 | Endurecer CI/empaquetado | Pendiente | Workflow valida el paquete antes de publicarlo |
 | 3 | Cimientos store/device/plugin | Pendiente | Migración v17→nueva con backup/rollback probado |
 | 4 | Browser/library/device features | Pendiente | Funciones nuevas sin perder fuentes ni i18n del fork |
@@ -376,8 +376,8 @@ Studio, temas ni la numeración nueva del store.
 | **C1** | **Descartado:** no reproduce el stack overflow con 1 MiB en Linux; no se toca `ui/app.slint` ni el smoke (`10e977d`) | — | — | Bajo |
 | **C5** | **Hecho:** SYNC solo lo lidera el deck que suena; un MASTER fijado se sigue; KEY SYNC no cambia | `src/app/deck/sync/master.rs`, `sync/mod.rs` | — | Bajo |
 | **C4** | **Hecho:** Beat FX con fuente CH/MST/TAP; stems conservan EQ y no cambian el strip a STEM ISO. Revisión visual pendiente | `src/app/fx/`, `src/app/deck/stems/mod.rs`, `src/app/mixer/`, `src/app/prefs/`, `ui/fx.slint`, `ui/mixer.slint` | — | Medio |
-| **C2** | Primitivas de transporte/reloj/loop de 0.2.5 (`latency_ms`, `steady`, `written_ms`, loops en 256 pasos, slip, catch-up consciente del loop) | `src/audio/player/{mod,clock,voice,tests}.rs`, `src/audio/transport.rs`, `src/app/deck/loops.rs` (solo cast a `f64`) | — | Medio |
-| **C3** | Timing de deck, loops, quantize, cues, slicer, sequencer y SYNC sobre C2 | `src/app/deck/*`, `src/app/deck/sync/*`, `src/app/midi/actions/*`, `midi/input.rs` (release de `Kind::Deck`) | C2 | Alto |
+| **C2** | **Hecho:** `latency_ms`, `steady`, `written_ms`, loops a 1/256 ms, slip y catch-up consciente del loop | `src/audio/player/{mod,clock,voice,tests}.rs`, `src/audio/transport.rs`, `src/app/deck/loops.rs` | — | Medio |
+| **C3** | **Hecho:** timing de deck, loops, quantize, cues, slicer, sequencer y SYNC sobre C2 | `src/app/deck/*`, `src/app/deck/sync/*`, `src/app/midi/actions/*`, `midi/input.rs` (release de `Kind::Deck`) | C2 | Alto |
 | **C6** | Soft takeover MIDI para knobs/faders absolutos (`midi/pickup.rs`, pref, toast) | `src/app/midi/`, `src/app/prefs/controller/`, `src/app/toast.rs`, `src/app/mixer/mod.rs` | C4 (lectores `knob_at`/`iso_at`) | Alto, pero autocontenido |
 | **C7** | Hot cues exactos al pulsar rápido (`seek_on_beat`) | `src/audio/player/{mod,voice,tests}.rs`, `audio/player/hotcue_tests.rs`, `audio/transport.rs`, `deck/quantize.rs` | C2 + C3 | Medio |
 | **C8** | “Reload Tag (discard edits)” sin overrides de texto: refresca análisis/BPM/key desde el archivo y descarta el texto editado, dentro de `Store::action` | `src/app/library/track.rs`, `ui/app.slint`, `ui/browser-table.slint`, `es.po` | — | Bajo, opcional |
@@ -440,12 +440,21 @@ parche necesita `src/store/mod.rs`, el browser o `ui/studio`, se parte y se mand
 - Matriz visual mínima: 2H/2V/4H/4V, Classic/VDJ, vídeo on/off, tres skins y inglés/español;
   abrir Track, FX, mixer con STEM ISO, menú contextual, EXPORT de 2 players y split.
 
-#### 17.3.6 Estado de C1, C5 y C4 (26/10/2026)
+#### 17.3.6 Estado de C1–C5 (26/10/2026)
 
 - **C1 descartado:** `target/release/openfader` arrancó 15 s con `ulimit -s 1024`, plugins y HOME
   privados, sin `stack overflow` ni panic. No se modificaron `ui/app.slint` ni `.github/smoke.sh`.
 - **C5 hecho:** `leader_of` distingue SYNC de KEY SYNC, un deck audible no sigue a uno idle y el
   MASTER fijado sigue siendo la excepción. `cargo test --bin openfader app::deck::sync` → 15 pasan.
+- **C2 hecho:** loops guardados y reproducidos a 1/256 ms, `Clock::latency_ms`, `Player::steady`,
+  `written_ms`, slip que se apaga al volver a la sombra, catch-up consciente del loop y arranque
+  sin rampa para hot cue/CUE/synced start. `cargo test --lib audio::player` → 82; `cargo test
+  --lib` → 634; release lib → 634.
+- **C3 hecho:** loops con fase, quantize NEXT BEAT consciente del wrap, cue al final, hot cues con
+  loop, slicer con `seek_in_phase`, sequencer por pad, instant doubles por `written_ms`, SYNC sin
+  corregir durante brake/spin-up/scratch del master, fader libre si el master no se puede seguir y
+  `start_ms` con latencia. `cargo test --bin openfader` → 522; release bin → 522; integraciones
+  verdes salvo la prueba de vídeo preexistente (saltada).
 - **C4 hecho en código:** `fx_tempo_master` persistido, fuente CH/MST/TAP, texto `CHn`/`MST`/`TAP`,
   `iso-part` para los botones de stem y EQ que sigue procesando en STEM ISO. `cargo test --bin
   openfader app::fx` → 12; `app::mixer` → 28; `app::deck::stems` → 7; `app::prefs` → 63.
@@ -456,7 +465,9 @@ parche necesita `src/store/mod.rs`, el browser o `ui/studio`, se parte y se mand
   principal; abrir el panel FX en esa ventana sigue pendiente. Faltan vídeo, STEM ISO, menú
   contextual, EXPORT de 2 players y split. El código compila (`cargo build --release`) y las
   pruebas pasan.
-- **C2/C3 pendientes.** No se tocaron store, browser, `ui/studio` ni `ui/app.slint`.
+- **Pendiente de fase 1:** C6 (soft takeover), C7 (hot cues exactos) y C8 opcional; completar
+  la matriz visual con datos (1000×760 con FX, vídeo, STEM ISO, menú contextual, EXPORT y split).
+  No se tocaron store, browser, `ui/studio` ni `ui/app.slint`.
 
 ### 17.4 Fase 2 — CI y empaquetado
 
@@ -671,13 +682,15 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | Informes reconciliados; §17.3.5 fija contratos UI/Rust y §17.3.1 ajusta el veredicto | Hecho |
 | 26/10/2026 | F0a: identidad del store, rechazo read-only y `LOCAL_TABLES` | Hecho; ver §17.5.2 |
 | 26/10/2026 | F0a: pruebas store/lib/integración, build release y smokes | Hecho; vídeo falla también en `main` |
-| 26/10/2026 | Alcance de fase 1 aprobado; C1, C5 y C4 iniciados | Hecho |
+| 26/10/2026 | Alcance de fase 1 aprobado; C1, C5, C4 y C2/C3 | Hecho |
 | 26/10/2026 | C1: reproducción con 1 MiB de stack | Descartado; no reproduce |
 | 26/10/2026 | C5: SYNC audible y MASTER fijado | Hecho; 15 pruebas |
 | 26/10/2026 | C4: Beat FX CH/MST/TAP y stems conservan EQ | Hecho en código; matriz full-screen 2H/2V/4H/4V, 3 skins y 2 idiomas revisada; 1000 y casos con datos pendientes |
-| Pendiente | Rama `backport/fase-1`: C2/C3 y pruebas completas | En curso |
+| 26/10/2026 | C2: reloj/latencia/loops de 1/256 ms/slip | Hecho; 82 pruebas de player y 634 de librería |
+| 26/10/2026 | C3: loops/quantize/cues/slicer/sequencer/SYNC | Hecho; 522 pruebas de binario en debug y release |
+| Pendiente | Rama `backport/fase-1`: C6/C7/C8 y matriz visual con datos | En curso |
 | Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
-| Pendiente | Commit grande de fase 1 y merge a `main` | Pendiente |
+| Pendiente | Commit de C2/C3, smoke final y merge a `main` | Pendiente |
 
 **Hallazgo crítico cerrado en F0a:** un backup de store de upstream v17–v23 ya no puede
 restaurarse en el fork: se rechaza por `application_id`/firmas antes de `ATTACH`, y un backup
