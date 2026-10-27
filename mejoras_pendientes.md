@@ -468,6 +468,8 @@ parche necesita `src/store/mod.rs`, el browser o `ui/studio`, se parte y se mand
 - **Pendiente de fase 1:** C6 (soft takeover), C7 (hot cues exactos) y C8 opcional; completar
   la matriz visual con datos (1000×760 con FX, vídeo, STEM ISO, menú contextual, EXPORT y split).
   No se tocaron store, browser, `ui/studio` ni `ui/app.slint`.
+- **Commits del núcleo:** `9adb8d2` (C5/C4), `ba97780` (MST en MASTER), `99b1777` (matriz visual)
+  y `bc1c9cb` (C2/C3).
 
 ### 17.4 Fase 2 — CI y empaquetado
 
@@ -688,9 +690,10 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | C4: Beat FX CH/MST/TAP y stems conservan EQ | Hecho en código; matriz full-screen 2H/2V/4H/4V, 3 skins y 2 idiomas revisada; 1000 y casos con datos pendientes |
 | 26/10/2026 | C2: reloj/latencia/loops de 1/256 ms/slip | Hecho; 82 pruebas de player y 634 de librería |
 | 26/10/2026 | C3: loops/quantize/cues/slicer/sequencer/SYNC | Hecho; 522 pruebas de binario en debug y release |
-| Pendiente | Rama `backport/fase-1`: C6/C7/C8 y matriz visual con datos | En curso |
+| 26/10/2026 | Commit de C2/C3 (`bc1c9cb`) y smoke release | Hecho |
+| Pendiente | Merge de C1–C5 a `main` | En curso |
+| Pendiente | Rama tardía: C6/C7/C8 y matriz visual con datos | Pendiente |
 | Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
-| Pendiente | Commit de C2/C3, smoke final y merge a `main` | Pendiente |
 
 **Hallazgo crítico cerrado en F0a:** un backup de store de upstream v17–v23 ya no puede
 restaurarse en el fork: se rechaza por `application_id`/firmas antes de `ATTACH`, y un backup
