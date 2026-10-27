@@ -343,7 +343,7 @@ el `Cargo.toml` del repo de plugins) se quedan como están.
 | Fase | Objetivo | Estado | Cierre |
 |---|---|---|---|
 | 0 | Preparar rama y baseline | Pendiente | `main` limpio, build release y tests de partida verdes |
-| 1 | Correcciones 0.2.5 de audio/UI | En curso (C2–C7 hechos; visual y C8 pendientes) | Tests + build release + smoke + revisión manual |
+| 1 | Correcciones 0.2.5 de audio/UI | C2–C7 hechos y fusionados en `main` local; C8 opcional y matriz visual con datos pendientes | Tests + build release + smoke + revisión manual |
 | 2 | Endurecer CI/empaquetado | Pendiente | Workflow valida el paquete antes de publicarlo |
 | 3 | Cimientos store/device/plugin | Pendiente | Migración v17→nueva con backup/rollback probado |
 | 4 | Browser/library/device features | Pendiente | Funciones nuevas sin perder fuentes ni i18n del fork |
@@ -476,7 +476,8 @@ parche necesita `src/store/mod.rs`, el browser o `ui/studio`, se parte y se mand
   vídeo, STEM ISO, menú contextual, EXPORT y split). No se tocaron store, browser, `ui/studio` ni
   `ui/app.slint`.
 - **Commits del núcleo:** `9adb8d2` (C5/C4), `ba97780` (MST en MASTER), `99b1777` (matriz visual)
-  y `bc1c9cb` (C2/C3). C6 va en `backport/fase-1-tardia`.
+  y `bc1c9cb` (C2/C3). Rama tardía: `8f2faef` (C6) y `a955cc3` (C7). Todo está fusionado en
+  `main` local; no se hizo push.
 
 ### 17.4 Fase 2 — CI y empaquetado
 
@@ -699,8 +700,9 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | C3: loops/quantize/cues/slicer/sequencer/SYNC | Hecho; 522 pruebas de binario en debug y release |
 | 26/10/2026 | Commit de C2/C3 (`bc1c9cb`) y smoke release | Hecho |
 | 26/10/2026 | Merge de C1–C5 a `main` | Hecho |
-| 26/10/2026 | C6: soft takeover MIDI, preferencia y toast | Hecho en `backport/fase-1-tardia`; 62 pruebas MIDI + release |
-| 26/10/2026 | C7: hot cues exactos (`seek_on_beat`) y tests de spam | Hecho en `backport/fase-1-tardia`; 642 librería + 523 binario |
+| 26/10/2026 | C6: soft takeover MIDI, preferencia y toast | Hecho (`8f2faef`); 62 pruebas MIDI + release |
+| 26/10/2026 | C7: hot cues exactos (`seek_on_beat`) y tests de spam | Hecho (`a955cc3`); 642 librería + 523 binario |
+| 26/10/2026 | Merge de C6/C7 a `main` local | Hecho; sin push |
 | Pendiente | C8 opcional y matriz visual con datos | Pendiente |
 | Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
 
