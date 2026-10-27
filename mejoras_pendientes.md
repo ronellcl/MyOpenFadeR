@@ -343,7 +343,7 @@ el `Cargo.toml` del repo de plugins) se quedan como están.
 | Fase | Objetivo | Estado | Cierre |
 |---|---|---|---|
 | 0 | Preparar rama y baseline | Pendiente | `main` limpio, build release y tests de partida verdes |
-| 1 | Correcciones 0.2.5 de audio/UI | C2–C7 hechos y fusionados en `main` local; C8 opcional y matriz visual con datos pendientes | Tests + build release + smoke + revisión manual |
+| 1 | Correcciones 0.2.5 de audio/UI | C2–C8 hechos; matriz visual con datos pendiente | Tests + build release + smoke + revisión manual |
 | 2 | Endurecer CI/empaquetado | Pendiente | Workflow valida el paquete antes de publicarlo |
 | 3 | Cimientos store/device/plugin | Pendiente | Migración v17→nueva con backup/rollback probado |
 | 4 | Browser/library/device features | Pendiente | Funciones nuevas sin perder fuentes ni i18n del fork |
@@ -380,7 +380,7 @@ Studio, temas ni la numeración nueva del store.
 | **C3** | **Hecho:** timing de deck, loops, quantize, cues, slicer, sequencer y SYNC sobre C2 | `src/app/deck/*`, `src/app/deck/sync/*`, `src/app/midi/actions/*`, `midi/input.rs` (release de `Kind::Deck`) | C2 | Alto |
 | **C6** | **Hecho:** soft takeover MIDI para knobs/faders absolutos (`midi/pickup.rs`, pref, toast) | `src/app/midi/`, `src/app/prefs/controller/`, `src/app/toast.rs`, `src/app/mixer/mod.rs` | C4 (lectores `knob_at`/`iso_at`) | Alto, pero autocontenido |
 | **C7** | **Hecho:** hot cues exactos al pulsar rápido (`seek_on_beat`, `Plan::Beat`, fase leída en el callback) | `src/audio/player/{mod,voice,tests}.rs`, `audio/player/hotcue_tests.rs`, `src/audio/transport.rs`, `src/app/deck/quantize.rs` | C2 + C3 | Medio |
-| **C8** | “Reload Tag (discard edits)” sin overrides de texto: refresca análisis/BPM/key desde el archivo y descarta el texto editado, dentro de `Store::action` | `src/app/library/track.rs`, `ui/app.slint`, `ui/browser-table.slint`, `es.po` | — | Bajo, opcional |
+| **C8** | **Hecho:** “Reload Tag (discard edits)” sin overrides de texto: refresca campos/análisis, BPM y key desde el archivo y descarta el texto editado, dentro de `Store::action` | `src/app/library/track.rs`, `src/store/journal/tests.rs`, `ui/app.slint`, `ui/browser-table.slint`, `es.po` | — | Bajo, opcional |
 
 Orden práctico: **C1 → C5 → C4 → C2 → C3**. C6 y C7 son “fase 1 tardía”: se pueden cerrar en
 otra rama o en un segundo commit después de que el núcleo esté verificado. C8 es opcional y solo
@@ -472,11 +472,17 @@ parche necesita `src/store/mod.rs`, el browser o `ui/studio`, se parte y se mand
   fase leída en el callback (`Plan::Beat`/`Keep`), no en la pulsación; el motor incluye la batería
   `hotcue_tests` de spam, latencias, key lock y tempo. `cargo test --lib audio::player` → 90;
   `cargo test --lib` → 642; binario debug/release → 523; quantize → 5.
-- **Pendiente de fase 1:** C8 opcional; completar la matriz visual con datos (1000×760 con FX,
-  vídeo, STEM ISO, menú contextual, EXPORT y split). No se tocaron store, browser, `ui/studio` ni
-  `ui/app.slint`.
+- **C8 hecho en la rama tardía:** “Reload Tag (discard edits)” reemplaza texto y campos de análisis
+  de la fila de Collection con los del archivo, conserva lo que el archivo no trae y agrupa la
+  operación en un solo paso de undo. Menú Track y menú contextual actualizados; traducción española
+  “Recargar etiquetas (descartar ediciones)” visible sin recortes en 1920×1080
+  (`/tmp/opencode/c8-run/track-menu.png`). `store::journal::tests::reload_tag_is_one_undo_step`
+  pasa; binario debug/release → 523 pasan, 1 ignorada.
+- **Pendiente de fase 1:** completar la matriz visual con datos (1000×760 con FX, vídeo, STEM ISO,
+  menú contextual, EXPORT y split). No se tocaron browser, `ui/studio` ni `ui/app.slint` salvo la
+  entrada de menú de C8.
 - **Commits del núcleo:** `9adb8d2` (C5/C4), `ba97780` (MST en MASTER), `99b1777` (matriz visual)
-  y `bc1c9cb` (C2/C3). Rama tardía: `8f2faef` (C6) y `a955cc3` (C7). Todo está fusionado en
+  y `bc1c9cb` (C2/C3). Rama tardía: `8f2faef` (C6), `a955cc3` (C7) y `0c5fd8a` (C8). Todo está fusionado en
   `main` local; no se hizo push.
 
 ### 17.4 Fase 2 — CI y empaquetado
@@ -703,7 +709,8 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | C6: soft takeover MIDI, preferencia y toast | Hecho (`8f2faef`); 62 pruebas MIDI + release |
 | 26/10/2026 | C7: hot cues exactos (`seek_on_beat`) y tests de spam | Hecho (`a955cc3`); 642 librería + 523 binario |
 | 26/10/2026 | Merge de C6/C7 a `main` local | Hecho; sin push |
-| Pendiente | C8 opcional y matriz visual con datos | Pendiente |
+| 26/10/2026 | C8: “Reload Tag (discard edits)” undoable, menú y español | Hecho (`0c5fd8a`); 523 binario + prueba de undo; smoke y menú revisados |
+| Pendiente | Matriz visual con datos | Pendiente |
 | Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
 
 **Hallazgo crítico cerrado en F0a:** un backup de store de upstream v17–v23 ya no puede
