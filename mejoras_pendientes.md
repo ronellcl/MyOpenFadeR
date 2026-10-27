@@ -343,7 +343,7 @@ el `Cargo.toml` del repo de plugins) se quedan como están.
 | Fase | Objetivo | Estado | Cierre |
 |---|---|---|---|
 | 0 | Preparar rama y baseline | Pendiente | `main` limpio, build release y tests de partida verdes |
-| 1 | Correcciones 0.2.5 de audio/UI | En curso (C2–C6 hechos; visual y C7/C8 pendientes) | Tests + build release + smoke + revisión manual |
+| 1 | Correcciones 0.2.5 de audio/UI | En curso (C2–C7 hechos; visual y C8 pendientes) | Tests + build release + smoke + revisión manual |
 | 2 | Endurecer CI/empaquetado | Pendiente | Workflow valida el paquete antes de publicarlo |
 | 3 | Cimientos store/device/plugin | Pendiente | Migración v17→nueva con backup/rollback probado |
 | 4 | Browser/library/device features | Pendiente | Funciones nuevas sin perder fuentes ni i18n del fork |
@@ -379,7 +379,7 @@ Studio, temas ni la numeración nueva del store.
 | **C2** | **Hecho:** `latency_ms`, `steady`, `written_ms`, loops a 1/256 ms, slip y catch-up consciente del loop | `src/audio/player/{mod,clock,voice,tests}.rs`, `src/audio/transport.rs`, `src/app/deck/loops.rs` | — | Medio |
 | **C3** | **Hecho:** timing de deck, loops, quantize, cues, slicer, sequencer y SYNC sobre C2 | `src/app/deck/*`, `src/app/deck/sync/*`, `src/app/midi/actions/*`, `midi/input.rs` (release de `Kind::Deck`) | C2 | Alto |
 | **C6** | **Hecho:** soft takeover MIDI para knobs/faders absolutos (`midi/pickup.rs`, pref, toast) | `src/app/midi/`, `src/app/prefs/controller/`, `src/app/toast.rs`, `src/app/mixer/mod.rs` | C4 (lectores `knob_at`/`iso_at`) | Alto, pero autocontenido |
-| **C7** | Hot cues exactos al pulsar rápido (`seek_on_beat`) | `src/audio/player/{mod,voice,tests}.rs`, `audio/player/hotcue_tests.rs`, `audio/transport.rs`, `deck/quantize.rs` | C2 + C3 | Medio |
+| **C7** | **Hecho:** hot cues exactos al pulsar rápido (`seek_on_beat`, `Plan::Beat`, fase leída en el callback) | `src/audio/player/{mod,voice,tests}.rs`, `audio/player/hotcue_tests.rs`, `src/audio/transport.rs`, `src/app/deck/quantize.rs` | C2 + C3 | Medio |
 | **C8** | “Reload Tag (discard edits)” sin overrides de texto: refresca análisis/BPM/key desde el archivo y descarta el texto editado, dentro de `Store::action` | `src/app/library/track.rs`, `ui/app.slint`, `ui/browser-table.slint`, `es.po` | — | Bajo, opcional |
 
 Orden práctico: **C1 → C5 → C4 → C2 → C3**. C6 y C7 son “fase 1 tardía”: se pueden cerrar en
@@ -468,9 +468,13 @@ parche necesita `src/store/mod.rs`, el browser o `ui/studio`, se parte y se mand
 - **C6 hecho en la rama tardía:** soft takeover de knobs/faders absolutos con `pickup.rs`,
   lectores `knob_at`/`iso_at`, preferencia `soft_takeover` y toast de dirección. `cargo test --bin
   openfader app::midi` → 62; suite del binario → 523 y release → 523; smoke release vivo.
-- **Pendiente de fase 1:** C7 (hot cues exactos) y C8 opcional; completar la matriz visual con
-  datos (1000×760 con FX, vídeo, STEM ISO, menú contextual, EXPORT y split). No se tocaron store,
-  browser, `ui/studio` ni `ui/app.slint`.
+- **C7 hecho en la rama tardía:** hot cues y loops cuantizados usan `Player::seek_on_beat` con la
+  fase leída en el callback (`Plan::Beat`/`Keep`), no en la pulsación; el motor incluye la batería
+  `hotcue_tests` de spam, latencias, key lock y tempo. `cargo test --lib audio::player` → 90;
+  `cargo test --lib` → 642; binario debug/release → 523; quantize → 5.
+- **Pendiente de fase 1:** C8 opcional; completar la matriz visual con datos (1000×760 con FX,
+  vídeo, STEM ISO, menú contextual, EXPORT y split). No se tocaron store, browser, `ui/studio` ni
+  `ui/app.slint`.
 - **Commits del núcleo:** `9adb8d2` (C5/C4), `ba97780` (MST en MASTER), `99b1777` (matriz visual)
   y `bc1c9cb` (C2/C3). C6 va en `backport/fase-1-tardia`.
 
@@ -696,7 +700,7 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | Commit de C2/C3 (`bc1c9cb`) y smoke release | Hecho |
 | 26/10/2026 | Merge de C1–C5 a `main` | Hecho |
 | 26/10/2026 | C6: soft takeover MIDI, preferencia y toast | Hecho en `backport/fase-1-tardia`; 62 pruebas MIDI + release |
-| Pendiente | C7: hot cues exactos (`seek_on_beat`) | Pendiente |
+| 26/10/2026 | C7: hot cues exactos (`seek_on_beat`) y tests de spam | Hecho en `backport/fase-1-tardia`; 642 librería + 523 binario |
 | Pendiente | C8 opcional y matriz visual con datos | Pendiente |
 | Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
 
