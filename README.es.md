@@ -27,9 +27,21 @@ MyOpenFadeR es un fork de [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): una
 
 Todas las capturas de esta página salen de la aplicación en marcha, con una biblioteca de pistas sintéticas generadas para estas imágenes. No hay música con derechos en ellas.
 
-## Qué añade esta versión
+## Novedades de la 0.4.2
 
-La 0.4.0 reúne lo que esta rama ha añadido desde la 0.3.1:
+La 0.4.2 hace fiable el timing y el SYNC con las manos rápidas y añade los últimos detalles de seguridad y flujo de trabajo:
+
+- **Los loops y los cues no pierden el beat.** Los finales de loop se guardan a 1/256 ms, LOOP OUT sigue en la fase que habría tenido, los saltos cuantizados recuperan el retraso al cruzar el wrap del loop y los hot cues caen en el beat que realmente escribe el callback de audio, también con latencia, key lock y cambios de tempo.
+- **SYNC sabe cuándo soltar.** Deja de corregir mientras una mesa frena, arranca o el máster hace scratch o va hacia atrás; no toca un loop del máster que no puede conservar la fase y devuelve el fader de tempo cuando el máster no se puede seguir.
+- **Beat FX siguen su fuente.** Cada unidad elige CH, MST o TAP. Los botones de stem conservan el EQ y ya no cambian el strip a STEM ISO.
+- **Instant doubles y ediciones conservan la fase.** Los instant doubles, slicers, beat jumps y loop moves mantienen el beat en vez de caer hasta un búfer tarde.
+- **Soft takeover MIDI.** Un knob o fader absoluto espera en el valor de pantalla tras un cambio de capa, STEM o modo, con un aviso de hacia dónde girarlo; PREFERENCIAS > CONTROLADOR > OTHERS lo desactiva.
+- **Recargar etiquetas (descartar ediciones).** Un solo paso de undo recarga el texto, BPM, tonalidad y campos de análisis del fichero sobre la fila de la Colección; lo que el fichero no trae se conserva.
+- **Store a salvo.** Un `store.db` de otra compilación o programa se rechaza en vez de migrarse, y las tablas locales que faltan fallan cerrado en vez de recrearse.
+
+### 0.4.0
+
+La 0.4.0 reunió lo que esta rama añadió desde la 0.3.1:
 
 - **SYNC engancha de una vez.** Los candados de tempo y fase se toman juntos y la corrección se queda dentro de 1 ms, así que sincronizar dos mesas ya no da el tirón que se notaba.
 - **Cada pista vive una sola vez, en 16 bits.** Las mesas, la vista previa del navegador y el análisis en bloque decodifican directamente a muestras de 16 bits (10,6 MB por minuto de estéreo a 44,1 kHz) en vez de guardar una copia f32 de la pista entera, y la huella se calcula mientras se decodifica.

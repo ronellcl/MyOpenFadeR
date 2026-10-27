@@ -27,9 +27,21 @@ MyOpenFadeR is a fork of [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): an o
 
 Every screenshot on this page comes from the running app, with a library of synthetic tracks generated for these pictures. There is no copyrighted music in them.
 
-## What this version adds
+## What's new in 0.4.2
 
-0.4.0 gathers what this branch has added since 0.3.1:
+0.4.2 makes timing and SYNC trustworthy under fast hands and adds the last safety and workflow details:
+
+- **Loops and cues keep the beat.** Loop ends are stored to 1/256 ms, LOOP OUT goes on at the phase it would have had, quantized jumps catch up through loop wraps, and hot cues land on the beat the audio callback actually plays, including under latency, key lock and tempo changes.
+- **SYNC knows when to let go.** It stops correcting while either deck brakes, spins up or the master scratches or reverses, leaves a master loop alone when it cannot preserve the beat phase, and gives the tempo fader back when the master cannot be followed.
+- **Beat FX follow their source.** Each unit chooses CH, MST or TAP. Stem buttons keep the EQ processing and no longer switch the strip to STEM ISO.
+- **Instant doubles and edits stay in phase.** Instant doubles, slicers, beat jumps and loop moves keep the beat instead of jumping up to a buffer late.
+- **MIDI soft takeover.** An absolute knob or fader waits at the on-screen value after a layer, STEM or mode change, with a hint telling you which way to turn it; PREFERENCES > CONTROLLER > OTHERS turns it off.
+- **Reload Tag (discard edits).** One undoable step reloads the file's text, BPM, key and analysis fields over the Collection row; fields the file lacks stay.
+- **Store safety.** A `store.db` from another build or program is refused instead of migrated, and missing local tables fail closed instead of being recreated.
+
+### 0.4.0
+
+0.4.0 gathered what this branch added since 0.3.1:
 
 - **SYNC locks at once.** The tempo and phase locks are taken together and the correction stays within a millisecond, so syncing two decks no longer pulls the mix.
 - **Each track lives once, in 16 bits.** Decks, the browser preview and batch analysis decode straight to 16-bit samples (10.6 MB per minute of stereo at 44.1 kHz) instead of keeping an f32 copy of the whole track, and the fingerprint is computed while decoding.

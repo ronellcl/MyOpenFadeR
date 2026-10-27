@@ -6,9 +6,9 @@ haciendo de a uno, compilando en release al cerrar cada tanda.
 > Recordatorio: la app **solo** debe ejecutarse en **release** (`start.sh` línea 14:
 > `cargo run --release`). El build debug sirve para compilar/`cargo test`, no para correr la GUI.
 
-> Última revisión: **26/10/2026**, contra `main` (`ddcc4a0`, 0.4.1). Las tandas de abajo están
-> cerradas y `hallazgos.md` no tiene nada sin resolver. Sigue abierto **§16** (decisiones) y el
-> **§17**, el plan de backport selectivo desde upstream (en validación, sin código cambiado).
+> Última revisión: **27/10/2026**, contra `main` (0.4.2). Las tandas de abajo están cerradas y
+> `hallazgos.md` no tiene nada sin resolver. Sigue abierto **§16** (decisiones) y el **§17**, el
+> plan de backport selectivo desde upstream (fase 1 cerrada en código).
 
 ## 1. Terminales que se abren solas — ARREGLADO
 - **Síntoma:** cada vez que se carga un tema de la nube (deezer/youtube) o un vídeo se abre
@@ -264,9 +264,9 @@ Notas:
 - El preview de vídeo por fotograma (F5-2) **sí se implementó** (`85131bd`) y sigue en el código; la nota anterior lo daba por descartado y no era exacta. Se queda como está salvo que se decida otra cosa.
 - La versión, los instaladores y la release se tocan solo cuando se pidan.
 
-## 16. Lo que queda abierto (revisado el 26/10/2026)
+## 16. Lo que queda abierto (revisado el 27/10/2026)
 
-Revisado contra el código de `main` (`7ee52c8`, versión 0.4.1). **`hallazgos.md` está cerrado
+Revisado contra el código de `main` (versión 0.4.2). **`hallazgos.md` está cerrado
 entero**: los 30 hallazgos figuran resueltos en [hallazgos_solucionados.md](hallazgos_solucionados.md).
 Lo que sigue es decisión, no avería:
 
@@ -314,10 +314,10 @@ el `Cargo.toml` del repo de plugins) se quedan como están.
 
 ## 17. Plan de backport selectivo desde upstream (26/10/2026)
 
-> **Estado:** planificado y en validación. **No se ha modificado código, no hay rama nueva y no
-> hay commits de esta fase.**
+> **Estado:** fase 1 cerrada en código (C1 descartado; C2–C8 en `main`). Queda la matriz visual
+> con datos, anotada abajo.
 >
-> **Base local:** `main` = `ddcc4a0` (0.4.1; 15 commits por delante de `origin/main`).
+> **Base local:** `main` = 0.4.2 (release `v0.4.2`).
 > **Upstream de referencia:** `upstream/main` = `9ac712c` (0.2.5 más trabajo posterior sin release).
 > **Decisión:** backport por fases; **nunca** un merge completo. El merge produce 306 archivos en
 > conflicto y upstream no es un superconjunto: elimina funciones propias del fork.
@@ -711,6 +711,7 @@ esta operación; requiere un diseño aparte y aprobación explícita.
 | 26/10/2026 | Merge de C6/C7 a `main` local | Hecho; sin push |
 | 26/10/2026 | C8: “Reload Tag (discard edits)” undoable, menú y español | Hecho (`0c5fd8a`); 523 binario + prueba de undo; smoke y menú revisados |
 | 26/10/2026 | Merge de C8 a `main` local | Hecho; sin push |
+| 27/10/2026 | Release 0.4.2: README en/es, versión y tag `v0.4.2` | Hecho; push a `origin` |
 | Pendiente | Matriz visual con datos | Pendiente |
 | Pendiente | Aprobación de F0b/F0c como precondición de fase 3 | Pendiente |
 
@@ -726,7 +727,8 @@ Decisiones abiertas:
    fork, y si `c293a3c` entra junto a las correcciones de FX.
 2. Decidir si el endurecimiento de CI va en fase 1 o fase 2. Recomendación: fase 2.
 3. Decidir más adelante si se quiere updater adaptado al fork; no se implementa sin aprobación.
-4. Confirmar que no se tocará versión, tags, releases ni push durante las fases.
+4. ~~Confirmar que no se tocará versión, tags, releases ni push durante las fases.~~ Autorizado
+   el 27/10/2026 para publicar la 0.4.2 con push y tag; no se publica release de GitHub sin pedirlo.
 5. Aprobar F0b/F0c (`reconcile()`, v18–v23, `backup_auto`, rollback y `docs/store-schema.md`)
    como bloque separado y precondición de todas las funciones nuevas de biblioteca/dispositivo.
    F0a (identidad, rechazo read-only, `store.id`, tablas locales y FK check) ya está hecho.
