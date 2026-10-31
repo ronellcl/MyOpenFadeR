@@ -146,6 +146,7 @@ impl Deck {
     }
 
     pub(super) fn tick(&self) {
+        openfader::audio::recover();
         self.poll_decode();
         self.poll_stems();
         self.stemwave_tick();

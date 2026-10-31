@@ -50,6 +50,13 @@ thread_local! {
     /// The Preferences' audio settings the next stream is opened with ([`super::configure`]).
     static SETTINGS: RefCell<Settings> = RefCell::new(Settings::default());
     static STATUS: RefCell<Status> = RefCell::new(Status::default());
+    /// The exact device a recovery is retrying and where that choice came from (`None` = no recovery).
+    static RECOVERY: RefCell<Option<(String, &'static str)>> = const { RefCell::new(None) };
+}
+
+/// Pins the next [`choose`] to the exact device a recovery is retrying; `None` gives the normal precedence back.
+pub(super) fn set_recovery(r: Option<(String, &'static str)>) {
+    RECOVERY.set(r);
 }
 
 /// The settings the next stream is opened with.
@@ -128,8 +135,21 @@ fn find_wanted(want: &str) -> Result<(String, cpal::Device), String> {
         .ok_or_else(|| format!("no output device named like {want:?}"))
 }
 
-/// Device, config and layout for the next stream (see the module doc for the precedence).
+/// The exact device a recovery retry asks for: never another one, and never the system default.
+fn recovery_device(name: &str) -> Result<cpal::Device, String> {
+    if device::unplugged(name) {
+        return Err(format!("nothing is plugged into {name:?}"));
+    }
+    device::output_named(name).ok_or_else(|| format!("{name:?} is not available"))
+}
+
+/// Device, config and layout for the next stream (see the module doc for the precedence). A pending recovery pins the
+/// exact device it names; it does not fall back to the system default.
 pub(super) fn choose() -> Result<Output, String> {
+    if let Some((name, source)) = RECOVERY.with_borrow(Clone::clone) {
+        let dev = recovery_device(&name)?;
+        return prepare(name, dev, source, Vec::new(), settings());
+    }
     let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
     let wanted = WANTED.with_borrow(Clone::clone);
     let set = settings();
@@ -170,6 +190,17 @@ pub(super) fn choose() -> Result<Output, String> {
             (n, d, "system default")
         }
     };
+    prepare(name, dev, source, notes, set)
+}
+
+fn prepare(
+    name: String,
+    dev: cpal::Device,
+    source: &'static str,
+    mut notes: Vec<String>,
+    set: Settings,
+) -> Result<Output, String> {
+    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
     let rate_want = (set.rate > 0).then_some(set.rate);
     let external = set.mixer == Mixer::External;
     let (cue_want, hp_env) = (env(cue::ENV), env(bus::HP_ENV));
@@ -193,7 +224,7 @@ pub(super) fn choose() -> Result<Output, String> {
         && !external
         && cue_want.is_none()
         && env(bus::OUTPUT_ENV).is_none()
-        && wanted.is_some()
+        && source == "controller"
         && config_for(&dev, &name, 4, None).is_ok()
     {
         multi = Ok(Some([2, 3]));
@@ -269,7 +300,7 @@ pub(super) fn choose() -> Result<Output, String> {
     };
     let status = Status {
         device: name,
-        source,
+        source: if source.is_empty() { "recovery" } else { source },
         rate,
         channels: cfg.channels as usize,
         buffer,

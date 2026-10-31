@@ -50,7 +50,7 @@ pub use decode::{
 };
 pub use dsp::{EQ_KILL_DB, EQ_MAX_DB};
 pub use player::{
-    Player, Status, configure, controller, live_bus, release_controller, set_output, status,
+    Player, Status, configure, controller, live_bus, recover, release_controller, set_output, status,
 };
 pub use rec::{Options as RecOptions, Recorder, new_path as rec_path};
 pub use stems::{

@@ -60,6 +60,22 @@ impl Clock {
         }
     }
 
+    /// A new hardware stream must not extrapolate anchors queued by the old one: hold at `pos`, not playing, until the
+    /// replacement stream records its first callback.
+    pub(super) fn freeze(&mut self, pos: f64) {
+        self.push(
+            Anchor {
+                at: Instant::now(),
+                pos,
+                latency: Duration::ZERO,
+                fps: 0.0,
+                lp: None,
+            },
+            false,
+            true,
+        );
+    }
+
     /// Output latency (ms) of the newest recorded buffer; 0 before the first.
     pub(super) fn latency_ms(&self) -> f64 {
         self.anchors
@@ -264,5 +280,43 @@ mod tests {
             assert_eq!(heard_frames(&c, t0 + MS(ms), 1e9), 12345.0);
         }
         assert_eq!(heard_frames(&c, t0, 100.0), 100.0);
+    }
+
+    #[test]
+    fn reconnect_discards_the_old_hardware_epoch() {
+        let (t0, mut c) = (Instant::now(), clock());
+        c.push(
+            Anchor {
+                at: t0,
+                pos: 1000.0,
+                latency: MS(40),
+                fps: SRC,
+                lp: None,
+            },
+            true,
+            true,
+        );
+        c.freeze(2000.0);
+        assert_eq!(c.latency_ms(), 0.0);
+        assert_eq!(heard_frames(&c, t0 + MS(5000), 1e9), 2000.0);
+        let reset = !c.playing;
+        let resumed = t0 + MS(6000);
+        c.push(
+            Anchor {
+                at: resumed,
+                pos: 2000.0,
+                latency: MS(30),
+                fps: SRC,
+                lp: None,
+            },
+            true,
+            reset,
+        );
+        assert_eq!(heard_frames(&c, resumed + MS(10), 1e9), 2000.0);
+        assert!(!audible(&c, resumed + MS(10)));
+        assert_eq!(
+            heard_frames(&c, resumed + MS(40), 1e9),
+            2000.0 + SRC * 0.01
+        );
     }
 }

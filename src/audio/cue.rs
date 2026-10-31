@@ -13,6 +13,7 @@ use super::{Ring, find_output, put_frame};
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SampleRate, SizedSample, Stream};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 
 /// Env: substring of the second (headphone) output device's name.
 pub const ENV: &str = "OPENFADER_CUE_DEVICE";
@@ -76,12 +77,15 @@ pub struct Cue {
     pub ring: Arc<Ring>,
     pub name: String,
     pub _stream: Stream,
+    /// Set by the stream's error callback; the main stream's watchdog turns it into a reconnect.
+    pub(crate) failed: Arc<AtomicBool>,
 }
 
 fn build<T: SizedSample + FromSample<f32> + Send + 'static>(
     dev: &cpal::Device,
     cfg: &cpal::StreamConfig,
     mut feed: Feed,
+    failed: Arc<AtomicBool>,
 ) -> Result<Stream, cpal::BuildStreamError> {
     let ch = cfg.channels as usize;
     dev.build_output_stream(
@@ -91,7 +95,10 @@ fn build<T: SizedSample + FromSample<f32> + Send + 'static>(
                 put_frame(&mut o[i * ch..(i + 1) * ch], f)
             })
         },
-        |e| eprintln!("cue audio: {e}"),
+        move |e| {
+            eprintln!("cue audio: {e}");
+            failed.store(true, Relaxed);
+        },
         None,
     )
 }
@@ -115,10 +122,11 @@ pub fn open(want: &str, rate: u32) -> Result<Cue, String> {
     let cfg: cpal::StreamConfig = sup.into();
     let ring = Arc::new(Ring::new(RING_FRAMES));
     let feed = Feed::new(ring.clone());
+    let failed = Arc::new(AtomicBool::new(false));
     let stream = match fmt {
-        SampleFormat::F32 => build::<f32>(&dev, &cfg, feed),
-        SampleFormat::I16 => build::<i16>(&dev, &cfg, feed),
-        SampleFormat::U16 => build::<u16>(&dev, &cfg, feed),
+        SampleFormat::F32 => build::<f32>(&dev, &cfg, feed, failed.clone()),
+        SampleFormat::I16 => build::<i16>(&dev, &cfg, feed, failed.clone()),
+        SampleFormat::U16 => build::<u16>(&dev, &cfg, feed, failed.clone()),
         f => return Err(format!("{ENV}: {name}: unsupported sample format {f:?}")),
     }
     .map_err(|e| format!("{ENV}: {name}: {e}"))?;
@@ -127,6 +135,7 @@ pub fn open(want: &str, rate: u32) -> Result<Cue, String> {
         ring,
         name,
         _stream: stream,
+        failed,
     })
 }
 

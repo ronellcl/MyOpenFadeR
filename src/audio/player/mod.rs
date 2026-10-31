@@ -679,6 +679,7 @@ impl Player {
         // Paused, or a seek not yet consumed: no extrapolation, report the resting position. A scratch moves the paused playhead too.
         let f = if (self.is_playing() || self.is_scratching())
             && self.shared.seek.load(Relaxed) == NO_SEEK
+            && self.engine.available()
         {
             heard_frames(&self.shared.clock.lock(), Instant::now(), frames)
         } else {
@@ -691,6 +692,7 @@ impl Player {
     /// since the last seek or start is past its output latency (until then the position holds at the target).
     pub fn settled(&self) -> bool {
         self.shared.seek.load(Relaxed) == NO_SEEK
+            && self.engine.available()
             && audible(&self.shared.clock.lock(), Instant::now())
     }
 
@@ -772,4 +774,10 @@ impl Player {
             samples,
         }
     }
+}
+
+/// Pumps a pending output recovery on the UI thread: the deck tick calls this so a lost device reconnects (one attempt
+/// a second, on the same device).
+pub fn recover() {
+    engine::recover();
 }
