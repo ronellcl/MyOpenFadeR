@@ -4,6 +4,7 @@
 use super::{Ask, Confirm, Ctx, missing, show_in_folder};
 use crate::app::browser;
 use openfader::{
+    analysis::cache,
     library::{Track, folder},
     store,
 };
@@ -19,8 +20,22 @@ pub fn act(c: &Rc<Ctx>, id: &str) {
             if c.store.analysis_locked(&store::key(&t)).unwrap_or(false) {
                 return c.say("this track has an Analysis Lock: unlock it first");
             }
-            c.say(&format!("analysing “{}”…", t.title));
-            c.analyze(vec![t], true);
+            if cache::load(&t).ok().flatten().is_some() {
+                let text = format!(
+                    "“{}” already has an analysis. Analysing it again replaces its BPM, grid, key and waveform; cues follow Preferences > Analysis. Continue?",
+                    t.title
+                );
+                c.confirm(
+                    Confirm::Analyze(t),
+                    "ANALYZE TRACK",
+                    &text,
+                    "ANALYZE",
+                    "CANCEL",
+                );
+            } else {
+                c.say(&format!("analysing “{}”…", t.title));
+                c.analyze_replacing_grid(vec![t]);
+            }
         }
         "track-lock" => lock(c, &t),
         // `track-reload-tag` stays for bindings made before the explicit "discard edits" label.

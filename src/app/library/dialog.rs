@@ -33,6 +33,8 @@ pub enum Confirm {
     Restore(PathBuf),
     Remove(Vec<Track>),
     RemoveMissing(Vec<Track>),
+    /// Analyze Track replacing a stored analysis and its grid.
+    Analyze(Track),
     /// A two-way connection's write-back, after its dry run (the plan is held by [`crate::app::connect`]).
     WriteBack,
 }

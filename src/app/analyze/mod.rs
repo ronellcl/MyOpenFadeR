@@ -231,16 +231,34 @@ fn run_pending() {
         }
     };
     let todo = detected::pending(&tracks, &detected(), &options::get().parts);
-    start_run(&app, jobs(&*lib, &todo, false), prefs::with(settings));
+    start_run(
+        &app,
+        jobs(&*lib, &todo, false, false),
+        prefs::with(settings),
+    );
 }
 
 /// Explicit analysis (the track menu's ANALYZE TRACK): `tracks` are analysed again, whatever the cache holds and whether
 /// the library has their BPM and key; tracks without a file or with the analysis lock are skipped. Does nothing before
-/// [`wire`].
+/// [`wire`]. The grid edited in the library is kept.
 pub fn request(tracks: &[Track]) {
+    request_with(tracks, false);
+}
+
+/// ANALYZE TRACK when it must replace the saved grid too (the track menu): the new analysis supplies both the beats and
+/// the key. Imports and the automatic run keep their grid edits.
+pub fn request_replacing_grid(tracks: &[Track]) {
+    request_with(tracks, true);
+}
+
+fn request_with(tracks: &[Track], replace_grid: bool) {
     let Some((app, lib)) = context() else { return };
     let refs: Vec<&Track> = tracks.iter().collect();
-    start_run(&app, jobs(&*lib, &refs, true), prefs::with(settings));
+    start_run(
+        &app,
+        jobs(&*lib, &refs, true, replace_grid),
+        prefs::with(settings),
+    );
 }
 
 fn settings(p: &prefs::Prefs) -> Settings {
@@ -255,7 +273,7 @@ fn settings(p: &prefs::Prefs) -> Settings {
 }
 
 /// The jobs for `tracks`: what the library knows about each is gathered here, on the UI thread.
-fn jobs(lib: &dyn Library, tracks: &[&Track], explicit: bool) -> Vec<Job> {
+fn jobs(lib: &dyn Library, tracks: &[&Track], explicit: bool, replace_grid: bool) -> Vec<Job> {
     let store = store::global();
     tracks
         .iter()
@@ -278,6 +296,7 @@ fn jobs(lib: &dyn Library, tracks: &[&Track], explicit: bool) -> Vec<Job> {
                 key,
                 explicit,
                 library_key: !t.key.is_empty(),
+                replace_grid,
                 guide,
             })
         })

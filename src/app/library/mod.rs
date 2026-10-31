@@ -187,6 +187,11 @@ impl Ctx {
             analyze::request(&tracks);
         }
     }
+
+    /// Analyze Track from the track menu: reanalyses and replaces the grid saved in the library.
+    pub fn analyze_replacing_grid(&self, tracks: Vec<Track>) {
+        analyze::request_replacing_grid(&tracks);
+    }
 }
 
 /// The path-entry dialog closed: OK runs what it asked for.
@@ -232,6 +237,10 @@ fn confirm_done(c: &Rc<Ctx>, answer: i32) {
         (Confirm::Restore(p), 1) => backup::restore(c, p),
         (Confirm::Remove(t), 1) => track::remove(c, t),
         (Confirm::RemoveMissing(t), 1) => missing::remove(c, t),
+        (Confirm::Analyze(t), 1) => {
+            c.say(&format!("analysing “{}”…", t.title));
+            c.analyze_replacing_grid(vec![t]);
+        }
         _ => {}
     }
 }
