@@ -6,6 +6,7 @@ pub mod device;
 pub mod edit;
 pub mod library;
 pub mod lighting;
+pub mod memory;
 pub mod paths;
 pub mod plugin;
 pub mod stems;
