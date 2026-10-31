@@ -640,8 +640,8 @@ mod tests {
     #[test]
     fn the_checked_out_themes_have_readable_text_contrast() {
         // THEME-01: the pairs text makes against its surfaces, as WCAG AA has them. A theme below the thresholds is odd but
-        // allowed: the report is a stderr warning, not a failure, so artistic themes are not vetoed (the hallazgos file asks
-        // for a warning). A theme that does not list one of the pair's tokens (the small examples) holds no measurement.
+        // allowed: the report is a stderr warning, not a failure, so artistic themes are not vetoed. A theme that does not
+        // list one of the pair's tokens (the small examples) holds no measurement.
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let dirs: Vec<PathBuf> =
             [root.join("extension/skin"), root.join("../themes-repo")]
