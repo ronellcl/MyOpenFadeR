@@ -908,6 +908,7 @@ fn read(app: &App, kind: Kind) {
             });
         };
         if let Kind::Device(d) = &kind {
+            let t = Instant::now();
             let mut shown = u64::MAX;
             plug::prefetch(d, |done, total| {
                 let pct = done * 100 / total.max(1);
@@ -920,6 +921,10 @@ fn read(app: &App, kind: Kind) {
                     );
                 }
             });
+            eprintln!(
+                "sources: {name}: library read through in {} ms",
+                t.elapsed().as_millis()
+            );
         }
         // A volume's top-level folders: the tree lists them, here, and keeps the answer.
         let folders = match &kind {
@@ -928,11 +933,27 @@ fn read(app: &App, kind: Kind) {
             _ => Vec::new(),
         };
         step(format!("{name}: listing tracks and playlists"), 0.85);
-        let read: Read = kind.open().and_then(|lib| {
+        let t_open = Instant::now();
+        let opened = kind.open();
+        if let Err(e) = &opened {
+            eprintln!("sources: {name}: open failed in {} ms: {e}", t_open.elapsed().as_millis());
+        } else {
+            eprintln!("sources: {name}: opened in {} ms", t_open.elapsed().as_millis());
+        }
+        let read: Read = opened.and_then(|lib| {
+            let t_lists = Instant::now();
             let playlists = lib.playlists()?;
+            let lists_ms = t_lists.elapsed().as_millis();
+            let t_tracks = Instant::now();
             let tracks = lib.tracks(None)?;
             let count = tracks.len();
+            let tracks_ms = t_tracks.elapsed().as_millis();
+            let t_missing = Instant::now();
             let missing = missing_of(&kind, &tracks);
+            eprintln!(
+                "sources: {name}: playlists {lists_ms} ms, {count} tracks {tracks_ms} ms, missing-of-collection {} ms",
+                t_missing.elapsed().as_millis()
+            );
             Ok((lib, playlists, count, missing))
         });
         let secs = start.elapsed().as_secs_f32();

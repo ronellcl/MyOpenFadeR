@@ -14,6 +14,7 @@ use super::{Library, Playlist, PlaylistRow, Track, playlist_tree, walk_files};
 use crate::analysis::cache;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 use symphonia::core::formats::FormatOptions;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::{MetadataOptions, MetadataRevision, StandardTagKey};
@@ -283,18 +284,26 @@ impl Folder {
         if !root.is_dir() {
             return Err(format!("{} is not a folder", root.display()));
         }
+        // Phase 0 instrumentation: where a slow stick spends its time. Everything here runs on a worker thread.
         let mut files = Vec::new();
+        let t = Instant::now();
         walk(root, &mut files);
         files.sort();
+        let walk_ms = t.elapsed().as_millis();
+        let t = Instant::now();
         let mut old = cache
             .and_then(|c| std::fs::read(c).ok())
             .map(|b| decode(&b))
             .unwrap_or_default();
+        let cache_ms = t.elapsed().as_millis();
         let old_len = old.len();
         let mut dirs = BTreeSet::new();
         let mut tracks = Vec::with_capacity(files.len());
         let mut stamps = Vec::with_capacity(files.len());
         let mut dirty = false;
+        let mut tags = 0;
+        let t = Instant::now();
+        let n_files = files.len();
         for f in files {
             let rel = f
                 .strip_prefix(root)
@@ -318,11 +327,14 @@ impl Folder {
             });
             let t = hit.unwrap_or_else(|| {
                 dirty = true;
+                tags += 1;
                 read(&f)
             });
             stamps.push(st);
             tracks.push((rel, t));
         }
+        let checked_ms = t.elapsed().as_millis();
+        let mut saved_ms = 0;
         if let Some(c) = cache.filter(|_| dirty || old_len != tracks.len()) {
             let entries: Vec<_> = tracks
                 .iter()
@@ -332,8 +344,15 @@ impl Folder {
             let tmp = c.with_extension(format!("{}.tmp", std::process::id()));
             let _ = c.parent().map_or(Ok(()), std::fs::create_dir_all);
             // ponytail: a failed cache write is dropped; the tracks are still returned.
+            let t = Instant::now();
             let _ = std::fs::write(&tmp, encode(&entries)).and_then(|()| std::fs::rename(&tmp, c));
+            saved_ms = t.elapsed().as_millis();
         }
+        eprintln!(
+            "sources: Explorer {}: {} files, walk {walk_ms} ms, cache {cache_ms} ms, checked {checked_ms} ms, tags {tags}, saved {saved_ms} ms",
+            root.display(),
+            n_files
+        );
         Ok(Self { tracks, dirs })
     }
 }
@@ -371,8 +390,9 @@ impl Library for Folder {
 
     /// A folder lists its own audio and that of everything below it.
     fn tracks(&self, playlist: Option<&str>) -> Result<Vec<Track>, String> {
+        let t = Instant::now();
         let below = playlist.map(|p| (p, format!("{p}/")));
-        Ok(self
+        let out = self
             .tracks
             .iter()
             .filter(|(d, _)| {
@@ -381,7 +401,18 @@ impl Library for Folder {
                     .is_none_or(|(p, b)| d == p || d.starts_with(b.as_str()))
             })
             .map(|(_, t)| t.clone())
-            .collect())
+            .collect::<Vec<_>>();
+        // Instrumentation: a UI-thread listing of a big folder shows up here.
+        if t.elapsed().as_millis() >= 20 {
+            eprintln!(
+                "sources: Explorer {}: listed {}/{} tracks in {} ms",
+                playlist.unwrap_or("(all)"),
+                out.len(),
+                self.tracks.len(),
+                t.elapsed().as_millis()
+            );
+        }
+        Ok(out)
     }
 }
 

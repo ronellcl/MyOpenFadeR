@@ -9,6 +9,7 @@ use super::{
 use openfader::{device, library::Track, store};
 use slint::{ComponentHandle, Model};
 use std::path::PathBuf;
+use std::time::Instant;
 
 /// Whether the track's file lies on one of the device / local volume roots (case-insensitive on Windows drive letters).
 fn on_device(t: &Track, roots: &[PathBuf]) -> bool {
@@ -137,6 +138,7 @@ impl View {
     /// BPM and key are resolved once per track ([`Facts`]) and the search compares without lowercasing each field
     /// ([`filter::shown`], [`filter::sort`]).
     pub(super) fn refresh(&mut self, app: &App) {
+        let t = Instant::now();
         self.look = Look::now();
         let look = self.look;
         let q = if self.search_entry().is_some() {
@@ -213,6 +215,15 @@ impl View {
         }
         state.set_status(status.into());
         state.set_tag_filter_count(self.tag_filter.len() as i32);
+        // Instrumentation: how long the UI thread takes to turn the list into rows.
+        if t.elapsed().as_millis() >= 50 {
+            eprintln!(
+                "sources: refresh: {} of {} tracks in {} ms (filter, sort, rows)",
+                self.shown.len(),
+                self.list.len(),
+                t.elapsed().as_millis()
+            );
+        }
     }
 
     /// Re-marks the visible rows for a new reference: only each row's hint cell changes, in place (the selection stays).

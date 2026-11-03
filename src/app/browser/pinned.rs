@@ -11,6 +11,7 @@ use crate::app::prefs;
 use openfader::device::{self, Device};
 use slint::ComponentHandle;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 /// A pinned folder: the volume's label and the path of the folder below it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -111,8 +112,11 @@ pub fn reindex_volume(label: String) {
 /// Reads the folder of the pin `p` (the volume is mounted at `mount`) and keeps what it holds in the index: the
 /// search finds the tracks of a pinned folder without walking the stick again. Returns how many rows it holds.
 pub fn index(p: &Pinned, mount: &Path) -> usize {
+    let t_walk = Instant::now();
     let mut files = Vec::new();
     openfader::library::folder::walk(&mount.join(&p.path), &mut files);
+    let walk_ms = t_walk.elapsed().as_millis();
+    let t_tags = Instant::now();
     let mut rows = Vec::with_capacity(files.len());
     for f in &files {
         let t = openfader::library::folder::read_track(f);
@@ -144,7 +148,16 @@ pub fn index(p: &Pinned, mount: &Path) -> usize {
     }
     let store = openfader::store::global();
     let n = rows.len();
-    if let Ok(written) = store.index_put(&p.label, &rows) {
+    let tags_ms = t_tags.elapsed().as_millis();
+    let t_put = Instant::now();
+    let written = store.index_put(&p.label, &rows).ok();
+    let put_ms = t_put.elapsed().as_millis();
+    eprintln!(
+        "sources: pin {}: {} files, walk {walk_ms} ms, tags {tags_ms} ms, index {put_ms} ms",
+        p.as_text(),
+        files.len()
+    );
+    if let Some(written) = written {
         return written;
     }
     n
