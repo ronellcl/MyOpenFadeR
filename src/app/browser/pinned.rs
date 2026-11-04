@@ -82,6 +82,7 @@ pub fn is_pinned(p: &Pinned) -> bool {
 }
 
 /// Pins the folder (and saves the settings).
+#[allow(dead_code)]
 pub fn pin(p: &Pinned) {
     let text = p.as_text();
     prefs::update(|s| {
@@ -92,6 +93,7 @@ pub fn pin(p: &Pinned) {
 }
 
 /// Takes the pin off (and saves the settings).
+#[allow(dead_code)]
 pub fn unpin(p: &Pinned) {
     let text = p.as_text();
     prefs::update(|s| s.pinned_folders.retain(|t| *t != text));
@@ -293,16 +295,35 @@ impl super::View {
         let Some(p) = self.chosen_pin() else {
             return;
         };
-        if is_pinned(&p) {
-            unpin(&p);
+        let text = p.as_text().to_owned();
+        let was_pinned = is_pinned(&p);
+        let app_weak = app.as_weak();
+
+        if was_pinned {
             self.say(app, format!("{} is not pinned any more", p.label));
         } else {
-            pin(&p);
             self.say(app, format!("{} is pinned", p.label));
             self.index_pin(app, &p);
         }
         // The tree lists the pins: build it again.
         self.refresh_sources(app);
+        // Persist the prefs change on the Slint event loop, after this handler returns and
+        // the View borrow is released. Calling prefs::update() synchronously here triggers
+        // prefs::on_change listeners that borrow View again while folder_action still holds
+        // the RefCell borrow, causing a RefCell already borrowed panic.
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(_) = app_weak.upgrade() else { return };
+            prefs::update(|s| {
+                if was_pinned {
+                    s.pinned_folders.retain(|t| *t != text);
+                } else if !s.pinned_folders.contains(&text) {
+                    s.pinned_folders.push(text);
+                }
+            });
+            // Notify listeners now that View is no longer borrowed, so the UI reflects
+            // the new prefs (e.g. favorites section in the tree).
+            prefs::notify();
+        });
     }
 
     /// Indexes the pinned folder in the background: the search finds its tracks without walking the stick again.
