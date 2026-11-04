@@ -90,6 +90,7 @@ mod tests {
         };
         let out = |tag| Outcome {
             found: (0, String::new()),
+            learned: None,
             src: Source::Cache,
             cues: true,
             tag,

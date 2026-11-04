@@ -61,6 +61,8 @@ pub type Found = (i64, String);
 /// What one finished track gave back to the UI thread.
 struct Outcome {
     found: Found,
+    /// The track with the file tags the analysis filled in, when anything changed.
+    learned: Option<Track>,
     src: Source,
     /// CUE Analysis stored cues for the track.
     cues: bool,
@@ -322,6 +324,10 @@ fn start_run(app: &App, jobs: Vec<Job>, settings: Settings) {
             match r {
                 Ok(o) => {
                     progress.record(&o);
+                    if let Some(t) = &o.learned {
+                        super::browser::tags_learned(t);
+                        trackinfo::tags_learned(&app, t);
+                    }
                     have.insert(path.clone(), o.found);
                     trackinfo::detected_changed(&app, &path);
                 }

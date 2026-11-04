@@ -11,7 +11,7 @@ use openfader::{
         options::Options,
         tag, Analysis, Beat, Phrases,
     },
-    library::Track,
+    library::{Track, folder},
     store::Store,
 };
 use std::{
@@ -60,6 +60,31 @@ pub struct Settings {
     pub workers: usize,
     /// Analysis Process "Power saving": the workers run at the lowest priority.
     pub low_priority: bool,
+}
+
+/// The file tags the analysis can fill in without a second pass: duration, average bitrate and sample rate from the
+/// file, BPM and key from the analysis. Only the fields the library lacked change.
+fn learned_tags(job: &Job, a: &Analysis) -> Option<Track> {
+    let mut t = job.track.clone();
+    let file = t.file.as_deref()?;
+    let probe = folder::read_track(file);
+    if t.length_s == 0 {
+        t.length_s = probe.length_s;
+    }
+    if t.bitrate == 0 {
+        t.bitrate = probe.bitrate;
+    }
+    if t.sample_rate == 0 {
+        t.sample_rate = probe.sample_rate;
+    }
+    let (bpm, key) = summary(a);
+    if t.bpm_x100 == 0 {
+        t.bpm_x100 = bpm;
+    }
+    if t.key.is_empty() {
+        t.key = key;
+    }
+    (t != job.track).then_some(t)
 }
 
 /// The cues and tag of one analysed track (`a`), the part of [`spawn`]'s work that is not decoding.
@@ -111,6 +136,7 @@ fn finish(job: &Job, a: &Analysis, src: Source, s: &Settings, store: &Store) -> 
     }
     Outcome {
         found: summary(a),
+        learned: learned_tags(job, a),
         src,
         cues,
         tag,

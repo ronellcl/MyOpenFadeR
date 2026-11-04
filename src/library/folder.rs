@@ -140,6 +140,20 @@ fn stem_track(p: &Path) -> Track {
     }
 }
 
+/// Average bitrate in kbps from the file size and a playing time: what an MP3 or AAC file actually uses, where the
+/// container's sample format has no bit depth to report. 0 when either side is unknown.
+pub fn average_bitrate(path: &Path, length_s: i64) -> u32 {
+    if length_s <= 0 {
+        return 0;
+    }
+    let bytes = std::fs::metadata(path).map_or(0, |m| m.len());
+    if bytes == 0 {
+        return 0;
+    }
+    let kbps = bytes.saturating_mul(8) / (length_s as u64).saturating_mul(1000);
+    kbps.min(u64::from(u32::MAX)) as u32
+}
+
 /// The track a file is: tags and stream facts through symphonia, the title falling back to the file stem.
 pub fn read_track(path: &Path) -> Track {
     let stem = stem(path);
@@ -189,6 +203,10 @@ pub fn read_track(path: &Path) -> Track {
         }
         Some(())
     })();
+    let avg = average_bitrate(path, t.length_s);
+    if avg > 0 {
+        t.bitrate = avg;
+    }
     if t.title.is_empty() {
         t.title = stem;
     }
@@ -596,6 +614,18 @@ mod tests {
             file: Some(p.to_path_buf()),
             ..Track::default()
         }
+    }
+
+    #[test]
+    fn average_bitrate_reads_the_file_size_over_its_playing_time() {
+        let dir = std::env::temp_dir().join(format!("rk-bitrate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("a.mp3");
+        std::fs::write(&file, vec![0u8; 1_000_000]).unwrap();
+        assert_eq!(average_bitrate(&file, 40), 200);
+        assert_eq!(average_bitrate(&file, 0), 0);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

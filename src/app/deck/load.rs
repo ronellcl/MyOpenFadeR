@@ -13,10 +13,11 @@ use super::{
 use crate::app::{
     browser,
     prefs::{self, analysis::GridSource},
+    trackinfo,
 };
 use openfader::{
     analysis, audio,
-    library::{Library, Track},
+    library::{Library, Track, folder},
     plugin::{event, source},
     store,
 };
@@ -388,8 +389,17 @@ impl Deck {
         let mut added_cues = false;
         let mut stem_src = None;
         let mut src_rate = 0;
+        let mut decoded_ms = 0;
+        let mut decoded_rate = 0;
         match res {
             Ok((track, analysed)) => {
+                // The decode itself knows the real duration and rate, whether or not a player takes the audio below.
+                decoded_rate = track.rate;
+                decoded_ms = if track.rate > 0 {
+                    (track.frames() as u64 * 1000 / u64::from(track.rate)) as u32
+                } else {
+                    0
+                };
                 // Fill only what the library lacked; keep its beats / waveform otherwise.
                 if let Some(an) = analysed {
                     notes.retain(|n| n != "not analysed");
@@ -436,10 +446,13 @@ impl Deck {
                     .filter(|_| prefs::with(|p| p.stems));
                 if let Some(player) = &self.player {
                     let mut player = player.borrow_mut();
-                    src_rate = track.rate;
+                    src_rate = decoded_rate;
                     player.load16(track);
                     player.seek(l.cue_ms);
                     l.duration_ms = player.duration_ms();
+                }
+                if l.duration_ms == 0 {
+                    l.duration_ms = decoded_ms;
                 }
                 l.overview = render::overview::wave(&l.analysis, l.duration_ms);
             }
@@ -467,15 +480,15 @@ impl Deck {
                 return None;
             }
             let mut learned = t.clone();
-            if learned.length_s == 0 && l.duration_ms > 0 {
-                learned.length_s = ((u64::from(l.duration_ms) + 500) / 1000) as i64;
+            let ms = l.duration_ms.max(decoded_ms);
+            if learned.length_s == 0 && ms > 0 {
+                learned.length_s = ((u64::from(ms) + 500) / 1000) as i64;
             }
-            if learned.bitrate == 0 && l.duration_ms > 0 {
-                let bytes = std::fs::metadata(file).map_or(0, |m| m.len());
-                learned.bitrate = (bytes * 8 / u64::from(l.duration_ms)) as u32;
+            if learned.bitrate == 0 {
+                learned.bitrate = folder::average_bitrate(file, learned.length_s);
             }
             if learned.sample_rate == 0 {
-                learned.sample_rate = src_rate;
+                learned.sample_rate = src_rate.max(decoded_rate);
             }
             if learned.bpm_x100 == 0 {
                 learned.bpm_x100 = grid.map_or(0, |g| (g * 100.0).round() as i64);
@@ -497,6 +510,9 @@ impl Deck {
         drop(l);
         if let Some(t) = &learned {
             browser::tags_learned(t);
+            if let Some(app) = self.app.upgrade() {
+                trackinfo::tags_learned(&app, t);
+            }
         }
         self.show(|v| {
             v.loaded = true;

@@ -69,6 +69,18 @@ pub fn detected_changed(app: &App, path: &Path) {
     }
 }
 
+/// Re-shows the selected track when a deck or Analyze Track just learned its file tags (bitrate, duration, rate).
+pub fn tags_learned(app: &App, t: &Track) {
+    let same = t.file.is_some()
+        && SHOWN.with_borrow(|s| {
+            s.as_ref()
+                .is_some_and(|x| x.file.is_some() && x.file == t.file)
+        });
+    if same {
+        show(app, t);
+    }
+}
+
 pub fn set_progress(app: &App, text: &str) {
     app.global::<TrackInfoState>().set_progress(text.into());
 }
