@@ -132,6 +132,8 @@ pub struct Inputs<'a> {
     pub folded_lib: &'a HashSet<usize>,
     /// The tree's root sections the user folded (History, Tags, Devices, Downloaded, Local Music, Online Music).
     pub folded_sections: &'a HashSet<Entry>,
+    /// The device folders the user folded: (source, folder, relative path; "" for its top-level row).
+    pub folded_folders: &'a HashSet<(usize, usize, String)>,
     /// Day → custom display name for a renamed history session.
     pub day_names: &'a HashMap<String, String>,
 }
@@ -163,10 +165,14 @@ fn indent(depth: usize, label: &str) -> String {
 }
 
 /// Label of a library playlist `base` levels in, plus its own depth; folders get the `▸` marker.
-fn playlist_label(base: usize, p: &Playlist) -> String {
+fn playlist_label(base: usize, p: &Playlist, open: bool) -> String {
     indent(
         base + p.depth,
-        &format!("{}{}", if p.is_folder { "▸ " } else { "" }, p.name),
+        &format!("{}{}", if p.is_folder {
+            if open { "▾ " } else { "▸ " }
+        } else {
+            ""
+        }, p.name),
     )
 }
 
@@ -238,13 +244,13 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             .iter()
             .take_while(|c| c.depth > p.depth)
             .count();
-        rows.push((Entry::Lib(at), playlist_label(1, p)));
+        rows.push((Entry::Lib(at), playlist_label(1, p, false)));
         if children > 0 && !i.folded_lib.contains(&at) {
             rows.extend(
                 i.lib[at + 1..at + 1 + children]
                     .iter()
                     .enumerate()
-                    .map(|(k, c)| (Entry::Lib(at + 1 + k), playlist_label(1, c))),
+                    .map(|(k, c)| (Entry::Lib(at + 1 + k), playlist_label(1, c, false))),
             );
         }
         at += 1 + children;
@@ -375,26 +381,43 @@ fn source_rows(rows: &mut Vec<(Entry, String)>, i: &Inputs, n: usize, d: usize) 
         return;
     }
     // A device's own folders: each opens as a source, with its tracks and its subfolders.
-    rows.extend(s.folders.iter().enumerate().flat_map(|(j, f)| {
-        let mut r = vec![(
+    for (j, f) in s.folders.iter().enumerate() {
+        let root = i.folded_folders.contains(&(n, j, String::new()));
+        rows.push((
             Entry::DeviceFolder(n, j),
-            indent(d + 1, &format!("▸ {}", f.name)),
-        )];
-        r.extend(
-            f.playlists
-                .iter()
-                .enumerate()
-                .map(|(k, p)| (Entry::DeviceFolderList(n, j, k), playlist_label(d + 2, p))),
-        );
-        r
-    }));
+            indent(
+                d + 1,
+                &format!("{} {}", if root { "▸" } else { "▾" }, f.name),
+            ),
+        ));
+        if root {
+            continue;
+        }
+        let mut hide_below: Option<usize> = None;
+        for (k, p) in f.playlists.iter().enumerate() {
+            if hide_below.is_some_and(|depth| p.depth > depth) {
+                continue;
+            }
+            if hide_below.is_some_and(|depth| p.depth <= depth) {
+                hide_below = None;
+            }
+            let folded = i.folded_folders.contains(&(n, j, p.id.clone()));
+            rows.push((
+                Entry::DeviceFolderList(n, j, k),
+                playlist_label(d + 2, p, !folded),
+            ));
+            if p.is_folder && folded {
+                hide_below = Some(p.depth);
+            }
+        }
+    }
     if s.open {
         rows.push((Entry::SourceAll(n), indent(d + 1, "All tracks")));
         rows.extend(
             s.playlists
                 .iter()
                 .enumerate()
-                .map(|(j, p)| (Entry::SourceList(n, j), playlist_label(d + 1, p))),
+                .map(|(j, p)| (Entry::SourceList(n, j), playlist_label(d + 1, p, false))),
         );
         if !s.missing.is_empty() {
             rows.push((
@@ -499,6 +522,7 @@ mod tests {
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
             folded_sections: &HashSet::new(),
+            folded_folders: &HashSet::new(),
             day_names: &HashMap::new(),
         });
         assert_eq!(entries[TAG_ROW], Entry::Tags);
@@ -559,6 +583,7 @@ mod tests {
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
             folded_sections: &HashSet::new(),
+            folded_folders: &HashSet::new(),
             day_names: &HashMap::new(),
         });
         assert_eq!(
@@ -620,6 +645,7 @@ mod tests {
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
             folded_sections: &HashSet::new(),
+            folded_folders: &HashSet::new(),
             day_names: &HashMap::new(),
         });
         let at = labels
@@ -678,6 +704,7 @@ mod tests {
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
             folded_sections: &HashSet::new(),
+            folded_folders: &HashSet::new(),
             day_names: &HashMap::new(),
         });
         let at = labels
@@ -688,9 +715,91 @@ mod tests {
         assert_eq!(labels[at + 1], "        USB (vfat)");
         // The folder and the folder inside it.
         assert_eq!(entries[at + 2], Entry::DeviceFolder(0, 0));
-        assert_eq!(labels[at + 2], "            ▸ Musica");
+        assert_eq!(labels[at + 2], "            ▾ Musica");
         assert_eq!(entries[at + 3], Entry::DeviceFolderList(0, 0, 0));
         assert_eq!(labels[at + 3], "                Rock");
+    }
+
+    #[test]
+    fn a_folder_folds_and_unfolds_its_subtree() {
+        let sources = [SourceRows {
+            device: true,
+            local: false,
+            downloaded: false,
+            pinned: false,
+            system_folder: false,
+            online_plugin: false,
+            name: "USB (vfat)".into(),
+            open: false,
+            playlists: Vec::new(),
+            missing: Vec::new(),
+            folders: vec![FolderRow {
+                name: "Musica".into(),
+                playlists: vec![pl("Set", 0, true), pl("Inner", 1, false), pl("Other", 0, false)],
+            }],
+        }];
+        let folded: HashSet<(usize, usize, String)> =
+            HashSet::from([(0, 0, "Set".to_owned())]);
+        let (entries, labels) = build(&Inputs {
+            tag_list: 0,
+            session: 0,
+            lib: &[],
+            nodes: &[],
+            days: &[],
+            cats: &[],
+            tags: &[],
+            sources: &sources,
+            all_tracks: false,
+            cue_analysis: None,
+            banks: None,
+            sections: Sections::default(),
+            folded: &HashSet::new(),
+            folded_lib: &HashSet::new(),
+            folded_sections: &HashSet::new(),
+            folded_folders: &folded,
+            day_names: &HashMap::new(),
+        });
+        let at = labels
+            .iter()
+            .position(|l| l == "    ▾ Devices")
+            .expect("the devices hang under Local Music");
+        assert_eq!(entries[at + 2], Entry::DeviceFolder(0, 0));
+        assert_eq!(labels[at + 2], "            ▾ Musica");
+        assert_eq!(entries[at + 3], Entry::DeviceFolderList(0, 0, 0));
+        assert_eq!(labels[at + 3], "                ▸ Set");
+        assert_eq!(entries[at + 4], Entry::DeviceFolderList(0, 0, 2));
+        assert_eq!(labels[at + 4], "                Other");
+        assert!(!labels.iter().any(|l| l.trim() == "Inner"));
+
+        // Folding the top-level folder hides every row under it.
+        let folded: HashSet<(usize, usize, String)> =
+            HashSet::from([(0, 0, String::new())]);
+        let (entries, labels) = build(&Inputs {
+            tag_list: 0,
+            session: 0,
+            lib: &[],
+            nodes: &[],
+            days: &[],
+            cats: &[],
+            tags: &[],
+            sources: &sources,
+            all_tracks: false,
+            cue_analysis: None,
+            banks: None,
+            sections: Sections::default(),
+            folded: &HashSet::new(),
+            folded_lib: &HashSet::new(),
+            folded_sections: &HashSet::new(),
+            folded_folders: &folded,
+            day_names: &HashMap::new(),
+        });
+        let at = labels
+            .iter()
+            .position(|l| l == "    ▾ Devices")
+            .expect("the devices hang under Local Music");
+        assert_eq!(entries[at + 2], Entry::DeviceFolder(0, 0));
+        assert_eq!(labels[at + 2], "            ▸ Musica");
+        assert!(!labels.iter().any(|l| ["Set", "Inner", "Other"].contains(&l.trim())));
     }
 
     /// The local disk (the system volume) hangs under the "Devices" heading with its own folders, read-only.
@@ -728,6 +837,7 @@ mod tests {
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
             folded_sections: &HashSet::new(),
+            folded_folders: &HashSet::new(),
             day_names: &HashMap::new(),
         });
         let at = labels
@@ -738,7 +848,7 @@ mod tests {
         assert_eq!(labels[at + 1], "        ▸ C: (OS)");
         // Its folder, under it.
         assert_eq!(entries[at + 2], Entry::DeviceFolder(0, 0));
-        assert_eq!(labels[at + 2], "            ▸ Users");
+        assert_eq!(labels[at + 2], "            ▾ Users");
     }
 
     /// A list with lists under it folds them: the plugin sources come this way.
@@ -767,6 +877,7 @@ mod tests {
                 folded: &HashSet::new(),
                 folded_lib: folded,
                 folded_sections: &HashSet::new(),
+                folded_folders: &HashSet::new(),
                 day_names: &HashMap::new(),
             });
             (entries, labels)
@@ -835,6 +946,7 @@ mod tests {
             folded: &HashSet::new(),
             folded_lib: &HashSet::new(),
             folded_sections: &HashSet::new(),
+            folded_folders: &HashSet::new(),
             day_names: &HashMap::new(),
         });
         assert_eq!(l[4], "CUE Analysis (3)");

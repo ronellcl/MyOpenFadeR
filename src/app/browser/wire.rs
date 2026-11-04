@@ -122,6 +122,7 @@ pub fn wire(
         folded: std::collections::HashSet::new(),
         folded_lib: std::collections::HashSet::new(),
         folded_sections: std::collections::HashSet::new(),
+        folded_folders: std::collections::HashSet::new(),
         day_names: std::collections::HashMap::new(),
         played,
         strips: strip::Strips::new(app),

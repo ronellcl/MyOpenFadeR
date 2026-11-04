@@ -202,6 +202,7 @@ impl View {
             folded: &self.folded,
             folded_lib: &self.folded_lib,
             folded_sections: &self.folded_sections,
+            folded_folders: &self.folded_folders,
             day_names: &self.day_names,
         });
         self.entries = entries;
@@ -224,20 +225,46 @@ impl View {
     }
 
     pub(in crate::app::browser) fn select(&mut self, app: &App, row: usize) {
-        if let Some(e) = self.entries.get(row).cloned() {
-            self.entry = e;
-            match self.entry {
-                Entry::Source(i) => self.open_source(app, i),
-                Entry::SystemFolder(i) => self.open_source(app, i),
-                Entry::OnlinePlugin(i) => self.open_source(app, i),
-                Entry::OnlineSearch(i, _) => self.open_source(app, i),
-                Entry::OnlineDownloads(i, _) => self.open_source(app, i),
-                Entry::OnlinePlaylist(i, _) => self.open_source(app, i),
-                Entry::DeviceFolder(d, j) => self.open_device_folder(app, d, j),
-                _ => {}
+        let Some(e) = self.entries.get(row).cloned() else {
+            return;
+        };
+        // A folder that already is the current row folds or unfolds on this click; the first click
+        // only opens it. The key is the path, so rebuilds that shift indexes keep the state.
+        if self.entry == e {
+            let key = match &e {
+                Entry::DeviceFolder(n, j) => Some((*n, *j, String::new())),
+                Entry::DeviceFolderList(n, j, k) => self
+                    .sources
+                    .get(*n)
+                    .and_then(|s| s.folders.get(*j))
+                    .and_then(|f| f.playlists.get(*k))
+                    .filter(|p| p.is_folder)
+                    .map(|p| (*n, *j, p.id.clone())),
+                _ => None,
+            };
+            if let Some(key) = key {
+                if self.folded_folders.remove(&key) {
+                    self.rebuild(app);
+                    self.show(app);
+                } else {
+                    self.folded_folders.insert(key);
+                    self.rebuild(app);
+                }
+                return;
             }
-            self.show(app);
         }
+        self.entry = e;
+        match self.entry {
+            Entry::Source(i) => self.open_source(app, i),
+            Entry::SystemFolder(i) => self.open_source(app, i),
+            Entry::OnlinePlugin(i) => self.open_source(app, i),
+            Entry::OnlineSearch(i, _) => self.open_source(app, i),
+            Entry::OnlineDownloads(i, _) => self.open_source(app, i),
+            Entry::OnlinePlaylist(i, _) => self.open_source(app, i),
+            Entry::DeviceFolder(d, j) => self.open_device_folder(app, d, j),
+            _ => {}
+        }
+        self.show(app);
     }
 
     /// The user clicked a row of the tree: a list with lists under it folds them, and the sources fold their branch too.
