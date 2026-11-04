@@ -81,6 +81,10 @@ export component Browser inherits Rectangle {
     property <bool> sorted-asc <=> BrowserState.sort-asc;
     /// The second toolbar row (track filter) is open.
     property <bool> filter-open;
+    /// The right-hand track inspector is open; it still needs a wide window (see `inspector-visible`).
+    property <bool> inspector-open: true;
+    /// The inspector replaces the track panel under the tree when there is width for it. EXPORT keeps its own dock.
+    property <bool> inspector-visible: !root.dock && root.inspector-open && root.width >= 960px;
     /// Related off, the sidebar on `row`, the table focused.
     function show-list(row: int) {
         root.tree-focus = false;
@@ -174,13 +178,74 @@ export component Browser inherits Rectangle {
                 Chip { text: "MORE"; font-size: Theme.font-xs; tooltip: "Edit smart playlist, move; Cue Bank: add cues, load onto a deck"; enabled: (BrowserState.side-kind >= 2 && BrowserState.side-kind <= 4) || BrowserState.side-kind == 14; clicked => { BrowserState.panel-request(4); } }
             }
             // Shrinks (clipped) with the browser instead of forcing it taller than the window allows.
-            if !root.dock: TrackInfo { min-height: 0px; preferred-height: root.info-h; max-height: root.info-h; clip: true; vertical-stretch: 0; }
+            if !root.dock && !root.inspector-visible: TrackInfo { min-height: 0px; preferred-height: root.info-h; max-height: root.info-h; clip: true; vertical-stretch: 0; }
             // EXPORT mode: the device dock (exportmode.slint) takes the track info's place under the tree.
             @children
         }
-        // Tabs, toolbar, filter row, name bar, table.
+        // List header, tabs, toolbar, filter row, name bar, table.
         VerticalLayout {
             spacing: 0;
+            // Breadcrumb, list title and count, with the search box (Figma's list header).
+            Rectangle {
+                height: PaneState.h-list-header;
+                background: Theme.bg;
+                HorizontalLayout {
+                    padding-left: Theme.space-lg;
+                    padding-right: Theme.space-md;
+                    spacing: Theme.space-md;
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 0px;
+                        Text {
+                            text: BrowserState.location;
+                            color: Theme.text-faint;
+                            font-family: Theme.font;
+                            font-size: Theme.font-xs;
+                            overflow: elide;
+                        }
+                        HorizontalLayout {
+                            spacing: Theme.space-md;
+                            alignment: start;
+                            Text {
+                                text: BrowserState.list-title;
+                                color: Theme.text-bright;
+                                font-family: Theme.font;
+                                font-size: Theme.font-lg;
+                                font-weight: Theme.weight-bold;
+                                horizontal-stretch: 0;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: BrowserState.list-detail;
+                                color: Theme.text-dim;
+                                font-family: Theme.font;
+                                font-size: Theme.font-sm;
+                                vertical-alignment: bottom;
+                                horizontal-stretch: 0;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                    search := TextField {
+                        width: 220px;
+                        horizontal-stretch: 0;
+                        icon: Icon.search;
+                        placeholder-text: BrowserState.remote-search ? "Search online (Enter)" : "Search tracks (Ctrl+F)";
+                        edited(text) => { BrowserState.search-edited(text); }
+                        accepted(text) => { BrowserState.search-accepted(text); table.focus(); }
+                    }
+                    Chip {
+                        text: "INFO";
+                        width: 44px;
+                        height: Theme.h-ctl;
+                        horizontal-stretch: 0;
+                        active: root.inspector-visible;
+                        enabled: !root.dock && root.width >= 960px;
+                        tooltip: "Track inspector beside the list";
+                        clicked => { root.inspector-open = !root.inspector-open; }
+                    }
+                }
+            }
             Rectangle {
                 height: Theme.h-tab;
                 background: Theme.panel;
@@ -220,15 +285,6 @@ export component Browser inherits Rectangle {
                     Chip { text: "FILTER"; width: 54px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: root.filter-open; clicked => { root.filter-open = !root.filter-open; } }
                     Chip { text: "FAV"; width: 44px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; tooltip: "Pin the chosen folder (a volume's folder) or take the pin off"; enabled: BrowserState.fav-possible; active: BrowserState.fav-pinned; clicked => { BrowserState.fav-toggle(); } }
                     Chip { text: "SECTIONS"; width: 76px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; tooltip: "Show or hide the sections of the tree (Favorites, Downloaded, Devices, Explorer)"; clicked => { BrowserState.panel-request(5); } }
-                    search := TextField {
-                        width: 200px;
-                        y: (parent.height - self.height) / 2;
-                        horizontal-stretch: 0;
-                        icon: Icon.search;
-                        placeholder-text: BrowserState.remote-search ? "Search online (Enter)" : "Search tracks (Ctrl+F)";
-                        edited(text) => { BrowserState.search-edited(text); }
-                        accepted(text) => { BrowserState.search-accepted(text); table.focus(); }
-                    }
                 }
             }
             if root.filter-open: Rectangle {
@@ -308,6 +364,25 @@ export component Browser inherits Rectangle {
             // Playlist Palette: the TAG LIST and three playlists under the track list.
             if BrowserState.palette-enabled && BrowserState.palette-open: Palette { height: root.palette-h; vertical-stretch: 0; }
         }
+        // Track inspector beside the list (Figma's right panel). The tree keeps the full height here.
+        if root.inspector-visible: VerticalLayout {
+            width: 230px;
+            spacing: 0px;
+            Rectangle {
+                height: 24px;
+                background: Theme.panel;
+                Text {
+                    x: Theme.space-md;
+                    text: "TRACK INFO";
+                    vertical-alignment: center;
+                    color: Theme.text-dim;
+                    font-family: Theme.font;
+                    font-size: Theme.font-xs;
+                    font-weight: Theme.weight-bold;
+                }
+            }
+            TrackInfo { vertical-stretch: 1; min-height: 0px; }
+        }
         // Right strip: list actions on the chosen track, plus the browse view.
         Rectangle {
             width: 28px;
@@ -348,7 +423,7 @@ export component Browser inherits Rectangle {
         lo: PaneState.tree-lo();
         hi: PaneState.tree-hi(root.width);
     }
-    if !root.dock: Splitter {
+    if !root.dock && !root.inspector-visible: Splitter {
         horizontal: true;
         invert: true;
         x: 28px + Theme.gap;

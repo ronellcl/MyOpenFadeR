@@ -312,11 +312,84 @@ impl View {
         state.set_fav_pinned(pin.as_ref().is_some_and(crate::app::browser::pinned::is_pinned));
     }
 
+    /// Breadcrumb over the list on screen: the collection section, source and folder path that lead to it.
+    pub(in crate::app::browser) fn location(&self) -> String {
+        match &self.entry {
+            Entry::All | Entry::LibRoot | Entry::Lib(_) | Entry::PlaylistsAll | Entry::Dupes => {
+                "Collection".to_owned()
+            }
+            Entry::Tags | Entry::TagsRoot | Entry::Category(_) | Entry::Tag(_) => {
+                "Tag List".to_owned()
+            }
+            Entry::Session | Entry::HistoryRoot | Entry::Day(_) => "History".to_owned(),
+            Entry::CueAnalysis => "Analysis".to_owned(),
+            Entry::UserRoot | Entry::User(_) => "My Playlists".to_owned(),
+            Entry::BankRoot | Entry::Bank(_) => "Cue Banks".to_owned(),
+            Entry::DevicesRoot => "Devices".to_owned(),
+            Entry::FavoritesRoot | Entry::Pinned(_) => "Favorites".to_owned(),
+            Entry::DownloadedRoot => "Downloaded".to_owned(),
+            Entry::LocalMusicRoot => "Local Music".to_owned(),
+            Entry::SystemFolder(i) => self.sources.get(*i).map_or_else(
+                || "Local Music".to_owned(),
+                |s| format!("Local Music › {}", s.name),
+            ),
+            Entry::DeviceFolder(d, _) => self
+                .sources
+                .get(*d)
+                .map_or_else(String::new, |s| s.name.clone()),
+            Entry::DeviceFolderList(d, j, k) => {
+                let Some(source) = self.sources.get(*d) else {
+                    return String::new();
+                };
+                let Some(folder) = source.folders.get(*j) else {
+                    return String::new();
+                };
+                let parent = folder
+                    .playlists
+                    .get(*k)
+                    .and_then(|p| p.id.rsplit_once('/'))
+                    .map(|(parent, _)| parent.replace('/', " › "))
+                    .filter(|parent| !parent.is_empty());
+                parent.map_or_else(
+                    || format!("{} › {}", source.name, folder.name),
+                    |parent| format!("{} › {} › {parent}", source.name, folder.name),
+                )
+            }
+            Entry::Source(i) | Entry::SourceAll(i) | Entry::SourceMissing(i) => self
+                .sources
+                .get(*i)
+                .map_or_else(String::new, |s| s.name.clone()),
+            Entry::SourceList(i, _) => self
+                .sources
+                .get(*i)
+                .map_or_else(String::new, |s| s.name.clone()),
+            Entry::OnlineMusicRoot => "Online Music".to_owned(),
+            Entry::OnlinePlugin(i)
+            | Entry::OnlineSearch(i, _)
+            | Entry::OnlineDownloads(i, _)
+            | Entry::OnlinePlaylist(i, _) => self.sources.get(*i).map_or_else(
+                || "Online Music".to_owned(),
+                |s| format!("Online Music › {}", s.name),
+            ),
+        }
+    }
+
     /// Name of the list on screen, for file names and messages.
     pub(in crate::app::browser) fn list_name(&self) -> String {
         match &self.entry {
             e if super::is_named(e) => self.name_of(e),
             Entry::Lib(i) => self.lib_playlists[*i].name.clone(),
+            Entry::DeviceFolder(d, j) => self
+                .sources
+                .get(*d)
+                .and_then(|s| s.folders.get(*j))
+                .map_or_else(String::new, |f| f.name.clone()),
+            Entry::DeviceFolderList(d, j, k) => self
+                .sources
+                .get(*d)
+                .and_then(|s| s.folders.get(*j))
+                .and_then(|f| f.playlists.get(*k))
+                .map_or_else(String::new, |p| p.name.clone()),
             Entry::Source(i) | Entry::SourceAll(i) => self
                 .sources
                 .get(*i)

@@ -179,8 +179,27 @@ export component TrackTable inherits Rectangle {
                     /// The track is the one a deck has loaded (its row wears `row-loaded`): the row's file and the
                     /// deck's `file` are the same path (cells[15], src/app/browser/table.rs).
                     property <bool> on-deck: cells[15].text != "" && (DeckState.decks[0].file == cells[15].text || DeckState.decks[1].file == cells[15].text || DeckState.decks[2].file == cells[15].text || DeckState.decks[3].file == cells[15].text);
+                    /// Which deck holds this file: 0 A, 1 B, 2 C, 3 D, -1 none (the row's number becomes that letter).
+                    property <int> deck: cells[15].text == "" ? -1 : (DeckState.decks[0].file == cells[15].text ? 0 : (DeckState.decks[1].file == cells[15].text ? 1 : (DeckState.decks[2].file == cells[15].text ? 2 : (DeckState.decks[3].file == cells[15].text ? 3 : -1))));
                     background: current ? Theme.select : (row-ta.has-hover ? Theme.hover-row : (Math.mod(i, 2) == 0 ? Theme.bg-deep : Theme.row-alt));
-                    Cell { x: 0; width: root.w-lead - Theme.space-md; text: "\{i + 1}"; right: true; color: Theme.text-faint; }
+                    if deck >= 0: Rectangle {
+                        x: (root.w-lead - 14px) / 2;
+                        y: (parent.height - 14px) / 2;
+                        width: 14px;
+                        height: 14px;
+                        border-radius: 3px;
+                        background: Theme.accent;
+                        Text {
+                            text: deck == 0 ? "A" : (deck == 1 ? "B" : (deck == 2 ? "C" : "D"));
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            color: Theme.text-bright;
+                            font-family: Theme.font;
+                            font-size: Theme.font-xs;
+                            font-weight: Theme.weight-bold;
+                        }
+                    }
+                    Cell { x: 0; width: root.w-lead - Theme.space-md; text: "\{i + 1}"; right: true; color: Theme.text-faint; visible: deck < 0; }
                     // A plugin track whose audio is already downloaded (cells[11], src/app/browser/table.rs).
                     if cells[11].text == "1": Text { x: 1px; height: parent.height; text: "✓"; vertical-alignment: center; color: Theme.play; font-size: Theme.font-sm; }
                     if root.w-preview > 0px: Image { x: root.x-preview + 1px; y: (parent.height - self.height) / 2; width: root.w-strip; height: 20px; source: BrowserState.previews[i]; image-fit: fill; }

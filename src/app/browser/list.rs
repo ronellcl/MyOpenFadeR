@@ -287,6 +287,9 @@ impl View {
         self.rows.set_vec(rows);
         self.strips.reset(self.shown.len());
         let state = app.global::<BrowserState>();
+        state.set_location(self.location().into());
+        state.set_list_title(self.list_name().into());
+        state.set_list_detail(self.list_detail().into());
         // The selection follows the track, not the row index.
         let at = self.selected.as_ref().and_then(|s| self.row_of(s));
         state.set_current_row(at.map_or(-1, |n| n as i32));
@@ -324,6 +327,31 @@ impl View {
                 self.list.len(),
                 t.elapsed().as_millis()
             );
+        }
+    }
+
+    /// "48 tracks · 4 h 52 min" for the rows on screen, "12 of 80 tracks · …" while a filter hides some.
+    fn list_detail(&self) -> String {
+        let shown = self.shown.len();
+        let secs: u64 = self
+            .shown
+            .iter()
+            .filter_map(|&i| self.list.get(i))
+            .map(|t| t.length_s.max(0) as u64)
+            .sum();
+        let count = if shown == self.list.len() {
+            format!("{shown} track{}", if shown == 1 { "" } else { "s" })
+        } else {
+            format!("{shown} of {} tracks", self.list.len())
+        };
+        if secs == 0 {
+            return count;
+        }
+        let (hours, mins) = (secs / 3600, secs % 3600 / 60);
+        if hours > 0 {
+            format!("{count} · {hours} h {mins:02} min")
+        } else {
+            format!("{count} · {mins} min")
         }
     }
 

@@ -6,6 +6,12 @@ export global BrowserState {
     in property <[[StandardListViewItem]]> tracks;
     /// "N of M tracks" or the last error, shown under the table.
     in property <string> status;
+    /// Where the list on screen is: a breadcrumb over its title ("Devices › Música › MusicaVideo").
+    in property <string> location;
+    /// The list on screen: the folder, playlist, tag, device or view name.
+    in property <string> list-title;
+    /// What the list holds: "48 tracks · 4 h 52 min", or "12 of 80 tracks · 1 h 03 min" while filtered.
+    in property <string> list-detail;
     /// A plugged-in device being mounted / read: the status bar's loading bar fills with it (0 to 1); -1 when nothing loads.
     in property <float> load-progress: -1;
     /// The step that read is at, one readable line ("KINGSTON: reading the library 2.1 of 4.8 MB"), shown beside the bar.

@@ -35,11 +35,13 @@ export global PaneState {
     /// The smallest column of the track table; the title column keeps `min-title`.
     out property <length> min-col: 48px;
     out property <length> min-title: 120px;
+    /// The browser's list header: breadcrumb, title, count and search.
+    out property <length> h-list-header: 44px;
 
     /// Track rows the browser keeps when the stage grows: 8 with two decks, 6 with four.
     pure public function min-rows(decks: int) -> int { return decks >= 4 ? 6 : 8; }
-    /// Height of a browser showing `rows` track rows: tabs, toolbar, table header and the rows.
-    pure public function browser-h(rows: int) -> length { return Theme.h-tab + Theme.h-toolbar + Theme.h-header + rows * Theme.h-row; }
+    /// Height of a browser showing `rows` track rows: list header, tabs, toolbar, table header and the rows.
+    pure public function browser-h(rows: int) -> length { return root.h-list-header + Theme.h-tab + Theme.h-toolbar + Theme.h-header + rows * Theme.h-row; }
 
     /// The stage growth range: the strips shrink to `min-wave` (the vertical columns do not shrink: the decks beside them stay as tall),
     /// and grow until the browser is down to `min-rows`. `y0` is the browser's top with every strip at its default height.
