@@ -301,9 +301,10 @@ impl View {
         );
     }
 
-    /// ADD TO PLAYLIST pressed.
+    /// ADD TO PLAYLIST pressed: opens the picker when at least one track is picked (or the
+    /// single chosen track when nothing is picked).
     pub(super) fn open_add_to(&mut self, app: &App) {
-        if self.selected.is_none() {
+        if self.picked_tracks().is_empty() {
             return self.say(app, "select a track to add");
         }
         let (rows, ids) = playlist_labels(&self.nodes);
@@ -316,10 +317,14 @@ impl View {
         self.show_panel(app, Panel::AddTo(ids), "ADD TO PLAYLIST", rows);
     }
 
-    /// A row of the ADD TO panel was clicked: the chosen track goes to the end of that playlist.
+    /// A row of the ADD TO panel was clicked: every picked track goes to the end of that playlist.
     pub(super) fn add_to(&mut self, app: &App, id: i64) {
         self.close_panel(app);
-        if let Some(t) = self.selected.clone() {
+        let tracks = self.picked_tracks();
+        if tracks.is_empty() {
+            return self.say(app, "select a track to add");
+        }
+        for t in tracks {
             self.add_track_to(app, id, &t);
         }
     }

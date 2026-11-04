@@ -9,7 +9,7 @@ use super::{
     sync,
 };
 use crate::app::prefs::view::{DrawRate, JogDisplay, PadMode};
-use openfader::analysis::{Beat, Cue};
+use openfader::analysis::{self, Beat, Cue};
 use serde_json::json;
 use slint::{ComponentHandle, Model};
 use std::{cell::Cell, time::Duration};
@@ -158,6 +158,35 @@ impl Deck {
         let mut l = self.loaded.borrow_mut();
         if !l.ready {
             return;
+        }
+        // Apply an analysis that arrived while the deck was playing / scratching / looping:
+        // it is safe only when the deck is stopped or paused, without a loop and without scratch.
+        if let Some(an) = l.pending_analysis.take() {
+            let safe = !self.playing()
+                && l.loop_.is_none()
+                && !self.sync.scratching.get();
+            if safe {
+                l.analysis.key = an.key.clone();
+                if l.analysis.beats.is_empty() && !an.beats.is_empty() {
+                    l.lib_beats = an.beats.clone();
+                    l.analysis.beats = an.beats;
+                }
+                if l.analysis.three_band_detail.is_empty()
+                    && !an.three_band_detail.is_empty()
+                {
+                    l.analysis.three_band_detail = an.three_band_detail;
+                    l.analysis.three_band_preview = an.three_band_preview;
+                }
+                analysis::auto::fill(&mut l.analysis);
+                if l.analysis.cues.is_empty() {
+                    let auto = analysis::auto::cues(&l.analysis);
+                    l.auto_cues.set(!auto.is_empty());
+                    l.analysis.cues.extend(auto);
+                }
+                l.invalidate();
+            } else {
+                l.pending_analysis = Some(an);
+            }
         }
         let (pos, playing) = self.clock(&l);
         let opts = OPTS.get();

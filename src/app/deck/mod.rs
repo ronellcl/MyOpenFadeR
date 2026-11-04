@@ -145,6 +145,9 @@ struct Loaded {
     time_key: Option<u32>,
     /// GRID panel undo / redo lists and range ([`exportedit`]); gone with the next LOAD.
     grid_hist: exportedit::Hist,
+    /// Analysis that arrived while the deck plays, scratches or loops: kept here and applied
+    /// when it is safe (stopped or paused, no loop, no scratch). Never replaces beats/grid live.
+    pending_analysis: Option<analysis::Analysis>,
 }
 
 impl Loaded {

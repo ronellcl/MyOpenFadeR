@@ -407,17 +407,32 @@ impl Deck {
                 // Fill only what the library lacked; keep its beats / waveform otherwise.
                 if let Some(an) = analysed {
                     notes.retain(|n| n != "not analysed");
-                    l.analysis.key = an.key.clone();
-                    if l.analysis.beats.is_empty() && !an.beats.is_empty() {
-                        l.lib_beats = an.beats.clone();
-                        l.analysis.beats = an.beats;
-                        notes.push("grid: analysed".into());
-                    }
-                    if l.analysis.three_band_detail.is_empty() && !an.three_band_detail.is_empty() {
-                        l.analysis.three_band_detail = an.three_band_detail;
-                        l.analysis.three_band_preview = an.three_band_preview;
-                        l.detail = render::detail::wave_frames(&l.analysis, Some((&track, track.rate)));
-                        notes.push("waveform: analysed".into());
+                    // Never change beats/grid/waveform live: if the deck plays, scratches,
+                    // seeks or loops, keep the new analysis pending until it is safe.
+                    let safe = !self.playing()
+                        && l.loop_.is_none()
+                        && !self.sync.scratching.get();
+                    if safe {
+                        l.analysis.key = an.key.clone();
+                        if l.analysis.beats.is_empty() && !an.beats.is_empty() {
+                            l.lib_beats = an.beats.clone();
+                            l.analysis.beats = an.beats;
+                            notes.push("grid: analysed".into());
+                        }
+                        if l.analysis.three_band_detail.is_empty()
+                            && !an.three_band_detail.is_empty()
+                        {
+                            l.analysis.three_band_detail = an.three_band_detail;
+                            l.analysis.three_band_preview = an.three_band_preview;
+                            l.detail = render::detail::wave_frames(
+                                &l.analysis,
+                                Some((&track, track.rate)),
+                            );
+                            notes.push("waveform: analysed".into());
+                        }
+                    } else {
+                        l.pending_analysis = Some(an);
+                        notes.push("grid: diferido (deck reproduciendo)".into());
                     }
                 }
                 // The analysis may have just given this track a grid and waveform: phrases and automatic cues follow.

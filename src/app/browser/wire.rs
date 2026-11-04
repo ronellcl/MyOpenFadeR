@@ -16,6 +16,7 @@ use crate::app::{
     library::settings, plural, prefs, trackinfo,
 };
 use openfader::{
+    analysis,
     library::{Library, Track},
     store,
 };
@@ -512,5 +513,33 @@ fn wire_selection(
             return;
         };
         load_to_deck(&weak.unwrap(), &*on_track, &t);
+    });
+    let weak = app.as_weak();
+    state.on_check_analyzer_version(move || {
+        let app = weak.unwrap();
+        let state = app.global::<BrowserState>();
+        let version = analysis::cache::ANALYZER_VERSION.to_string();
+        let seen_version = prefs::with(|p| p.extra("seen-analyzer-version").unwrap_or_default().to_string());
+        if seen_version != version {
+            state.set_analyzer_version_pending(true);
+            state.set_analyzer_version_message(
+                format!(
+                    "Hay una nueva versión del analizador ({}). ¿Quieres reanalizar los temas ya analizados?",
+                    version
+                )
+                .into(),
+            );
+        }
+    });
+    let weak2 = app.as_weak();
+    state.on_analyzer_version_dismiss(move || {
+        let app = weak2.unwrap();
+        let version = analysis::cache::ANALYZER_VERSION.to_string();
+        let _ = prefs::update(|p| {
+            p.set_extra("seen-analyzer-version", &version);
+        });
+        app.global::<BrowserState>().set_analyzer_version_pending(false);
+        app.global::<BrowserState>()
+            .set_analyzer_version_message("".into());
     });
 }

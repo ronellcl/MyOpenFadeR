@@ -446,4 +446,40 @@ export component Browser inherits Rectangle {
         lo: PaneState.palette-lo();
         hi: PaneState.palette-hi(root.height);
     }
+    // Popup de nueva versión del analizador: aparece una sola vez tras el arranque si la versión vista es antigua.
+    analyzer-check := Timer {
+        interval: 1000ms;
+        running: true;
+        triggered => {
+            self.running = false;
+            BrowserState.check-analyzer-version();
+        }
+    }
+    analyzer-popup := PopupWindow {
+        visible: BrowserState.analyzer-version-pending;
+        width: 420px;
+        height: 3 * Theme.h-row + 4px;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.radius;
+            VerticalLayout {
+                padding: Theme.space-md;
+                spacing: Theme.space-md;
+                Text {
+                    text: BrowserState.analyzer-version-message;
+                    color: Theme.text;
+                    font-family: Theme.font;
+                    font-size: Theme.font-size;
+                }
+                HorizontalLayout {
+                    spacing: Theme.space-sm;
+                    alignment: end;
+                    Chip { text: "Más tarde"; height: Theme.h-ctl; clicked => { BrowserState.analyzer-version-dismiss(); } }
+                    Chip { text: "Reanalizar ahora"; height: Theme.h-ctl; active: true; clicked => { BrowserState.analyzer-version-dismiss(); } }
+                }
+            }
+        }
+    }
 }

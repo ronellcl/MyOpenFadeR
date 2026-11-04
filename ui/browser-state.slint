@@ -202,6 +202,15 @@ export global BrowserState {
     callback cond-remove(int);
     callback editor-save();
     callback editor-cancel();
+    /// Nuevo análisis del analizador disponible y aún no visto por el usuario.
+    in property <bool> analyzer-version-pending: false;
+    /// Mensaje del popup de nueva versión del analizador.
+    in property <string> analyzer-version-message: "";
+    /// Arranque: pide a Rust que compruebe si hay una versión nueva del analizador.
+    callback check-analyzer-version();
+    /// El usuario descartó el popup ("Reanalizar ahora" o "Más tarde").
+    /// Ambos marcan la versión como vista para no repetir el aviso.
+    callback analyzer-version-dismiss();
 }
 
 /// Automix (src/app/automix/): plays the shown list over both decks. The AUTOMIX button is handled by the browser

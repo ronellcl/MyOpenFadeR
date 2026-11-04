@@ -154,9 +154,12 @@ pub(super) fn wire(app: &App, view: &Rc<RefCell<View>>, on_track: Rc<dyn Fn(&Tra
             return;
         };
         let mut v = q.view.borrow_mut();
-        match v.selected.clone() {
-            Some(t) => q.add_track(&app, &mut v, pal, &t),
-            None => v.say(&app, "select a track to add"),
+        let tracks = v.picked_tracks();
+        if tracks.is_empty() {
+            return v.say(&app, "select a track to add");
+        }
+        for t in tracks {
+            q.add_track(&app, &mut v, pal, &t);
         }
     });
     let (weak, q) = (app.as_weak(), p.clone());
