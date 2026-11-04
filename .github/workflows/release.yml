@@ -131,6 +131,30 @@ jobs:
             ;;
           esac
           ls -l out
+
+      - name: Linux packages (deb + Arch)
+        if: matrix.name == 'linux'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          d=MyOpenFadeR-$VERSION-linux-x86_64
+          curl -fsSL https://github.com/goreleaser/nfpm/releases/download/v2.48.0/nfpm_2.48.0_Linux_x86_64.tar.gz | tar xz -C /tmp nfpm
+          rm -rf pkgroot
+          mkdir -p pkgroot/opt/myopenfader pkgroot/usr/bin \
+            pkgroot/usr/share/applications \
+            pkgroot/usr/share/icons/hicolor/256x256/apps
+          cp -a "$d"/. pkgroot/opt/myopenfader/
+          ln -s /opt/myopenfader/openfader pkgroot/usr/bin/openfader
+          cp packaging/linux/openfader.desktop pkgroot/usr/share/applications/
+          cp assets/icon.png pkgroot/usr/share/icons/hicolor/256x256/apps/openfader.png
+          VERSION="$VERSION" envsubst < packaging/linux/nfpm.yaml > /tmp/nfpm.yaml
+          /tmp/nfpm package --config /tmp/nfpm.yaml --packager deb \
+            --target "out/myopenfader_${VERSION}_amd64.deb"
+          /tmp/nfpm package --config /tmp/nfpm.yaml --packager archlinux \
+            --target "out/myopenfader-${VERSION}-1-x86_64.pkg.tar.zst"
+          ls -lh out/*.deb out/*.pkg.tar.zst
+
       - uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.name }}
@@ -181,11 +205,13 @@ jobs:
           files: |
             out/*.zip
             out/*.tar.gz
+            out/*.deb
+            out/*.pkg.tar.zst
           generate_release_notes: true
           body: |
             Archives (each holds the app with its themes, controller mappings and plugins, ready to run):
 
-            - **Linux** (x86_64): `MyOpenFadeR-<version>-linux-x86_64.tar.gz`. Unpack and run `./openfader`. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
+            - **Linux** (x86_64): `MyOpenFadeR-<version>-linux-x86_64.tar.gz` (portable: unpack and run `./openfader`), or the system installers `myopenfader_<version>_amd64.deb` (Debian/Ubuntu: `sudo apt install ./myopenfader_<version>_amd64.deb`) and `myopenfader-<version>-1-x86_64.pkg.tar.zst` (Arch/CachyOS: `sudo pacman -U myopenfader-<version>-1-x86_64.pkg.tar.zst`). The installers put the app in `/opt/myopenfader`, add `openfader` to the PATH and a menu entry. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
             - **Windows** (x86_64): `MyOpenFadeR-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
             - **macOS** (Apple silicon): `MyOpenFadeR-<version>-macos-arm64.zip` holds `MyOpenFadeR.app`. It is **not signed or notarized**: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/MyOpenFadeR.app`.
 

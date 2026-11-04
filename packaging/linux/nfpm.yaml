@@ -1,0 +1,51 @@
+# nfpm turns the staged Linux folder into a Debian .deb and an Arch .pkg.tar.zst.
+# Run from the repository root with VERSION set, e.g.
+#   VERSION=0.5.0 envsubst < packaging/linux/nfpm.yaml > /tmp/nfpm.yaml
+#   nfpm package --config /tmp/nfpm.yaml --packager deb     --target out/myopenfader_0.5.0_amd64.deb
+#   nfpm package --config /tmp/nfpm.yaml --packager archlinux --target out/myopenfader-0.5.0-1-x86_64.pkg.tar.zst
+name: myopenfader
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: sound
+priority: optional
+maintainer: Ronell <ronellcl@users.noreply.github.com>
+description: |
+  MyOpenFadeR: open-source DJ software with stems, video and streaming.
+vendor: MyOpenFadeR
+homepage: https://github.com/ronellcl/MyOpenFadeR
+license: GPL-3.0-or-later
+
+contents:
+  - src: ./pkgroot/opt/myopenfader
+    dst: /opt/myopenfader
+  - src: /opt/myopenfader/openfader
+    dst: /usr/bin/openfader
+    type: symlink
+  - src: ./packaging/linux/openfader.desktop
+    dst: /usr/share/applications/openfader.desktop
+  - src: ./assets/icon.png
+    dst: /usr/share/icons/hicolor/256x256/apps/openfader.png
+
+scripts:
+  postinstall: ./packaging/linux/postinstall.sh
+  postremove: ./packaging/linux/postremove.sh
+
+overrides:
+  deb:
+    depends:
+      - libasound2
+      - libfontconfig1
+      - libxkbcommon0
+      - libwayland-client0
+      - libudev1
+      - libgl1
+      - libegl1
+  archlinux:
+    depends:
+      - alsa-lib
+      - fontconfig
+      - libxkbcommon
+      - wayland
+      - systemd-libs
+      - libglvnd

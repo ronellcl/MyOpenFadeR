@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=MyOpenFadeR
+Comment=DJ software
+Exec=/opt/myopenfader/openfader %F
+TryExec=/opt/myopenfader/openfader
+Icon=openfader
+StartupWMClass=openfader
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=DJ;music;mixer;stems;
