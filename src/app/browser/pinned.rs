@@ -312,7 +312,7 @@ impl super::View {
         // prefs::on_change listeners that borrow View again while folder_action still holds
         // the RefCell borrow, causing a RefCell already borrowed panic.
         let _ = slint::invoke_from_event_loop(move || {
-            let Some(_) = app_weak.upgrade() else { return };
+            let Some(app) = app_weak.upgrade() else { return };
             prefs::update(|s| {
                 if was_pinned {
                     s.pinned_folders.retain(|t| *t != text);
@@ -323,6 +323,13 @@ impl super::View {
             // Notify listeners now that View is no longer borrowed, so the UI reflects
             // the new prefs (e.g. favorites section in the tree).
             prefs::notify();
+            // Rebuild the sources tree so the newly pinned folder shows up immediately,
+            // not only after a restart. collect() reads prefs::get().pinned_folders, which
+            // now contains the added pin (or no longer contains the removed one).
+            if let Some(view) = super::view() {
+                let mut v = view.borrow_mut();
+                v.refresh_sources(&app);
+            }
         });
     }
 
