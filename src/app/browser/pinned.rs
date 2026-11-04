@@ -235,10 +235,8 @@ impl super::View {
             return;
         }
         match what {
-            "favorite" => {
-                self.entry = entry;
-                self.toggle_favorite(app);
-            }
+            "favorite" => self.set_favorite(app, entry, true),
+            "unfavorite" => self.set_favorite(app, entry, false),
             "analyze" => {
                 let Some(path) = self.folder_path(&entry) else {
                     return;
@@ -295,15 +293,47 @@ impl super::View {
         let Some(p) = self.chosen_pin() else {
             return;
         };
+        let pinned = !is_pinned(&p);
+        self.apply_pin(app, p, pinned);
+    }
+
+    /// The tree menu's "Favorite folder" / "Remove from favorites": pins or unpins the
+    /// folder of `entry` (the right-clicked row, which is not necessarily the chosen one).
+    pub(super) fn set_favorite(
+        &mut self,
+        app: &super::App,
+        entry: super::sidebar::Entry,
+        pinned: bool,
+    ) {
+        self.entry = entry;
+        let Some(p) = self.chosen_pin() else {
+            return;
+        };
+        if is_pinned(&p) == pinned {
+            self.say(
+                app,
+                if pinned {
+                    format!("{} is already a favorite", p.label)
+                } else {
+                    format!("{} is not a favorite", p.label)
+                },
+            );
+            return;
+        }
+        self.apply_pin(app, p, pinned);
+    }
+
+    /// Pins or unpins `p`, then saves the settings and rebuilds the tree on the event loop
+    /// (never while the View borrow is held: `prefs::update` runs its listeners).
+    fn apply_pin(&mut self, app: &super::App, p: Pinned, pinned: bool) {
         let text = p.as_text().to_owned();
-        let was_pinned = is_pinned(&p);
         let app_weak = app.as_weak();
 
-        if was_pinned {
-            self.say(app, format!("{} is not pinned any more", p.label));
-        } else {
+        if pinned {
             self.say(app, format!("{} is pinned", p.label));
             self.index_pin(app, &p);
+        } else {
+            self.say(app, format!("{} is not pinned any more", p.label));
         }
         // The tree lists the pins: build it again.
         self.refresh_sources(app);
@@ -314,10 +344,12 @@ impl super::View {
         let _ = slint::invoke_from_event_loop(move || {
             let Some(app) = app_weak.upgrade() else { return };
             prefs::update(|s| {
-                if was_pinned {
+                if pinned {
+                    if !s.pinned_folders.contains(&text) {
+                        s.pinned_folders.push(text);
+                    }
+                } else {
                     s.pinned_folders.retain(|t| *t != text);
-                } else if !s.pinned_folders.contains(&text) {
-                    s.pinned_folders.push(text);
                 }
             });
             // Notify listeners now that View is no longer borrowed, so the UI reflects
