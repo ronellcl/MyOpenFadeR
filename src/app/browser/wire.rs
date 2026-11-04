@@ -115,6 +115,8 @@ pub fn wire(
         confirm: None,
         _video_preview: Timer::default(),
         sources: Vec::new(),
+        levels: std::collections::HashMap::new(),
+        levels_reading: std::collections::HashSet::new(),
         folded: std::collections::HashSet::new(),
         folded_lib: std::collections::HashSet::new(),
         folded_sections: std::collections::HashSet::new(),

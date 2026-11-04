@@ -6,9 +6,14 @@ use super::{
     table::{self, Facts, Look, Reference},
     App, BrowserState, Home, View,
 };
-use openfader::{device, library::Track, store};
+use openfader::{
+    device,
+    library::{Library, Playlist, Track, folder},
+    store,
+};
 use slint::{ComponentHandle, Model};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Instant;
 
 /// Whether the track's file lies on one of the device / local volume roots (case-insensitive on Windows drive letters).
@@ -26,6 +31,30 @@ fn on_device(t: &Track, roots: &[PathBuf]) -> bool {
         let hit = file.starts_with(r);
         hit
     })
+}
+
+/// The folder source `file` lives under, deepest first: where its tag cache is. `None` when the file is not under
+/// a folder the browser opened (the Collection, a plugin download), so their stores are left alone.
+fn folder_root(sources: &[super::sources::Source], file: &Path) -> Option<PathBuf> {
+    let mut best: Option<PathBuf> = None;
+    let mut consider = |p: &Path| {
+        if file.starts_with(p)
+            && best
+                .as_ref()
+                .is_none_or(|b| p.as_os_str().len() > b.as_os_str().len())
+        {
+            best = Some(p.to_path_buf());
+        }
+    };
+    for s in sources {
+        if let Some((p, super::sources::SourceType::Folder)) = s.path() {
+            consider(&p);
+        }
+        for f in &s.folders {
+            consider(&f.path);
+        }
+    }
+    best
 }
 
 impl View {
@@ -75,22 +104,25 @@ impl View {
                 .and_then(|l| l.clone())
                 .ok_or_else(|| "the folder is not open".to_owned())
                 .and_then(|l| l.tracks(None)),
-            (None, Home::DeviceFolderList(d, j, k)) => self
-                .sources
-                .get(*d)
-                .and_then(|s| s.folder_libs.get(*j))
-                .and_then(|l| l.clone())
-                .ok_or_else(|| "the folder is not open".to_owned())
-                .and_then(|l| {
-                    let id = self
-                        .sources
-                        .get(*d)
-                        .and_then(|s| s.folders.get(*j))
-                        .and_then(|f| f.playlists.get(*k))
-                        .map(|p| p.id.clone())
-                        .ok_or_else(|| "the folder is not open".to_owned())?;
-                    l.tracks(Some(&id))
-                }),
+            (None, Home::DeviceFolderList(d, j, k)) => {
+                let id = self
+                    .sources
+                    .get(*d)
+                    .and_then(|s| s.folders.get(*j))
+                    .and_then(|f| f.playlists.get(*k))
+                    .map(|p| p.id.clone());
+                match id {
+                    Some(id) => match self.levels.get(&(*d, *j, id.clone())).cloned() {
+                        // A level already listed shows its own files (only those: [`Self::open_level`] lists one).
+                        Some(l) => l.tracks(None),
+                        None => {
+                            self.open_level(app, *d, *j, id);
+                            Ok(Vec::new())
+                        }
+                    },
+                    None => Err("the folder is not open".to_owned()),
+                }
+            }
             // A cloud plugin's search: open its own search box; here we just say so.
             (None, Home::PluginSearch(_s, _)) => {
                 state.set_status("use the plugin's search box to look up tracks".into());
@@ -130,6 +162,99 @@ impl View {
                 self.refresh(app);
             }
             Err(e) => state.set_status(format!("query failed: {e}").into()),
+        }
+    }
+
+    /// Lists the sub-folder `id` of the device folder `(d, j)` on a worker ([`folder::Folder::open_level`]: its own
+    /// files and its immediate sub-folders), then shows it through [`View::level_read`]. The table stays empty until
+    /// it lands; a second click on the same folder while one is reading does not start another walk.
+    fn open_level(&mut self, app: &App, d: usize, j: usize, id: String) {
+        let key = (d, j, id.clone());
+        if !self.levels_reading.insert(key.clone()) {
+            return;
+        }
+        let Some(path) = self
+            .sources
+            .get(d)
+            .and_then(|s| s.folders.get(j))
+            .map(|f| f.path.join(&id))
+        else {
+            self.levels_reading.remove(&key);
+            return;
+        };
+        let weak = app.as_weak();
+        std::thread::spawn(move || {
+            let listed = folder::Folder::open_level(&path)
+                .map(|lib| Box::new(lib) as Box<dyn Library + Send>)
+                .map_err(|e| format!("{}: {e}", path.display()));
+            if let Err(e) = &listed {
+                eprintln!("sources: {e}");
+            }
+            let _ = slint::invoke_from_event_loop(move || {
+                if let (Some(app), Some(view)) = (weak.upgrade(), super::view()) {
+                    view.borrow_mut().level_read(&app, d, j, id, listed);
+                }
+            });
+        });
+    }
+
+    /// A sub-folder level listed by [`View::open_level`]: its folders join the tree under their parent and, if the
+    /// level is the one on screen, its files replace the empty table.
+    fn level_read(
+        &mut self,
+        app: &App,
+        d: usize,
+        j: usize,
+        id: String,
+        listed: Result<Box<dyn Library + Send>, String>,
+    ) {
+        self.levels_reading.remove(&(d, j, id.clone()));
+        let lib: Rc<dyn Library> = match listed {
+            Ok(lib) => Rc::<dyn Library + Send>::from(lib),
+            Err(e) => {
+                app.global::<BrowserState>()
+                    .set_status(format!("query failed: {e}").into());
+                return;
+            }
+        };
+        if let Ok(playlists) = lib.playlists() {
+            if let Some(folder) = self.sources.get_mut(d).and_then(|s| s.folders.get_mut(j)) {
+                // The parent now has sub-folders: the tree marks it and lists them after its own subtree, prefixed
+                // with its id so a deeper level opens the right path. The full pass may have listed them already.
+                if let Some(at) = folder.playlists.iter().position(|p| p.id == id) {
+                    let depth = folder.playlists[at].depth;
+                    folder.playlists[at].is_folder = true;
+                    let mut end = at + 1;
+                    while folder.playlists.get(end).is_some_and(|p| p.depth > depth) {
+                        end += 1;
+                    }
+                    let fresh: Vec<Playlist> = playlists
+                        .iter()
+                        .map(|p| Playlist {
+                            id: format!("{id}/{}", p.id),
+                            name: p.name.clone(),
+                            depth: depth + 1 + p.depth,
+                            is_folder: p.is_folder,
+                        })
+                        .filter(|p| !folder.playlists.iter().any(|q| q.id == p.id))
+                        .collect();
+                    folder.playlists.splice(end..end, fresh);
+                }
+            }
+        }
+        self.levels.insert((d, j, id.clone()), lib);
+        self.rebuild(app);
+        let showing = match &self.home {
+            Home::DeviceFolderList(dd, jj, k) if *dd == d && *jj == j => self
+                .sources
+                .get(d)
+                .and_then(|s| s.folders.get(j))
+                .and_then(|f| f.playlists.get(*k))
+                .is_some_and(|p| p.id == id),
+            _ => false,
+        };
+        if showing {
+            self.load(app);
         }
     }
 
@@ -223,6 +348,40 @@ impl View {
                 self.list.len(),
                 t.elapsed().as_millis()
             );
+        }
+    }
+
+    /// A deck decode learned tags for `t` (bitrate, length, BPM, key, sample rate): update every copy the browser
+    /// holds, redraw its visible row in place, and let the folder's tag cache keep them (written on a worker).
+    pub(super) fn tags_learned(&mut self, t: &Track) {
+        let Some(file) = t.file.clone() else { return };
+        for copy in self
+            .list
+            .iter_mut()
+            .chain(self.tags.iter_mut())
+            .chain(self.history.iter_mut())
+            .chain(self.selected.iter_mut())
+        {
+            if copy.file.as_deref() == Some(file.as_path()) {
+                *copy = t.clone();
+            }
+        }
+        if let Some(n) = self.shown.iter().position(|&i| {
+            self.list
+                .get(i)
+                .is_some_and(|t| t.file.as_deref() == Some(file.as_path()))
+        }) {
+            let i = self.shown[n];
+            let facts = Facts {
+                origin: self.origins.get(i).cloned().unwrap_or_default(),
+                ..Facts::of(&self.list[i])
+            };
+            let row = self.table_row(i, &facts);
+            self.rows.set_row_data(n, row);
+        }
+        if let Some(root) = folder_root(&self.sources, &file) {
+            let learned = t.clone();
+            std::thread::spawn(move || folder::remember_tags(&root, &learned));
         }
     }
 

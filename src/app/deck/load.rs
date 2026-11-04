@@ -10,7 +10,10 @@ use super::{
     at_end, autocue, bpm_text, cuelist, fmt_ms, gain, grid_bpm, render, tempo_text, Deck, Decoded,
     Loaded, Pending,
 };
-use crate::app::prefs::{self, analysis::GridSource};
+use crate::app::{
+    browser,
+    prefs::{self, analysis::GridSource},
+};
 use openfader::{
     analysis, audio,
     library::{Library, Track},
@@ -298,6 +301,11 @@ impl Deck {
             v.pads = ModelRc::new(VecModel::from(pad_views));
             v.title = t.title.clone().into();
             v.artist = t.artist.clone().into();
+            v.file = t
+                .file
+                .as_deref()
+                .map_or_else(String::new, |p| p.to_string_lossy().into_owned())
+                .into();
             (v.elapsed_text, v.remain_text) =
                 (fmt_ms(0).into(), format!("-{}", fmt_ms(duration)).into());
             v.status = if loading {
@@ -379,6 +387,7 @@ impl Deck {
             .map_or_else(Default::default, |p| (p.title, p.notes));
         let mut added_cues = false;
         let mut stem_src = None;
+        let mut src_rate = 0;
         match res {
             Ok((track, analysed)) => {
                 // Fill only what the library lacked; keep its beats / waveform otherwise.
@@ -427,6 +436,7 @@ impl Deck {
                     .filter(|_| prefs::with(|p| p.stems));
                 if let Some(player) = &self.player {
                     let mut player = player.borrow_mut();
+                    src_rate = track.rate;
                     player.load16(track);
                     player.seek(l.cue_ms);
                     l.duration_ms = player.duration_ms();
@@ -444,6 +454,40 @@ impl Deck {
         if l.key.is_empty() {
             l.key = l.analysis.key.clone().unwrap_or_default(); // library key wins, else the detected one
         }
+        // B′: the decode already opened the file, so its tags cost nothing extra: keep them for the browser row and
+        // the folder's tag cache instead of rereading the file there.
+        let learned = l.track.as_ref().and_then(|t| {
+            let file = t.file.as_deref()?;
+            if t.length_s > 0
+                && t.bitrate > 0
+                && t.sample_rate > 0
+                && t.bpm_x100 > 0
+                && !t.key.is_empty()
+            {
+                return None;
+            }
+            let mut learned = t.clone();
+            if learned.length_s == 0 && l.duration_ms > 0 {
+                learned.length_s = ((u64::from(l.duration_ms) + 500) / 1000) as i64;
+            }
+            if learned.bitrate == 0 && l.duration_ms > 0 {
+                let bytes = std::fs::metadata(file).map_or(0, |m| m.len());
+                learned.bitrate = (bytes * 8 / u64::from(l.duration_ms)) as u32;
+            }
+            if learned.sample_rate == 0 {
+                learned.sample_rate = src_rate;
+            }
+            if learned.bpm_x100 == 0 {
+                learned.bpm_x100 = grid.map_or(0, |g| (g * 100.0).round() as i64);
+            }
+            if learned.key.is_empty() {
+                learned.key = l.analysis.key.clone().unwrap_or_default();
+            }
+            (learned != *t).then_some(learned)
+        });
+        if let Some(t) = &learned {
+            l.track = Some(t.clone());
+        }
         let (base, rate) = (l.base_bpm, self.rate.get());
         let (cue_views, pad_views) = if added_cues {
             (Some(cuelist::views(&l.analysis)), Some(self.pad_views(&l)))
@@ -451,6 +495,9 @@ impl Deck {
             (None, None)
         };
         drop(l);
+        if let Some(t) = &learned {
+            browser::tags_learned(t);
+        }
         self.show(|v| {
             v.loaded = true;
             v.loading = false;

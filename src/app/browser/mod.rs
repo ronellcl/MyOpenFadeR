@@ -135,6 +135,12 @@ pub fn track_edited(app: &App, t: &Track) {
     v.borrow_mut().track_edited(app, t);
 }
 
+/// A deck decode learned tags for `t` (B′): the browser shows them at once and the folder's tag cache keeps them.
+pub fn tags_learned(t: &Track) {
+    let Some(v) = view() else { return };
+    v.borrow_mut().tags_learned(t);
+}
+
 /// Where the list comes from when Related is off.
 #[derive(Clone)]
 enum Home {
@@ -244,6 +250,11 @@ struct View {
     _video_preview: Timer,
     /// The mounted devices and the iTunes / xml / Explorer sources (see [`sources`]).
     sources: Vec<sources::Source>,
+    /// The sub-folder levels listed on demand, by source, folder and path relative to the folder
+    /// ([`folder::Folder::open_level`]; [`list::View::open_level`]).
+    levels: HashMap<(usize, usize, String), Rc<dyn Library>>,
+    /// The levels a worker is listing right now, so a second click does not start another walk.
+    levels_reading: std::collections::HashSet<(usize, usize, String)>,
     /// The sources whose branch the user folded (only their own row is in the tree).
     folded: std::collections::HashSet<usize>,
     /// The lists of the library whose branch the user folded.

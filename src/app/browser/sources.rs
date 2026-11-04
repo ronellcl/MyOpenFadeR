@@ -832,7 +832,7 @@ impl View {
     }
 
     /// Puts a top-level folder's read into the source that owns it ([`Source::folder_libs`], found by path over
-    /// the device and the volumes that list it). The interim listing of [`Folder::open_partial`] fills it too,
+    /// the device and the volumes that list it). The interim listing of [`Folder::open_level`] fills it too,
     /// and the full read ([`View::source_read`]) replaces it when it lands.
     fn store_folder(&mut self, path: &Path, lib: &Rc<dyn Library>, playlists: &[Playlist]) {
         for s in &mut self.sources {
@@ -857,7 +857,7 @@ impl View {
         }
     }
 
-    /// Source `kind` was listed from its tag cache alone (the instant pass [`Folder::open_partial`] of
+    /// Source `kind` was listed from its tag cache alone (the instant pass [`Folder::open_level`] of
     /// [`read`]): its rows show now, and the full pass ([`View::source_read`]) fills the tags when it lands.
     /// No toast (the full pass reports itself); the loading line keeps the read's place in the status bar.
     fn source_interim(&mut self, app: &App, kind: Kind, read: Read, secs: f32) {
@@ -1011,7 +1011,7 @@ impl View {
 }
 
 /// The root of the plain folder kinds (`Explorer`, a device's top folder, a pinned or a system folder): the ones
-/// the worker lists from the tag cache first ([`Folder::open_partial`]), before the full open.
+/// the worker lists by level from the tag cache first ([`Folder::open_level`]), before the full open.
 fn plain_folder(kind: &Kind) -> Option<&Path> {
     match kind {
         Kind::Explorer(p)
@@ -1024,9 +1024,9 @@ fn plain_folder(kind: &Kind) -> Option<&Path> {
 
 /// Reads `kind` off the UI thread and hands it to the browser ([`View::source_read`]). A device's library files are read
 /// through once first with byte progress (the slow part on a USB stick); opening them then comes from the page cache.
-/// A plain folder kind ([`plain_folder`]) lists first from its tag cache alone ([`Folder::open_partial`]): the interim
-/// result reaches the browser at once ([`View::source_interim`]) and the full open behind it, on this same worker,
-/// replaces it when it lands.
+/// A plain folder kind ([`plain_folder`]) lists its level from the tag cache first ([`Folder::open_level`]): the
+/// interim result reaches the browser at once ([`View::source_interim`]) and the full open behind it, on this same
+/// worker, replaces it when it lands.
 fn read(app: &App, kind: Kind) {
     let weak = app.as_weak();
     std::thread::spawn(move || {
@@ -1069,7 +1069,7 @@ fn read(app: &App, kind: Kind) {
         // listing when it lands ([`View::source_interim`], then [`View::source_read`]).
         if let Some(p) = plain_folder(&kind) {
             let t = Instant::now();
-            let listed = Folder::open_partial(p).and_then(|lib| {
+            let listed = Folder::open_level(p).and_then(|lib| {
                 let lib: Box<dyn Library + Send> = Box::new(lib);
                 let playlists = lib.playlists()?;
                 let tracks = lib.tracks(None)?;
@@ -1079,7 +1079,7 @@ fn read(app: &App, kind: Kind) {
             let secs = start.elapsed().as_secs_f32();
             match &listed {
                 Ok((_, _, count, _)) => eprintln!(
-                    "sources: {name}: listed {count} in {} ms (cache-only)",
+                    "sources: {name}: listed {count} in {} ms (level)",
                     t.elapsed().as_millis()
                 ),
                 Err(e) => eprintln!(

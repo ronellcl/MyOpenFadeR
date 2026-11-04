@@ -27,7 +27,11 @@ pub const FORMAT: usize = 12;
 pub const ORIGIN: usize = 13;
 /// kbps of the audio file ("320 kbps", "256 kbps", …; empty when unknown).
 pub const BITRATE: usize = 14;
-pub const COLUMNS: usize = 15;
+/// The track's file path (hidden): the table compares it with each deck's `file` to mark the loaded row.
+pub const FILE: usize = 15;
+/// The file's extension in capitals ("MP3", "FLAC", "MP4", …; empty when unknown), shown after the FORMAT icon.
+pub const EXT: usize = 16;
+pub const COLUMNS: usize = 17;
 pub const KEY: usize = 3;
 
 /// BPM hint window: ± this fraction of the playing deck's BPM.
@@ -171,6 +175,15 @@ pub fn cell_of(t: &Track, f: &Facts, col: usize, look: &Look) -> String {
                 String::new()
             }
         }
+        FILE => t
+            .file
+            .as_deref()
+            .map_or_else(String::new, |p| p.to_string_lossy().into_owned()),
+        EXT => t
+            .file
+            .as_deref()
+            .and_then(|p| p.extension())
+            .map_or_else(String::new, |e| e.to_string_lossy().to_uppercase()),
         _ => t.comment.clone(),
     }
 }

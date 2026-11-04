@@ -16,6 +16,8 @@ export struct DeckView {
     remain-text: string,
     title: string,
     artist: string,
+    /// The file the deck holds ("" when none): the browser marks the row whose file matches it.
+    file: string,
     bpm-text: string,
     tempo-text: string,
     status: string,
