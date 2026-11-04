@@ -27,7 +27,18 @@ MyOpenFadeR es un fork de [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): una
 
 Todas las capturas de esta página salen de la aplicación en marcha, con una biblioteca de pistas sintéticas generadas para estas imágenes. No hay música con derechos en ellas.
 
-## Novedades de la 0.4.2
+## Novedades de la 0.5.0
+
+La 0.5.0 pone el navegador al ritmo de la mezcla:
+
+- **Selección múltiple en la lista.** Ctrl/Cmd+clic alterna una fila, Shift+clic elige un intervalo, y las filas elegidas se resaltan con un contador. *Remove from list* borra todas las entradas seleccionadas en un solo paso de undo y nunca toca archivos del disco.
+- **Las carpetas actúan desde su menú contextual.** Marca una carpeta como favorita, quita el favorito, analiza la carpeta entera en segundo plano o actualízala; las subcarpetas anidadas también se pueden marcar. Al hacer clic en una favorita se abre en vez de desmarcarse.
+- **El análisis de carpeta recuerda su trabajo.** Las pistas ya analizadas con el analizador actual se omiten, y el recorrido corre en un worker.
+- **Versiones del analizador sin reescaneo masivo.** La caché guarda la versión del analizador. Un aviso único al iniciar ofrece *Reanalizar ahora* o *Más tarde*; las pistas antiguas se reanalizan on demand al cargarlas en un deck, nunca todas de golpe.
+- **El grid no cambia bajo un deck en reproducción.** El análisis que llega se aplica solo cuando el deck está parado o en pausa, sin loop ni scratch; si no, espera.
+- **Añadir por lote.** *Add to playlist* y las paletas se aplican ahora a todas las pistas seleccionadas, sin duplicados.
+
+### 0.4.2
 
 La 0.4.2 hace fiable el timing y el SYNC con las manos rápidas y añade los últimos detalles de seguridad y flujo de trabajo:
 
