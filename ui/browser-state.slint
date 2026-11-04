@@ -12,6 +12,11 @@ export global BrowserState {
     in property <string> list-title;
     /// What the list holds: "48 tracks · 4 h 52 min", or "12 of 80 tracks · 1 h 03 min" while filtered.
     in property <string> list-detail;
+    /// The list on screen is a folder (or one of its levels): the SUBFOLDERS chip applies.
+    in property <bool> folder-view;
+    /// The folder list walks every level under the current folder instead of just the one on screen.
+    in-out property <bool> subfolders;
+    callback subfolders-toggled();
     /// A plugged-in device being mounted / read: the status bar's loading bar fills with it (0 to 1); -1 when nothing loads.
     in property <float> load-progress: -1;
     /// The step that read is at, one readable line ("KINGSTON: reading the library 2.1 of 4.8 MB"), shown beside the bar.

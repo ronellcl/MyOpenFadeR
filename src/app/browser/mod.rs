@@ -255,6 +255,11 @@ struct View {
     levels: HashMap<(usize, usize, String), Rc<dyn Library>>,
     /// The levels a worker is listing right now, so a second click does not start another walk.
     levels_reading: std::collections::HashSet<(usize, usize, String)>,
+    /// The recursive listings of a folder requested with SUBFOLDERS, by source, folder and relative
+    /// path ("" is the folder itself; [`list::View::open_deep`]).
+    deep: HashMap<(usize, usize, String), Rc<dyn Library>>,
+    /// The recursive listings a worker is reading right now.
+    deep_reading: std::collections::HashSet<(usize, usize, String)>,
     /// The sources whose branch the user folded (only their own row is in the tree).
     folded: std::collections::HashSet<usize>,
     /// The lists of the library whose branch the user folded.

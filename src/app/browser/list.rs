@@ -40,6 +40,7 @@ impl View {
         let (home, anchor) = (self.home.clone(), self.related.clone());
         self.slots.clear();
         let state = app.global::<BrowserState>();
+        let deep_on = state.get_subfolders();
         let list = match (&anchor, &home) {
             (Some(a), _) => self.cache().map(|all| {
                 let partners = self.store.matches_of(&store::key(a)).unwrap_or_default();
@@ -73,6 +74,16 @@ impl View {
                 .get(*s)
                 .map(|s| s.missing.clone())
                 .ok_or_else(|| "the source is not open".to_owned()),
+            (None, Home::DeviceFolder(d, j)) if deep_on => {
+                let key = (*d, *j, String::new());
+                match self.deep.get(&key).cloned() {
+                    Some(l) => l.tracks(None),
+                    None => {
+                        self.open_deep(app, *d, *j, String::new());
+                        Ok(Vec::new())
+                    }
+                }
+            }
             (None, Home::DeviceFolder(d, j)) => self
                 .sources
                 .get(*d)
@@ -88,6 +99,16 @@ impl View {
                     .and_then(|f| f.playlists.get(*k))
                     .map(|p| p.id.clone());
                 match id {
+                    Some(id) if deep_on => {
+                        let key = (*d, *j, id.clone());
+                        match self.deep.get(&key).cloned() {
+                            Some(l) => l.tracks(None),
+                            None => {
+                                self.open_deep(app, *d, *j, id);
+                                Ok(Vec::new())
+                            }
+                        }
+                    }
                     Some(id) => match self.levels.get(&(*d, *j, id.clone())).cloned() {
                         // A level already listed shows its own files (only those: [`Self::open_level`] lists one).
                         Some(l) => l.tracks(None),
@@ -234,6 +255,102 @@ impl View {
         }
     }
 
+    /// Lists every file under sub-folder `id` of the device folder `(d, j)` when SUBFOLDERS is on: the
+    /// explicit recursive mode ([`folder::Folder::open_partial`], cache-only, no tag reads). It runs on a
+    /// worker and the table stays empty until it lands; the deep result stays cached per level.
+    fn open_deep(&mut self, app: &App, d: usize, j: usize, id: String) {
+        let key = (d, j, id.clone());
+        if !self.deep_reading.insert(key.clone()) {
+            return;
+        }
+        let Some(folder) = self
+            .sources
+            .get(d)
+            .and_then(|s| s.folders.get(j))
+        else {
+            self.deep_reading.remove(&key);
+            return;
+        };
+        let path = if id.is_empty() {
+            folder.path.clone()
+        } else {
+            folder.path.join(&id)
+        };
+        let name = path
+            .file_name()
+            .map_or_else(|| path.display().to_string(), |n| n.to_string_lossy().into_owned());
+        super::loading(
+            app,
+            &format!("{name}: listing every file under this folder…"),
+            Some(0.0),
+        );
+        let weak = app.as_weak();
+        std::thread::spawn(move || {
+            let listed = folder::Folder::open_partial(&path)
+                .map(|lib| Box::new(lib) as Box<dyn Library + Send>)
+                .map_err(|e| format!("{}: {e}", path.display()));
+            if let Err(e) = &listed {
+                eprintln!("sources: {e}");
+            }
+            let _ = slint::invoke_from_event_loop(move || {
+                if let (Some(app), Some(view)) = (weak.upgrade(), super::view()) {
+                    view.borrow_mut().deep_read(&app, d, j, id, listed);
+                }
+            });
+        });
+    }
+
+    /// The recursive listing of [`View::open_deep`] landed: keep it and, if the same folder is still on
+    /// screen with SUBFOLDERS on, fill the table with its whole subtree.
+    fn deep_read(
+        &mut self,
+        app: &App,
+        d: usize,
+        j: usize,
+        id: String,
+        listed: Result<Box<dyn Library + Send>, String>,
+    ) {
+        self.deep_reading.remove(&(d, j, id.clone()));
+        let lib: Rc<dyn Library> = match listed {
+            Ok(lib) => Rc::<dyn Library + Send>::from(lib),
+            Err(e) => {
+                let state = app.global::<BrowserState>();
+                if state.get_subfolders() {
+                    super::loading(app, "", None);
+                    state.set_status(format!("query failed: {e}").into());
+                }
+                return;
+            }
+        };
+        self.deep.insert((d, j, id.clone()), lib);
+        let state = app.global::<BrowserState>();
+        if !state.get_subfolders() {
+            return;
+        }
+        let showing = match &self.home {
+            Home::DeviceFolder(dd, jj) => id.is_empty() && *dd == d && *jj == j,
+            Home::DeviceFolderList(dd, jj, k) if *dd == d && *jj == j => self
+                .sources
+                .get(d)
+                .and_then(|s| s.folders.get(j))
+                .and_then(|f| f.playlists.get(*k))
+                .is_some_and(|p| p.id == id),
+            _ => false,
+        };
+        if showing {
+            super::loading(app, "", None);
+            self.load(app);
+        }
+    }
+
+    /// The SUBFOLDERS chip changed: reload the folder on screen, one level or its whole subtree.
+    pub(super) fn subfolders_changed(&mut self, app: &App) {
+        if !app.global::<BrowserState>().get_subfolders() {
+            super::loading(app, "", None);
+        }
+        self.load(app);
+    }
+
     /// Search box, filter bar, tag filter and header sort over `list`, then the rows and the status line.
     ///
     /// BPM and key are resolved once per track ([`Facts`]) and the search compares without lowercasing each field
@@ -290,6 +407,10 @@ impl View {
         state.set_location(self.location().into());
         state.set_list_title(self.list_name().into());
         state.set_list_detail(self.list_detail().into());
+        state.set_folder_view(matches!(
+            self.home,
+            Home::DeviceFolder(..) | Home::DeviceFolderList(..)
+        ));
         // The selection follows the track, not the row index.
         let at = self.selected.as_ref().and_then(|s| self.row_of(s));
         state.set_current_row(at.map_or(-1, |n| n as i32));
@@ -390,12 +511,14 @@ impl View {
         // A level already listed keeps its rows in memory: drop the ones that contain this file, so going back
         // to them re-opens from the cache with the tag just learned.
         let sources = &self.sources;
-        self.levels.retain(|(d, j, id), _| {
+        let outside = |d: usize, j: usize, id: &str| {
             sources
-                .get(*d)
-                .and_then(|s| s.folders.get(*j))
+                .get(d)
+                .and_then(|s| s.folders.get(j))
                 .is_none_or(|f| !file.starts_with(f.path.join(id)))
-        });
+        };
+        self.levels.retain(|(d, j, id), _| outside(*d, *j, id));
+        self.deep.retain(|(d, j, id), _| outside(*d, *j, id));
     }
 
     /// Re-marks the visible rows for a new reference: only each row's hint cell changes, in place (the selection stays).

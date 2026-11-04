@@ -117,6 +117,8 @@ pub fn wire(
         sources: Vec::new(),
         levels: std::collections::HashMap::new(),
         levels_reading: std::collections::HashSet::new(),
+        deep: std::collections::HashMap::new(),
+        deep_reading: std::collections::HashSet::new(),
         folded: std::collections::HashSet::new(),
         folded_lib: std::collections::HashSet::new(),
         folded_sections: std::collections::HashSet::new(),
@@ -284,6 +286,11 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
             _ => Origin::All,
         };
         v.refresh(&app);
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
+    state.on_subfolders_toggled(move || {
+        let app = weak.unwrap();
+        v.borrow_mut().subfolders_changed(&app);
     });
     let (v, weak) = (view.clone(), app.as_weak());
     state.on_sort(move |col, asc| {
