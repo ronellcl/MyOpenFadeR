@@ -12,7 +12,7 @@ use openfader::{
     store,
 };
 use slint::{ComponentHandle, Model};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -31,30 +31,6 @@ fn on_device(t: &Track, roots: &[PathBuf]) -> bool {
         let hit = file.starts_with(r);
         hit
     })
-}
-
-/// The folder source `file` lives under, deepest first: where its tag cache is. `None` when the file is not under
-/// a folder the browser opened (the Collection, a plugin download), so their stores are left alone.
-fn folder_root(sources: &[super::sources::Source], file: &Path) -> Option<PathBuf> {
-    let mut best: Option<PathBuf> = None;
-    let mut consider = |p: &Path| {
-        if file.starts_with(p)
-            && best
-                .as_ref()
-                .is_none_or(|b| p.as_os_str().len() > b.as_os_str().len())
-        {
-            best = Some(p.to_path_buf());
-        }
-    };
-    for s in sources {
-        if let Some((p, super::sources::SourceType::Folder)) = s.path() {
-            consider(&p);
-        }
-        for f in &s.folders {
-            consider(&f.path);
-        }
-    }
-    best
 }
 
 impl View {
@@ -352,7 +328,7 @@ impl View {
     }
 
     /// A deck decode learned tags for `t` (bitrate, length, BPM, key, sample rate): update every copy the browser
-    /// holds, redraw its visible row in place, and let the folder's tag cache keep them (written on a worker).
+    /// holds, redraw its visible row in place, and let the learned-tag cache keep them (written on a worker).
     pub(super) fn tags_learned(&mut self, t: &Track) {
         let Some(file) = t.file.clone() else { return };
         for copy in self
@@ -379,10 +355,19 @@ impl View {
             let row = self.table_row(i, &facts);
             self.rows.set_row_data(n, row);
         }
-        if let Some(root) = folder_root(&self.sources, &file) {
+        if t.file.is_some() {
             let learned = t.clone();
-            std::thread::spawn(move || folder::remember_tags(&root, &learned));
+            std::thread::spawn(move || folder::remember_tags(&learned));
         }
+        // A level already listed keeps its rows in memory: drop the ones that contain this file, so going back
+        // to them re-opens from the cache with the tag just learned.
+        let sources = &self.sources;
+        self.levels.retain(|(d, j, id), _| {
+            sources
+                .get(*d)
+                .and_then(|s| s.folders.get(*j))
+                .is_none_or(|f| !file.starts_with(f.path.join(id)))
+        });
     }
 
     /// Re-marks the visible rows for a new reference: only each row's hint cell changes, in place (the selection stays).

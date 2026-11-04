@@ -13,11 +13,13 @@
 //! and no file is opened — the rows are there almost at once, while [`Folder::open`] fills the tags behind it.
 //! [`Folder::open_level`] lists one level like a file manager: the files directly in the root plus its immediate
 //! subfolders, with no recursive walk, so a big disk opens at once instead of after a full scan.
-//! A deck decode learns a file's tags for free: [`remember_tags`] keeps them in a small `<cache>.hot.bin` sidecar
-//! that the next open merges over the listing cache, so a played file does not need a second read.
+//! A deck decode learns a file's tags for free: [`remember_tags`] keeps them in one small `learned.bin` cache,
+//! keyed by the file's path, that any open merges over its listing cache: a played file keeps its tags at
+//! whichever level or root the browser reaches it from.
 
 use super::{Library, Playlist, PlaylistRow, Track, playlist_tree, walk_files};
 use crate::analysis::cache;
+use parking_lot::Mutex;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -30,7 +32,7 @@ use symphonia::core::units::TimeBase;
 const AUDIO_EXTS: [&str; 7] = ["mp3", "m4a", "aac", "flac", "wav", "aif", "aiff"];
 const CACHE_MAGIC: &[u8; 4] = b"RKFC";
 const CACHE_VERSION: u32 = 1;
-/// Learned-tag sidecar entries kept per folder ([`remember_tags`]): enough to warm a session's picks.
+/// Learned-tag entries kept ([`remember_tags`]): enough to warm a session's picks across folders.
 const HOT_MAX: usize = 4096;
 
 pub struct Folder {
@@ -212,27 +214,33 @@ fn cache_file(root: &Path) -> Option<PathBuf> {
     Some(cache::root()?.join("folder").join(format!("{h:016x}.bin")))
 }
 
-/// `<tag cache>.hot.bin`: the tags a deck learned since the last full open ([`remember_tags`]), merged over the
-/// listing cache by [`Folder::open`]/[`Folder::open_partial`] so a played file keeps its tags without a reread.
-fn hot_file(cache: &Path) -> PathBuf {
-    cache.with_extension("hot.bin")
+/// `<cache folder>/folder/learned.bin`: the tags a deck learned ([`remember_tags`]), keyed by the file's absolute
+/// path. One file for every folder: the same track shows the same tags at whichever level or root it is reached.
+fn learned_file() -> Option<PathBuf> {
+    Some(cache::root()?.join("folder").join("learned.bin"))
 }
 
 /// Keeps the tags a deck learned for `track` (its decode already opened the file: bitrate, length, sample rate,
-/// BPM and key come for free) in the folder's sidecar cache, merged over the listing cache by the next open.
-/// The sidecar is small and separate so this never rewrites the big tag cache; a failed write is dropped.
-pub fn remember_tags(root: &Path, track: &Track) {
+/// BPM and key come for free) in the learned-tag cache, merged over a folder's listing cache by the next open.
+/// Small and separate so this never rewrites a folder's big tag cache; a failed write is dropped.
+pub fn remember_tags(track: &Track) {
+    if let Some(file) = learned_file() {
+        remember_at(&file, track);
+    }
+}
+
+/// [`remember_tags`] writing to `hot` (the test chooses the path).
+fn remember_at(hot: &Path, track: &Track) {
     let Some(file) = track.file.as_deref() else {
-        return;
-    };
-    let Some(cache) = cache_file(root) else {
         return;
     };
     let Some(stamp) = stamp(file) else {
         return;
     };
-    let hot = hot_file(&cache);
-    let mut entries = std::fs::read(&hot)
+    // One writer at a time: two deck workers would read-modify-write the same cache.
+    static WRITE: Mutex<()> = Mutex::new(());
+    let _write = WRITE.lock();
+    let mut entries = std::fs::read(hot)
         .map(|b| decode(&b))
         .unwrap_or_default();
     entries.insert(file.to_string_lossy().into_owned(), (stamp, track.clone()));
@@ -246,7 +254,7 @@ pub fn remember_tags(root: &Path, track: &Track) {
     let rows: Vec<_> = entries.iter().map(|(_, (s, t))| (t, *s)).collect();
     let tmp = hot.with_extension(format!("{}.tmp", std::process::id()));
     let _ = hot.parent().map_or(Ok(()), std::fs::create_dir_all);
-    let _ = std::fs::write(&tmp, encode(&rows)).and_then(|()| std::fs::rename(&tmp, &hot));
+    let _ = std::fs::write(&tmp, encode(&rows)).and_then(|()| std::fs::rename(&tmp, hot));
 }
 
 fn put_str(o: &mut Vec<u8>, s: &str) {
@@ -341,6 +349,7 @@ impl Folder {
         Self::open_with(
             root,
             cache_file(root).as_deref(),
+            learned_file().as_deref(),
             read_track,
             Tag::Full,
             usize::MAX,
@@ -362,6 +371,7 @@ impl Folder {
         Self::open_with(
             root,
             cache_file(root).as_deref(),
+            learned_file().as_deref(),
             read_track,
             Tag::Cached,
             0,
@@ -371,15 +381,24 @@ impl Folder {
 
     /// [`Folder::open_partial`] with the tag cache file given (the test counts reads).
     fn open_partial_with(root: &Path, cache: Option<&Path>) -> Result<Self, String> {
-        Self::open_with(root, cache, read_track, Tag::Cached, usize::MAX, false)
+        Self::open_with(
+            root,
+            cache,
+            learned_file().as_deref(),
+            read_track,
+            Tag::Cached,
+            usize::MAX,
+            false,
+        )
     }
 
-    /// [`Folder::open`] with the tag cache file and the tag reader given (the test counts reads); `mode` picks
-    /// the full open or the listing-only one ([`Tag`]), `depth` how far [`walk_files`] descends and `subdirs`
-    /// whether the immediate subfolders are listed even when they hold no audio directly.
+    /// [`Folder::open`] with the tag cache, the learned-tag cache and the tag reader given (the tests choose
+    /// them); `mode` picks the full open or the listing-only one ([`Tag`]), `depth` how far [`walk_files`]
+    /// descends and `subdirs` whether the immediate subfolders are listed even when they hold no audio directly.
     fn open_with(
         root: &Path,
         cache: Option<&Path>,
+        learned: Option<&Path>,
         read: impl Fn(&Path) -> Track,
         mode: Tag,
         depth: usize,
@@ -403,9 +422,14 @@ impl Folder {
             .and_then(|c| std::fs::read(c).ok())
             .map(|b| decode(&b))
             .unwrap_or_default();
-        // What a deck learned since the last full open is newer than the listing cache ([`remember_tags`]).
-        if let Some(hot) = cache.map(hot_file).and_then(|h| std::fs::read(h).ok()) {
-            old.extend(decode(&hot));
+        // What a deck learned is newer than the listing cache ([`remember_tags`]); only the entries under this
+        // root matter, keyed as the cache is (the file's full path).
+        if let Some(hot) = learned.and_then(|h| std::fs::read(h).ok()) {
+            for (path, entry) in decode(&hot) {
+                if Path::new(&path).starts_with(root) {
+                    old.insert(path, entry);
+                }
+            }
         }
         let cache_ms = t.elapsed().as_millis();
         let old_len = old.len();
@@ -590,6 +614,7 @@ mod tests {
             let f = Folder::open_with(
                 &root,
                 Some(&cache),
+                None,
                 |p| {
                     reads.set(reads.get() + 1);
                     fake(p)
@@ -638,6 +663,7 @@ mod tests {
         let full = Folder::open_with(
             &root,
             Some(&cache),
+            None,
             |p| {
                 reads.set(reads.get() + 1);
                 fake(p)
@@ -688,6 +714,7 @@ mod tests {
         let full = Folder::open_with(
             &root,
             Some(&cache),
+            None,
             |p| {
                 reads.set(reads.get() + 1);
                 fake(p)
@@ -705,6 +732,7 @@ mod tests {
         let level = Folder::open_with(
             &root,
             Some(&cache),
+            None,
             |p| {
                 reads.set(reads.get() + 1);
                 fake(p)
@@ -734,15 +762,23 @@ mod tests {
         let cache = dir.join("cache/folder.bin");
         std::fs::create_dir_all(cache.parent().unwrap()).unwrap();
 
-        // No listing cache yet: the tags a deck learned come from the sidecar, without opening the file.
+        // No listing cache yet: the tags a deck learned come from the learned-tag cache, without opening the file.
         let mut learned = fake(&file);
         learned.bitrate = 320;
-        let hot = encode(&[(&learned, stamp(&file).unwrap())]);
-        std::fs::write(hot_file(&cache), hot).unwrap();
-        let t = &Folder::open_partial_with(&root, Some(&cache))
-            .unwrap()
-            .tracks(None)
-            .unwrap()[0];
+        let hot = dir.join("learned.bin");
+        remember_at(&hot, &learned);
+        let t = &Folder::open_with(
+            &root,
+            Some(&cache),
+            Some(&hot),
+            read_track,
+            Tag::Cached,
+            usize::MAX,
+            false,
+        )
+        .unwrap()
+        .tracks(None)
+        .unwrap()[0];
         assert_eq!((t.title.as_str(), t.bitrate), ("T a", 320));
         std::fs::remove_dir_all(&dir).unwrap();
     }
