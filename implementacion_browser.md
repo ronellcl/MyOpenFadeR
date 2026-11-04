@@ -1,7 +1,7 @@
 # Plan de implementación del navegador
 
-> Documento de planificación y seguimiento. La implementación avanza por la rama `browser-selection`.
-> La base de trabajo era `browser` = `78ebec0`; `main` = `74e790a`; release `v0.4.2` publicada.
+> Documento de planificación y seguimiento. La implementación está fusionada en `browser` (commit `726019b` + `6fffd7d`, ff-merge desde `78ebec0`).
+> `main` = `74e790a`; release `v0.4.2` publicada. Sin push, tag ni release sin autorización.
 
 ## Estado de implementación
 
@@ -14,13 +14,12 @@
 - [x] Análisis de carpeta en segundo plano, saltando las pistas ya analizadas.
 - [x] Versión del analizador separada del formato de caché, con sidecar `.ver`.
 - [x] Reanálisis on demand al cargar en un deck una pista con análisis de versión anterior.
-- [ ] Popup único al iniciar cuando cambia la versión del analizador.
-- [ ] Aplicación diferida del análisis si el deck está reproduciendo (nunca cambiar el grid en caliente).
-- [ ] Pruebas completas, commit y fusión a `browser`.
+- [x] Popup único al iniciar cuando cambia la versión del analizador (una sola vez por versión; botones Reanalizar ahora / Más tarde; sin reanálisis masivo automático).
+- [x] Aplicación diferida del análisis si el deck está reproduciendo (nunca cambiar el grid en caliente; pending aplicado al pausar o siguiente tick).
+- [x] Batch add a playlist y palette con múltiples pistas seleccionadas (evita duplicados, conserva orden).
+- [x] Pruebas completas, commit y fusión a `browser`.
 
-> Nota: este documento partía de la base `browser` = `78ebec0`; la implementación actual vive en `browser-selection`.
->
-> Rama de referencia: `browser` = `78ebec0`.
+> Rama de referencia: `browser` = `726019b` + `6fffd7d`; base previa `78ebec0`.
 > `main` = `74e790a`, release `v0.4.2` publicada.
 > Sin push, tag ni release sin autorización.
 
@@ -369,17 +368,125 @@ masiva. El plan es:
 
 ---
 
+## 7. Popup de nueva versión del analizador al iniciar
+
+### Objetivo
+
+Avisar una sola vez al iniciar cuando existe una versión nueva del analizador, con opciones
+"Reanalizar ahora" y "Más tarde", sin reanálisis masivo automático.
+
+### Diseño
+
+- Preferencia `seen-analyzer-version` en `Prefs::unknown` (par clave-valor, string). Se lee con
+  `prefs::extra` y se escribe con `prefs::set_extra` / `prefs::update`. Sin tocar el esquema del store.
+- En `app::run`, tras `prefs::wire(&app)`, programar un `slint::Timer` one-shot que, después de que el UI
+  esté visible, compruebe si `seen < ANALYZER_VERSION`.
+- Si es mayor: mostrar un `PopupWindow` modal una sola vez con:
+  - "Hay una nueva versión del analizador (ANALYZER_VERSION). ¿Quieres reanalizar los temas ya analizados?"
+  - Botón "Reanalizar ahora": marca `seen = ANALYZER_VERSION`, cierra el popup y encola solo pistas con
+    versión anterior desde la colección (on demand, sin recorrer discos no registrados).
+  - Botón "Más tarde": marca `seen = ANALYZER_VERSION` y cierra sin reanalizar.
+- "Reanalizar ahora" respeta Analysis Lock y no toca pistas bloqueadas.
+- El popup no bloquea el UI (se lanza por `slint::invoke_from_event_loop` tras el arranque).
+- UI: añadir a `BrowserState` `analyzer-version-pending: bool`, `analyzer-version-message: string`
+  y `callback analyzer-version-dismiss()`; `PopupWindow` en `browser.slint` controlado por esas propiedades.
+
+### Riesgos controlados
+
+- No aparecer más de una vez por versión (el pref registra la versión vista).
+- No disparar reanálisis masivo automático (el reanálisis es on demand por deck load, ya implementado).
+- No bloquear el hilo UI al iniciar.
+
+### Pruebas
+
+- Caché v4 se carga y sigue funcionando (versión leída como 0).
+- Popup aparece una vez por versión y "Más tarde" no lo repite hasta cambiar de versión.
+- "Reanalizar ahora" no recorre discos no registrados ni pistas con Analysis Lock.
+- No hay invalidación ni borrado masivo de cachés existentes.
+
+## 8. Aplicación diferida del análisis si el deck está reproduciendo
+
+### Objetivo
+
+Nunca cambiar el grid, beats o análisis vivo de un deck mientras está reproduciendo, haciendo scratch
+o con un seek/loop en transición. El nuevo análisis se guarda como pendiente y se aplica al pausar,
+al llegar al final o al recargar.
+
+### Diseño
+
+- Campo nuevo en `Loaded` (`src/app/deck/mod.rs`): `pending_analysis: Option<analysis::Analysis>`.
+- En `poll_decode` (`src/app/deck/load.rs`), al llegar `analysed`:
+  - Calcular `safe = !self.playing() && l.loop_.is_none() && !self.sync.scratching.get()`.
+  - Si `safe`: aplicar beats/3band/waveform/cues como ahora.
+  - Si no `safe`: guardar `an` en `l.pending_analysis`, NO tocar beats/3band/waveform, y añadir nota
+    "grid: diferido (deck reproduciendo)".
+- En `tick` (`src/app/deck/tick.rs`), tras `poll_decode()`: si `l.pending_analysis` es `Some` y ahora `safe`,
+  aplicar y hacer `take()`; si aún no es safe, conservar para el siguiente tick.
+- Detectar también el cambio `playing → false` en `tick` para aplicar pendiente inmediatamente.
+- Respetar Analysis Lock: los jobs ya filtran pistas bloqueadas; el pending no se crea para pistas bloqueadas.
+- No sobrescribir cues manuales, key editada, grid manual, tags ni comentarios: el código actual solo
+  llena lo vacío.
+
+### Riesgos controlados
+
+- No tocar grid mientras reproduce/scratch/seeks/loop.
+- Dedupe implícito: una sola `pending_analysis` por deck.
+- Aplicar al pausar, al fin o al recargar.
+- No sobrescribir ediciones manuales.
+
+### Pruebas
+
+- Reanalizar mientras reproduce: el grid no cambia.
+- Pausar: se aplica el pendiente.
+- Volver a cargar: se aplica el análisis nuevo.
+- Grid manual: no se sobrescribe.
+- Cues y loops se conservan.
+- Analysis Lock: no se encola ni se aplica nada.
+
+## 9. Batch add to playlist y palette
+
+### Objetivo
+
+Cuando hay varias pistas seleccionadas, añadir todas a una playlist o palette, no solo la pista activa.
+
+### Diseño
+
+- `src/app/browser/palette/mod.rs`: `on_palette_add_chosen` usa `v.picked_tracks()` y hace un bucle:
+  para cada track, `q.add_track(&app, &mut v, pal, &t)`. `add_track` ya evita duplicados.
+- `src/app/browser/playlists/manage.rs`: `open_add_to()` permite añadir cuando hay selección múltiple;
+  `add_to(id)` añade `picked_tracks()` a la playlist elegida, saltando duplicados (si la key ya está en
+  `entries`, avisa y salta).
+- `View::picked_tracks()` ya existe y devuelve todas las picked (o `selected` si ninguna picked).
+- Evitar duplicados y conservar el orden de las pistas seleccionadas.
+- Soportar Tag List y user playlists.
+
+### Riesgos controlados
+
+- No crear entradas duplicadas en playlists ni Tag List.
+- Conservar el orden de selección.
+- No tocar archivos del disco.
+
+### Pruebas
+
+- Seleccionar 3 pistas y añadirlas a una playlist: aparecen las 3, sin duplicados.
+- Añadir a palette: aparece en Tag List o palette correspondiente.
+- Añadir pistas ya presentes: no se duplican.
+- Sin selección múltiple: comportamiento actual sobre la pista activa.
+
+---
+
 ## Orden de implementación
 
 | Etapa | Rama propuesta | Contenido |
 |---|---|---|
-| 1 | `browser-selection` | Base común, selección múltiple, borrado de playlists, acciones por lote en carpetas |
-| 2 | `browser-folder-menu` | Menú contextual del árbol, favoritos de carpetas anidadas, refrescar, plegar |
-| 3 | `browser-analysis-version` | Versión del analizador, caché v4/v5, popup, reanálisis on demand, aplicación segura |
-| 4 | `browser-folder-analysis` | Análisis persistente de carpeta, sidecar, lotes, progreso, cancelación y conexión con el menú del árbol |
+| 1 | `browser-selection` (fusionada en `browser`) | Base común, selección múltiple, borrado de playlists, acciones por lote en carpetas |
+| 2 | `browser` (fusionada) | Menú contextual del árbol, favoritos de carpetas anidadas, refrescar, plegar |
+| 3 | `browser-analysis-version` (esta fase) | Versión del analizador, caché v4/v5, popup al iniciar, reanálisis on demand |
+| 4 | `browser-safe-apply` (esta fase) | Aplicación diferida si el deck reproduce; no cambiar grid en caliente |
+| 5 | `browser` (esta fase) | Batch add a playlist y palette con múltiples pistas seleccionadas |
+| 6 | `browser` (esta fase) | Pruebas completas, commit y fusión a `browser` |
 
-Cada rama saldría de `browser` (`78ebec0`), se verificaría y se fusionaría por
-fast-forward. Sin push, tag ni release.
+Cada rama saldría de `browser`, se verificaría y se fusionaría por fast-forward. Sin push, tag ni release.
 
 ## Verificación común
 
@@ -409,6 +516,13 @@ fast-forward. Sin push, tag ni release.
    invalidar análisis existentes.
 6. **Deck en reproducción**: el resultado nuevo se guarda, pero no se aplica al
    grid hasta que sea seguro.
+7. **Popup al iniciar**: no bloquear UI, no aparecer más de una vez por versión,
+   no disparar reanálisis masivo automático, respetar Analysis Lock.
+8. **Aplicación diferida**: no tocar grid mientras reproduce/scratch/seek/loop;
+   dedupe por pista; aplicar al pausar/fin; no sobrescribir cues manuales,
+   key editada, grid manual ni tags.
+9. **Batch add playlist/palette**: evitar duplicados, conservar orden,
+   soportar Tag List + user playlists + palettes, no tocar archivos.
 
 ## Siguiente paso propuesto
 
