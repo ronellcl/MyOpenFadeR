@@ -26,6 +26,9 @@ const MAGIC: &[u8; 4] = b"RKAC";
 const VERSION: u32 = 4;
 /// The layout before the audio size was stored: [`migrate`] upgrades these.
 const VERSION_BEFORE_SIZE: u32 = 3;
+/// The analyzer's own generation, stored beside each cache file. Old entries (no sidecar) read as 0 and stay usable:
+/// they are recomputed on demand when their track is loaded, never in a bulk invalidation.
+pub const ANALYZER_VERSION: u32 = 1;
 
 /// [`crate::paths::cache_dir`]: the parent of every cache folder (stems, models, folder tags).
 pub fn root() -> Option<PathBuf> {
@@ -80,6 +83,19 @@ fn audio_of(t: &Track) -> Result<&Path, String> {
 /// File name of `t`'s entry: the hash of its [`store::key`].
 fn file_name(t: &Track) -> String {
     format!("{:016x}.bin", fnv1a(store::key(t).bytes()))
+}
+
+/// The sidecar that records which analyzer produced the cache entry (missing = an old entry, version 0).
+fn version_name(t: &Track) -> String {
+    format!("{:016x}.ver", fnv1a(store::key(t).bytes()))
+}
+
+/// The analyzer version that wrote the cached analysis of `t`; 0 when the entry predates the sidecar.
+pub fn analyzer_version(t: &Track) -> u32 {
+    dir()
+        .and_then(|d| std::fs::read_to_string(d.join(version_name(t))).ok())
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
 }
 
 /// Size of `t`'s audio file: what a stored entry must match.
@@ -231,7 +247,9 @@ fn put(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), String> {
 }
 
 fn store_in(dir: &Path, t: &Track, a: &Analysis, profile: Profile) -> Result<(), String> {
-    put(dir, &file_name(t), &encode(a, profile, audio_size(t)?))
+    put(dir, &file_name(t), &encode(a, profile, audio_size(t)?))?;
+    // The analyzer version rides beside the entry: a missing sidecar is an older analysis (0), still usable.
+    put(dir, &version_name(t), ANALYZER_VERSION.to_string().as_bytes())
 }
 
 fn data_dir() -> Result<PathBuf, String> {

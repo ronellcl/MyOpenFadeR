@@ -28,6 +28,16 @@ export global BrowserState {
     callback track-selected(int);
     /// Left-button press on a row (same index); Rust turns two quick presses on one row into a double-click.
     callback track-pressed(int);
+    /// Left-button press with Ctrl/Meta (toggle one row) or Shift (grow from the last clicked row).
+    callback track-clicked(int, bool, bool);
+    /// How many rows the multi-selection holds (0 or 1 = the ordinary single selection).
+    in property <int> picked-count: 0;
+    /// More than one row is picked: the remove button and the batch menu act on all of them.
+    in property <bool> selection-mode;
+    /// A track-menu action that applies to every picked row ("tag", "analyze", "remove-collection").
+    callback selection-action(string);
+    /// A folder action from the tree's context menu: row, then "favorite" or "analyze".
+    callback folder-action(int, string);
     callback search-edited(string);
     /// Enter in the search box (the text). On a plugin source's search entry it runs the search online (src/app/browser/remote.rs).
     callback search-accepted(string);

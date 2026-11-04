@@ -181,12 +181,21 @@ impl Store {
     }
 
     pub fn remove_entry(&self, id: i64, index: usize) -> R<()> {
+        self.remove_entries(id, &[index])
+    }
+
+    /// Removes the entries at `indices` in one write ([`Self::set_entries`] keeps it undoable as one step).
+    pub fn remove_entries(&self, id: i64, indices: &[usize]) -> R<()> {
         let mut all = self.entries(id)?;
-        if index < all.len() {
-            all.remove(index);
-            self.set_entries(id, &all)?;
+        let mut indices = indices.to_vec();
+        indices.sort_unstable();
+        indices.dedup();
+        for index in indices.into_iter().rev() {
+            if index < all.len() {
+                all.remove(index);
+            }
         }
-        Ok(())
+        self.set_entries(id, &all)
     }
 
     /// Entry `from` moves to index `to` (clamped), the ones between shift.

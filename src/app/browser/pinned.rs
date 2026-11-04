@@ -9,6 +9,7 @@
 
 use crate::app::prefs;
 use openfader::device::{self, Device};
+use openfader::library::Library;
 use slint::ComponentHandle;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -190,7 +191,100 @@ impl super::View {
                     path: rel,
                 })
             }
+            super::sidebar::Entry::DeviceFolderList(d, j, k) => {
+                let source = self.sources.get(*d)?;
+                let device = match &source.kind {
+                    super::sources::Kind::Device(d) => d,
+                    _ => return None,
+                };
+                let folder = source.folders.get(*j)?;
+                let path = folder.path.join(&folder.playlists.get(*k)?.id);
+                Pinned::of(device, &path)
+            }
             _ => None,
+        }
+    }
+
+    /// The absolute path of a folder row (a device folder or one of its levels).
+    fn folder_path(&self, entry: &super::sidebar::Entry) -> Option<std::path::PathBuf> {
+        match entry {
+            super::sidebar::Entry::DeviceFolder(d, j) => {
+                Some(self.sources.get(*d)?.folders.get(*j)?.path.clone())
+            }
+            super::sidebar::Entry::DeviceFolderList(d, j, k) => {
+                let folder = self.sources.get(*d)?.folders.get(*j)?;
+                Some(folder.path.join(&folder.playlists.get(*k)?.id))
+            }
+            _ => None,
+        }
+    }
+
+    /// A folder command from the tree's right-click menu.
+    pub(super) fn folder_action(&mut self, app: &super::App, row: usize, what: &str) {
+        let Some(entry) = self.entries.get(row).cloned() else {
+            return;
+        };
+        if !matches!(
+            entry,
+            super::sidebar::Entry::DeviceFolder(..)
+                | super::sidebar::Entry::DeviceFolderList(..)
+                | super::sidebar::Entry::Pinned(_)
+        ) {
+            return;
+        }
+        match what {
+            "favorite" => {
+                self.entry = entry;
+                self.toggle_favorite(app);
+            }
+            "analyze" => {
+                let Some(path) = self.folder_path(&entry) else {
+                    return;
+                };
+                let weak = app.as_weak();
+                app.global::<super::BrowserState>().set_status(
+                    format!("{}: listing the folder to analyse…", path.display()).into(),
+                );
+                std::thread::spawn(move || {
+                    let tracks = openfader::library::folder::Folder::open_partial(&path)
+                        .and_then(|f| f.tracks(None))
+                        .map(|tracks| {
+                            tracks
+                                .into_iter()
+                                .filter(|t| {
+                                    t.file.is_some()
+                                        && openfader::analysis::cache::analyzer_version(t)
+                                            < openfader::analysis::cache::ANALYZER_VERSION
+                                })
+                                .collect::<Vec<_>>()
+                        });
+                    let _ = slint::invoke_from_event_loop(move || {
+                        let Some(app) = weak.upgrade() else { return };
+                        match tracks {
+                            Ok(tracks) if tracks.is_empty() => app
+                                .global::<super::BrowserState>()
+                                .set_status("every track in this folder is already analysed".into()),
+                            Ok(tracks) => {
+                                let n = tracks.len();
+                                crate::app::analyze::request(&tracks);
+                                app.global::<super::BrowserState>().set_status(
+                                    format!("analysing {n} track(s) from the folder").into(),
+                                );
+                            }
+                            Err(e) => app.global::<super::BrowserState>().set_status(
+                                format!("cannot read the folder: {e}").into(),
+                            ),
+                        }
+                    });
+                });
+            }
+            "refresh" => {
+                self.levels.clear();
+                self.deep.clear();
+                self.refresh_sources(app);
+                self.load(app);
+            }
+            _ => {}
         }
     }
 

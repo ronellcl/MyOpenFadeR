@@ -249,7 +249,11 @@ impl Deck {
             player.set_key_shift(0.0);
             player.seek(cue_ms);
             // Analyse only what is missing; analyze() fills both parts, poll_decode keeps whichever the library had.
-            let need = a.beats.is_empty() || a.three_band_detail.is_empty();
+            // A cache written by an older analyzer stays usable, but the deck asks for a fresh one as soon as it plays.
+            let stale = t.file.as_deref().is_some_and(|_| {
+                analysis::cache::analyzer_version(t) < analysis::cache::ANALYZER_VERSION
+            });
+            let need = a.beats.is_empty() || a.three_band_detail.is_empty() || stale;
             if need && t.file.is_some() && pcm.is_none() {
                 status += " · analyzing…";
             }

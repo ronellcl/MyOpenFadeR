@@ -154,6 +154,37 @@ impl View {
         true
     }
 
+    /// Takes the picked rows (indices into `list`) out of the Tag List / user playlist on screen. A user playlist is
+    /// edited by its stored positions in one transaction, never by rewriting the file on disk.
+    pub(in crate::app::browser) fn remove_picked(&mut self, app: &App, rows: &[usize]) -> bool {
+        if matches!(self.home, Home::User(_))
+            && self.protected(app, "remove tracks from a playlist")
+        {
+            return false;
+        }
+        let mut rows = rows.to_vec();
+        rows.sort_unstable();
+        rows.dedup();
+        match self.home.clone() {
+            Home::Tags if rows.iter().all(|&i| i < self.tags.len()) => {
+                for i in rows.into_iter().rev() {
+                    self.tags.remove(i);
+                }
+                self.tags_changed(app);
+            }
+            Home::User(id) if rows.iter().all(|&i| i < self.slots.len()) => {
+                let stored: Vec<usize> = rows.iter().map(|&i| self.slots[i]).collect();
+                let r = self.store.remove_entries(id, &stored);
+                if self.try_store(app, r).is_none() {
+                    return false;
+                }
+                self.load(app);
+            }
+            _ => return false,
+        }
+        true
+    }
+
     /// Moves list entry `from` to where entry `to` is (Tag List / user playlist on screen).
     pub(in crate::app::browser) fn move_entry(&mut self, app: &App, from: usize, to: usize) {
         match self.home.clone() {

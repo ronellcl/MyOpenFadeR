@@ -31,7 +31,9 @@ pub const BITRATE: usize = 14;
 pub const FILE: usize = 15;
 /// The file's extension in capitals ("MP3", "FLAC", "MP4", …; empty when unknown), shown after the FORMAT icon.
 pub const EXT: usize = 16;
-pub const COLUMNS: usize = 17;
+/// "1" when the row is part of the multi-selection (the table tints it).
+pub const PICKED: usize = 17;
+pub const COLUMNS: usize = 18;
 pub const KEY: usize = 3;
 
 /// BPM hint window: ± this fraction of the playing deck's BPM.
@@ -215,6 +217,7 @@ fn shown_cell(t: &Track, f: &Facts, col: usize, r: &Reference, look: &Look) -> S
         HINTS => hints(f, r, look.level).into(),
         PLAYED => SharedString::new(), // filled in by [`row`]
         DOWNLOADED => SharedString::new(), // filled in by [`row`]
+        PICKED => SharedString::new(), // filled in by the browser's selection
         FORMAT => f.format.text().into(),
         // A track whose file is gone is marked "[!]" (File > Display All Missing Files lists them).
         0 if t

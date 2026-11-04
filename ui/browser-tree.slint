@@ -1,5 +1,5 @@
 import { ListView } from "std-widgets.slint";
-import { Chip, IconButton, Icon, TextField } from "widgets.slint";
+import { Chip, IconButton, Icon, MenuItem, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { BrowserState } from "browser-state.slint";
 import { DragState, TreeDropTarget } from "dnd.slint";
@@ -15,6 +15,13 @@ export component TreeView inherits Rectangle {
     out property <bool> has-focus: fs.has-focus;
     background: Theme.panel;
     clip: true;
+    property <int> menu-row: -1;
+    property <length> menu-x;
+    property <length> menu-y;
+    function place-menu(x: length, y: length) {
+        root.menu-x = min(x, root.width - 190px);
+        root.menu-y = min(y, max(0px, root.height - 3 * Theme.h-row - 4px));
+    }
 
     forward-focus: fs;
     /// Chooses row `i` (clamped), scrolls it into view and reports it, as the std list view did.
@@ -60,6 +67,10 @@ export component TreeView inherits Rectangle {
                                 fs.focus();
                                 root.set-current-item(i);
                                 root.row-clicked(i);
+                            } else if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right) {
+                                root.menu-row = i;
+                                root.place-menu(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);
+                                menu.show();
                             }
                         }
                         // Preferences > Advanced > Browse > Edit Library: rename by double click.
@@ -67,6 +78,24 @@ export component TreeView inherits Rectangle {
                     }
                 }
                 TreeDropTarget { tree-row: i; }
+            }
+        }
+    }
+    menu := PopupWindow {
+        x: root.menu-x;
+        y: root.menu-y;
+        width: 190px;
+        height: 3 * Theme.h-row + 4px;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.radius;
+            VerticalLayout {
+                padding: 1px;
+                MenuItem { text: "Favorite folder"; activated => { BrowserState.folder-action(root.menu-row, "favorite"); menu.close(); } }
+                MenuItem { text: "Analyze folder"; activated => { BrowserState.folder-action(root.menu-row, "analyze"); menu.close(); } }
+                MenuItem { text: "Refresh folder"; activated => { BrowserState.folder-action(root.menu-row, "refresh"); menu.close(); } }
             }
         }
     }

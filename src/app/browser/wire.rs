@@ -94,6 +94,8 @@ pub fn wire(
         tags: Vec::new(),
         history: Vec::new(),
         selected: None,
+        picked: Vec::new(),
+        anchor: None,
         reference: Reference::default(),
         look: Look::now(),
         detected_ver: detected().version(),
@@ -338,6 +340,35 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
         app.global::<BrowserState>().set_status(msg.into());
     });
     let (v, weak) = (view.clone(), app.as_weak());
+    state.on_selection_action(move |what| {
+        let (app, mut v) = (weak.unwrap(), v.borrow_mut());
+        let tracks = v.picked_tracks();
+        if tracks.is_empty() {
+            app.global::<BrowserState>()
+                .set_status("select a track first".into());
+            return;
+        }
+        match what.as_str() {
+            "tag" => {
+                let mut added = 0;
+                for t in tracks {
+                    if !v.tags.contains(&t) {
+                        v.tags.push(t);
+                        added += 1;
+                    }
+                }
+                if added > 0 {
+                    v.tags_changed(&app);
+                }
+                app.global::<BrowserState>().set_status(
+                    format!("tagged {added} track{}", if added == 1 { "" } else { "s" }).into(),
+                );
+            }
+            "analyze" => crate::app::analyze::request(&tracks),
+            _ => {}
+        }
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
     state.on_list_move(move |d| {
         let (app, mut v) = (weak.unwrap(), v.borrow_mut());
         // Swap with the neighbour as shown (a search/filter may hide queue entries in between).
@@ -375,20 +406,34 @@ fn wire_selection(
     state.on_list_remove(move || {
         let (app, mut v) = (weak.unwrap(), v.borrow_mut());
         let Some(pos) = v.cursor(&app) else { return };
-        if !v.remove_at(&app, pos) {
+        let picked = v.picked.clone();
+        let removed = if picked.len() > 1 {
+            v.remove_picked(&app, &picked)
+        } else {
+            v.remove_at(&app, pos)
+        };
+        if !removed {
             return;
         }
+        v.clear_picks(&app);
         // The neighbour inherits the selection so the arrow keys keep working down the queue.
         v.selected = v
-            .list
+            .shown
             .get(pos)
-            .or_else(|| pos.checked_sub(1).and_then(|p| v.list.get(p)))
+            .or_else(|| pos.checked_sub(1).and_then(|p| v.shown.get(p)))
+            .and_then(|&i| v.list.get(i))
             .cloned();
         let (app, v) = (&app, &mut *v);
         v.refresh(app);
         if let Some(t) = &v.selected {
             trackinfo::show(app, t);
             on_removed(t);
+        }
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
+    state.on_track_clicked(move |i, ctrl, shift| {
+        if let Some(row) = usize::try_from(i).ok() {
+            v.borrow_mut().pick(&weak.unwrap(), row, ctrl, shift);
         }
     });
     let (v, weak, on_selected) = (view.clone(), app.as_weak(), on_track.clone());
@@ -399,6 +444,12 @@ fn wire_selection(
             v.borrow().suggest_selected(&app);
             trackinfo::show(&app, &t);
             on_selected(&t);
+        }
+    });
+    let (v, weak) = (view.clone(), app.as_weak());
+    state.on_folder_action(move |row, what| {
+        if let (Ok(row), Some(app)) = (usize::try_from(row), weak.upgrade()) {
+            v.borrow_mut().folder_action(&app, row, what.as_str());
         }
     });
     playlists::wire(app, view);

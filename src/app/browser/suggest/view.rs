@@ -9,7 +9,7 @@
 
 use super::super::{
     View,
-    table::{Facts, row},
+    table::{Facts, PICKED, row},
 };
 use super::{Conditions, Item, Links, Mode, max_list, rank};
 use crate::app::{App, BrowserState, DeckState, deck, plural, prefs};
@@ -291,6 +291,9 @@ impl View {
     ) -> ModelRc<slint::StandardListViewItem> {
         let t = &self.list[i];
         let r = row(t, f, &self.reference, self.is_played(t), &self.look);
+        if self.picked.contains(&i) {
+            r.set_row_data(PICKED, "1".into());
+        }
         if let Some(note) = self
             .suggest
             .notes

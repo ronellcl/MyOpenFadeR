@@ -175,13 +175,15 @@ export component TrackTable inherits Rectangle {
                 for cells[i] in BrowserState.tracks: Rectangle {
                     height: Theme.h-row;
                     property <bool> current: i == BrowserState.current-row;
+                    property <bool> picked: cells[17].text == "1";
                     property <string> hints: cells[9].text;
                     /// The track is the one a deck has loaded (its row wears `row-loaded`): the row's file and the
                     /// deck's `file` are the same path (cells[15], src/app/browser/table.rs).
                     property <bool> on-deck: cells[15].text != "" && (DeckState.decks[0].file == cells[15].text || DeckState.decks[1].file == cells[15].text || DeckState.decks[2].file == cells[15].text || DeckState.decks[3].file == cells[15].text);
                     /// Which deck holds this file: 0 A, 1 B, 2 C, 3 D, -1 none (the row's number becomes that letter).
                     property <int> deck: cells[15].text == "" ? -1 : (DeckState.decks[0].file == cells[15].text ? 0 : (DeckState.decks[1].file == cells[15].text ? 1 : (DeckState.decks[2].file == cells[15].text ? 2 : (DeckState.decks[3].file == cells[15].text ? 3 : -1))));
-                    background: current ? Theme.select : (row-ta.has-hover ? Theme.hover-row : (Math.mod(i, 2) == 0 ? Theme.bg-deep : Theme.row-alt));
+                    background: current ? Theme.select : (picked ? Theme.panel-high : (row-ta.has-hover ? Theme.hover-row : (Math.mod(i, 2) == 0 ? Theme.bg-deep : Theme.row-alt)));
+                    if picked: Rectangle { x: 0; width: 2px; height: parent.height; background: Theme.accent; }
                     if deck >= 0: Rectangle {
                         x: (root.w-lead - 14px) / 2;
                         y: (parent.height - 14px) / 2;
@@ -234,11 +236,15 @@ export component TrackTable inherits Rectangle {
                                 fs.focus();
                                 if (e.button == PointerEventButton.left) {
                                     root.choose(i);
+                                    BrowserState.track-clicked(i, e.modifiers.control || e.modifiers.meta, e.modifiers.shift);
                                     BrowserState.track-pressed(i);
                                     root.place-menu(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);
                                     hold.running = BrowserState.hold-menu;
                                 } else if (e.button == PointerEventButton.right) {
-                                    root.choose(i);
+                                    if (!(BrowserState.selection-mode && picked)) {
+                                        root.choose(i);
+                                        BrowserState.track-clicked(i, false, false);
+                                    }
                                     root.place-menu(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);
                                     menu.show();
                                 }
@@ -283,7 +289,7 @@ export component TrackTable inherits Rectangle {
             VerticalLayout {
                 padding: 1px;
                 MenuItem { text: "Load to deck"; activated => { BrowserState.track-pressed(BrowserState.current-row); BrowserState.track-pressed(BrowserState.current-row); menu.close(); } }
-                MenuItem { text: "Add to Tag List (T)"; activated => { BrowserState.tag-add(); menu.close(); } }
+                MenuItem { text: "Add to Tag List (T)"; activated => { BrowserState.selection-action("tag"); menu.close(); } }
                 MenuItem { text: "Add to playlist…"; activated => { BrowserState.panel-request(0); menu.close(); } }
                 if BrowserState.palette-enabled: MenuItem { text: "Add to palette 1"; activated => { BrowserState.palette-add-chosen(1); menu.close(); } }
                 if BrowserState.palette-enabled: MenuItem { text: "Add to palette 2"; activated => { BrowserState.palette-add-chosen(2); menu.close(); } }
@@ -293,7 +299,7 @@ export component TrackTable inherits Rectangle {
                 if root.list-view: MenuItem { text: "Move up"; activated => { BrowserState.list-move(-1); menu.close(); } }
                 if root.list-view: MenuItem { text: "Move down"; activated => { BrowserState.list-move(1); menu.close(); } }
                 if root.list-view: MenuItem { text: "Remove from list"; activated => { BrowserState.list-remove(); menu.close(); } }
-                MenuItem { text: "Analyze track"; activated => { LibraryState.action("track-analyze"); menu.close(); } }
+                MenuItem { text: "Analyze track"; activated => { BrowserState.selection-action("analyze"); menu.close(); } }
                 MenuItem { text: "Analysis lock"; activated => { LibraryState.action("track-lock"); menu.close(); } }
                 MenuItem { text: "Reload tag (discard edits)"; activated => { LibraryState.action("track-reload-tag-discard"); menu.close(); } }
                 MenuItem { text: "Show in file manager"; activated => { LibraryState.action("track-show"); menu.close(); } }

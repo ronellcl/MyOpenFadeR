@@ -219,6 +219,10 @@ struct View {
     history: Vec<Track>,
     /// The track chosen in the table last.
     selected: Option<Track>,
+    /// Rows picked with Ctrl/Shift, as indices into `list` (survive sorting and filtering).
+    picked: Vec<usize>,
+    /// The row a Shift range grows from, as an index into `list`.
+    anchor: Option<usize>,
     reference: Reference,
     /// The settings the cells were last built with; refreshed by every [`View::refresh`].
     look: Look,
@@ -360,6 +364,57 @@ impl View {
     fn cursor(&self, app: &App) -> Option<usize> {
         let row = usize::try_from(app.global::<BrowserState>().get_current_row()).ok()?;
         self.shown.get(row).copied()
+    }
+
+    /// Picks `row` (a visible row) with the modifiers of a click: Shift grows from the anchor, Ctrl/Meta toggles
+    /// one, a plain click replaces the selection. The clicked track is always the one shown in the inspector.
+    pub(in crate::app::browser) fn pick(&mut self, app: &App, row: usize, ctrl: bool, shift: bool) {
+        let Some(&at) = self.shown.get(row) else {
+            return;
+        };
+        if shift {
+            if let Some(a) = self.anchor.and_then(|a| self.shown.iter().position(|&i| i == a)) {
+                let (lo, hi) = (a.min(row), a.max(row));
+                self.picked = self.shown[lo..=hi].to_vec();
+            } else {
+                self.picked = vec![at];
+            }
+        } else if ctrl {
+            if let Some(n) = self.picked.iter().position(|&i| i == at) {
+                self.picked.remove(n);
+            } else {
+                self.picked.push(at);
+            }
+        } else {
+            self.picked = vec![at];
+        }
+        self.anchor = Some(at);
+        self.selected = self.list.get(at).cloned();
+        let state = app.global::<BrowserState>();
+        state.set_picked_count(self.picked.len() as i32);
+        state.set_selection_mode(self.picked.len() > 1);
+    }
+
+    /// Forgets the multi-selection (after a delete or when the list changes).
+    pub(in crate::app::browser) fn clear_picks(&mut self, app: &App) {
+        self.picked.clear();
+        self.anchor = None;
+        let state = app.global::<BrowserState>();
+        state.set_picked_count(0);
+        state.set_selection_mode(false);
+    }
+
+    /// The picked tracks, in table order (one entry when nothing was picked but a row is chosen).
+    pub(in crate::app::browser) fn picked_tracks(&self) -> Vec<Track> {
+        let mut at = self.picked.clone();
+        at.sort_unstable();
+        at.dedup();
+        if at.is_empty() {
+            return self.selected.iter().cloned().collect();
+        }
+        at.into_iter()
+            .filter_map(|i| self.list.get(i).cloned())
+            .collect()
     }
 }
 

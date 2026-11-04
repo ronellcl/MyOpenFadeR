@@ -396,6 +396,8 @@ impl View {
         if let Some((col, asc)) = self.sort.filter(|_| !self.ordered()) {
             filter::sort(&mut self.shown, &self.list, &facts, col, asc, &look);
         }
+        // A row filtered or sorted out stops being picked; the rest keep their track identity.
+        self.picked.retain(|i| self.shown.contains(i));
         let rows: Vec<_> = self
             .shown
             .iter()
@@ -404,6 +406,8 @@ impl View {
         self.rows.set_vec(rows);
         self.strips.reset(self.shown.len());
         let state = app.global::<BrowserState>();
+        state.set_picked_count(self.picked.len() as i32);
+        state.set_selection_mode(self.picked.len() > 1);
         state.set_location(self.location().into());
         state.set_list_title(self.list_name().into());
         state.set_list_detail(self.list_detail().into());
