@@ -220,7 +220,7 @@ impl View {
         if let Ok(playlists) = lib.playlists() {
             if let Some(folder) = self.sources.get_mut(d).and_then(|s| s.folders.get_mut(j)) {
                 // The parent now has sub-folders: the tree marks it and lists them after its own subtree, prefixed
-                // with its id so a deeper level opens the right path. The full pass may have listed them already.
+                // with its id so a deeper level opens the right path. A level already read is in `levels`.
                 if let Some(at) = folder.playlists.iter().position(|p| p.id == id) {
                     let depth = folder.playlists[at].depth;
                     folder.playlists[at].is_folder = true;

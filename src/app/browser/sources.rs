@@ -5,9 +5,9 @@
 //! Track menus, the strip button). Devices are polled once a second: plugging one in or out updates the tree, and a device
 //! with a library is read as soon as it appears. Every source is read on a worker thread (a USB stick or a big Explorer tree
 //! takes seconds), with its steps in the status bar's loading line ([`loading`]) and a toast when done. A plain folder kind
-//! (Explorer, a device's top folder, a pinned or a system folder) is read in two passes on the same worker: its tag cache
-//! alone lists it at once ([`View::source_interim`], and the tree's rows show without the unread tags), then the full pass
-//! ([`View::source_read`]) fills the tags behind the listing.
+//! (Explorer, a device's top folder, a pinned or a system folder) is listed one level at a time, from its tag cache
+//! ([`Folder::open_level`]): its files and its immediate subfolders, never the whole tree ([`View::source_level`]).
+//! Walking a tree is an explicit action, not part of opening a folder.
 
 use super::{
     loading,
@@ -832,8 +832,8 @@ impl View {
     }
 
     /// Puts a top-level folder's read into the source that owns it ([`Source::folder_libs`], found by path over
-    /// the device and the volumes that list it). The interim listing of [`Folder::open_level`] fills it too,
-    /// and the full read ([`View::source_read`]) replaces it when it lands.
+    /// the device and the volumes that list it). The level listing of [`Folder::open_level`] fills it, and a
+    /// later listing of the same folder replaces it.
     fn store_folder(&mut self, path: &Path, lib: &Rc<dyn Library>, playlists: &[Playlist]) {
         for s in &mut self.sources {
             if let Some(at) = s.folders.iter().position(|f| f.path.as_path() == path) {
@@ -846,8 +846,7 @@ impl View {
         }
     }
 
-    /// The top-level folder `path` was read ([`View::source_read`], or its interim [`View::source_interim`]):
-    /// its [`Source::folder_reading`] drops.
+    /// The top-level folder `path` was listed ([`View::source_level`]): its [`Source::folder_reading`] drops.
     fn clear_folder_reading(&mut self, path: &Path) {
         let shown = path.to_string_lossy().into_owned();
         for s in &mut self.sources {
@@ -857,45 +856,47 @@ impl View {
         }
     }
 
-    /// Source `kind` was listed from its tag cache alone (the instant pass [`Folder::open_level`] of
-    /// [`read`]): its rows show now, and the full pass ([`View::source_read`]) fills the tags when it lands.
-    /// No toast (the full pass reports itself); the loading line keeps the read's place in the status bar.
-    fn source_interim(&mut self, app: &App, kind: Kind, read: Read, secs: f32) {
+    /// Plain folder `kind` was listed by level ([`read`], [`Folder::open_level`]): the files and subfolders of
+    /// one directory, from the tag cache alone. It is the final result of opening a folder, so no recursive
+    /// walk follows; walking a whole tree is an explicit action, not part of showing a folder.
+    fn source_level(&mut self, app: &App, kind: Kind, read: Read, secs: f32) {
+        loading(app, "", None);
         // A device's or volume's top-level folder: its library goes into the folder it belongs to.
         if let Kind::DeviceFolder { path } = &kind {
+            self.clear_folder_reading(path);
             let (listed, text) = match read {
                 Ok((lib, playlists, tracks, _)) => {
                     let lib: Rc<dyn Library> = Rc::<dyn Library + Send>::from(lib);
                     self.store_folder(path, &lib, &playlists);
+                    let folders = playlists.len();
                     let s_ = |n: usize| if n == 1 { "" } else { "s" };
                     (
                         true,
                         format!(
-                            "{}: {tracks} track{} listed ({secs:.1} s)",
+                            "{}: {tracks} track{}, {folders} folder{} in this folder ({secs:.1} s)",
                             kind.short(),
                             s_(tracks),
+                            s_(folders),
                         ),
                     )
                 }
-                // The full pass repeats the listing and reports it when it fails for good.
                 Err(e) => (false, format!("{}: cannot read it: {e}", kind.short())),
             };
-            self.clear_folder_reading(path);
-            if listed {
-                loading(app, &format!("{}: filling tags…", kind.short()), Some(0.85));
-            }
             eprintln!("{text}");
+            self.say(app, text);
             self.rebuild(app);
             // The folder's rows are on screen: list what just arrived.
-            if matches!(
-                self.entry,
-                Entry::DeviceFolder(d, j) | Entry::DeviceFolderList(d, j, _)
-                    if self
-                        .sources
-                        .get(d)
-                        .and_then(|s| s.folders.get(j))
-                        .is_some_and(|f| f.path.as_path() == path.as_path())
-            ) {
+            if listed
+                && matches!(
+                    self.entry,
+                    Entry::DeviceFolder(d, j) | Entry::DeviceFolderList(d, j, _)
+                        if self
+                            .sources
+                            .get(d)
+                            .and_then(|s| s.folders.get(j))
+                            .is_some_and(|f| f.path.as_path() == path.as_path())
+                )
+            {
                 self.show(app);
             }
             return;
@@ -904,34 +905,24 @@ impl View {
             return; // unplugged or switched off meanwhile
         };
         let s = &mut self.sources[i];
-        let (listed, text) = match read {
+        s.reading = false;
+        let text = match read {
             Ok((lib, playlists, tracks, missing)) => {
                 let lib: Rc<dyn Library> = Rc::<dyn Library + Send>::from(lib);
-                let lists = playlists.iter().filter(|p| !p.is_folder).count();
-                // The listing alone makes the source browsable; `reading` stays set: the full pass still lands
-                // and replaces this with the tags ([`View::source_read`]).
+                let folders = playlists.len();
                 (s.lib, s.playlists, s.missing) = (Some(lib), playlists, missing);
                 let s_ = |n: usize| if n == 1 { "" } else { "s" };
-                (
-                    true,
-                    format!(
-                        "{}: {tracks} track{}, {lists} playlist{} listed ({secs:.1} s)",
-                        kind.short(),
-                        s_(tracks),
-                        s_(lists),
-                    ),
+                format!(
+                    "{}: {tracks} track{}, {folders} folder{} in this folder ({secs:.1} s)",
+                    kind.short(),
+                    s_(tracks),
+                    s_(folders),
                 )
             }
-            // The full pass repeats the listing and reports it when it fails for good.
-            Err(e) => {
-                s.reading = false;
-                (false, format!("{}: cannot read it: {e}", kind.short()))
-            }
+            Err(e) => format!("{}: cannot read it: {e}", kind.short()),
         };
-        if listed {
-            loading(app, &format!("{}: filling tags…", kind.short()), Some(0.85));
-        }
         eprintln!("{text}");
+        self.say(app, text);
         self.rebuild(app);
         if matches!(self.entry, Entry::Source(j) | Entry::SourceAll(j) | Entry::SourceList(j, _) if j == i)
         {
@@ -1011,7 +1002,7 @@ impl View {
 }
 
 /// The root of the plain folder kinds (`Explorer`, a device's top folder, a pinned or a system folder): the ones
-/// the worker lists by level from the tag cache first ([`Folder::open_level`]), before the full open.
+/// the worker lists one level at a time, from the tag cache ([`Folder::open_level`]).
 fn plain_folder(kind: &Kind) -> Option<&Path> {
     match kind {
         Kind::Explorer(p)
@@ -1024,9 +1015,8 @@ fn plain_folder(kind: &Kind) -> Option<&Path> {
 
 /// Reads `kind` off the UI thread and hands it to the browser ([`View::source_read`]). A device's library files are read
 /// through once first with byte progress (the slow part on a USB stick); opening them then comes from the page cache.
-/// A plain folder kind ([`plain_folder`]) lists its level from the tag cache first ([`Folder::open_level`]): the
-/// interim result reaches the browser at once ([`View::source_interim`]) and the full open behind it, on this same
-/// worker, replaces it when it lands.
+/// A plain folder kind ([`plain_folder`]) lists one directory at a time from its tag cache ([`Folder::open_level`])
+/// and hands that level to the browser ([`View::source_level`]): walking the whole tree is not part of opening a folder.
 fn read(app: &App, kind: Kind) {
     let weak = app.as_weak();
     std::thread::spawn(move || {
@@ -1064,9 +1054,9 @@ fn read(app: &App, kind: Kind) {
             Kind::LocalDisk { path, .. } => folder_rows(device::top_folders(path)),
             _ => Vec::new(),
         };
-        // Fase 1 of the instant browser: a plain folder kind lists from its tag cache alone first, so its rows
-        // show while a slow disk is still being read; the full open below, on this same worker, replaces the
-        // listing when it lands ([`View::source_interim`], then [`View::source_read`]).
+        // A plain folder opens one level at a time, from its tag cache: the files and subfolders of that
+        // directory. That listing is the final result, so the recursive walk below is skipped (walking the
+        // whole tree is an explicit action, never part of opening a folder).
         if let Some(p) = plain_folder(&kind) {
             let t = Instant::now();
             let listed = Folder::open_level(p).and_then(|lib| {
@@ -1087,14 +1077,12 @@ fn read(app: &App, kind: Kind) {
                     t.elapsed().as_millis()
                 ),
             }
-            let (kind, interim) = (kind.clone(), listed);
-            // A copy for the interim post: the original `weak` is the full pass's one below.
-            let weak = weak.clone();
             let _ = slint::invoke_from_event_loop(move || {
                 if let (Some(app), Some(view)) = (weak.upgrade(), super::view()) {
-                    view.borrow_mut().source_interim(&app, kind, interim, secs);
+                    view.borrow_mut().source_level(&app, kind, listed, secs);
                 }
             });
+            return;
         }
         step(format!("{name}: listing tracks and playlists"), 0.85);
         let t_open = Instant::now();
