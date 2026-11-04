@@ -57,7 +57,7 @@ use openfader::{
 };
 use playlists::{Ask, Panel};
 use sidebar::Entry;
-use slint::{ComponentHandle, ModelRc, StandardListViewItem, Timer, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, StandardListViewItem, Timer, VecModel};
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Duration};
 use table::{Look, Reference};
 
@@ -372,6 +372,7 @@ impl View {
         let Some(&at) = self.shown.get(row) else {
             return;
         };
+        let before = self.picked.clone();
         if shift {
             if let Some(a) = self.anchor.and_then(|a| self.shown.iter().position(|&i| i == a)) {
                 let (lo, hi) = (a.min(row), a.max(row));
@@ -393,15 +394,30 @@ impl View {
         let state = app.global::<BrowserState>();
         state.set_picked_count(self.picked.len() as i32);
         state.set_selection_mode(self.picked.len() > 1);
+        self.repaint_picked(&before);
+    }
+
+    /// Repaints only the visible rows whose picked state changed (`before` = the previous `picked`).
+    fn repaint_picked(&self, before: &[usize]) {
+        for (visible, &i) in self.shown.iter().enumerate() {
+            let (was, now) = (before.contains(&i), self.picked.contains(&i));
+            if was != now {
+                if let Some(row) = self.rows.row_data(visible) {
+                    row.set_row_data(table::PICKED, if now { "1" } else { "" }.into());
+                }
+            }
+        }
     }
 
     /// Forgets the multi-selection (after a delete or when the list changes).
     pub(in crate::app::browser) fn clear_picks(&mut self, app: &App) {
+        let before = self.picked.clone();
         self.picked.clear();
         self.anchor = None;
         let state = app.global::<BrowserState>();
         state.set_picked_count(0);
         state.set_selection_mode(false);
+        self.repaint_picked(&before);
     }
 
     /// The picked tracks, in table order (one entry when nothing was picked but a row is chosen).
