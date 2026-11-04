@@ -127,6 +127,14 @@ fn native() -> (Option<u64>, Option<u64>) {
 }
 
 #[cfg(target_os = "macos")]
+unsafe extern "C" {
+    /// Mach trap that releases the send right `mach_host_self` acquired (libc 0.2 no longer
+    /// exposes it; both ports are `u32` on macOS).
+    fn mach_port_deallocate(task: libc::mach_port_t, name: libc::mach_port_t)
+        -> libc::kern_return_t;
+}
+
+#[cfg(target_os = "macos")]
 #[allow(deprecated)]
 fn mac_available() -> Option<u64> {
     let mut info = std::mem::MaybeUninit::<libc::vm_statistics64_data_t>::zeroed();
@@ -141,7 +149,7 @@ fn mac_available() -> Option<u64> {
             &mut count,
         )
     };
-    unsafe { libc::mach_port_deallocate(libc::mach_task_self(), host) };
+    unsafe { mach_port_deallocate(libc::mach_task_self(), host) };
     if status != libc::KERN_SUCCESS || count != libc::HOST_VM_INFO64_COUNT {
         return None;
     }
