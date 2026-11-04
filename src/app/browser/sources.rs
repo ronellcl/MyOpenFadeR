@@ -825,8 +825,11 @@ impl View {
         toast::show(app, &text);
         self.say(app, text);
         self.rebuild(app);
-        if matches!(self.entry, Entry::Source(j) | Entry::SourceAll(j) | Entry::SourceList(j, _) if j == i)
-        {
+        if matches!(
+            self.entry,
+            Entry::Source(j) | Entry::Pinned(j) | Entry::SourceAll(j) | Entry::SourceList(j, _)
+                if j == i
+        ) {
             self.show(app);
         }
     }
@@ -924,8 +927,11 @@ impl View {
         eprintln!("{text}");
         self.say(app, text);
         self.rebuild(app);
-        if matches!(self.entry, Entry::Source(j) | Entry::SourceAll(j) | Entry::SourceList(j, _) if j == i)
-        {
+        if matches!(
+            self.entry,
+            Entry::Source(j) | Entry::Pinned(j) | Entry::SourceAll(j) | Entry::SourceList(j, _)
+                if j == i
+        ) {
             self.show(app);
         }
     }

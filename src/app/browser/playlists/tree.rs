@@ -256,6 +256,7 @@ impl View {
         self.entry = e;
         match self.entry {
             Entry::Source(i) => self.open_source(app, i),
+            Entry::Pinned(i) => self.open_source(app, i),
             Entry::SystemFolder(i) => self.open_source(app, i),
             Entry::OnlinePlugin(i) => self.open_source(app, i),
             Entry::OnlineSearch(i, _) => self.open_source(app, i),
@@ -298,13 +299,8 @@ impl View {
                 }
                 self.rebuild(app);
             }
-            // A pinned folder: click pins/unpins it (the FAV toggle works on the chosen row).
-            Entry::Pinned(i) => {
-                self.entry = Entry::Pinned(i);
-                self.toggle_favorite(app);
-                self.rebuild(app);
-                self.show(app);
-            }
+            // A pinned folder is a leaf: clicking it opens it (select handles the read); it never
+            // unpins on a click. Unpinning is the FAV chip or the tree's context menu.
             _ => {}
         }
     }
