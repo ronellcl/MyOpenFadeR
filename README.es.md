@@ -27,7 +27,15 @@ MyOpenFadeR es un fork de [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): una
 
 Todas las capturas de esta página salen de la aplicación en marcha, con una biblioteca de pistas sintéticas generadas para estas imágenes. No hay música con derechos en ellas.
 
-## Novedades de la 0.5.1
+## Novedades de la 0.5.2
+
+La 0.5.2 rediseña el árbol del navegador, con iconos y un orden más claro:
+
+- **Online Music** lista YouTube y Deezer (y sus playlists) desde la biblioteca, cada uno con su propia entrada **Downloads**. SoundCloud se oculta porque su plugin solo descarga avances de 37 segundos.
+- **Library (read-only)** ahora muestra solo las listas que no son de proveedores, y desaparece cuando está vacía; vuelve automáticamente cuando aparece una lista.
+- El árbol empieza por **All tracks**, seguido de Favorites, Tag List, Session history, duplicados, My Playlists (plegable), Cue Banks, History, Tags, Local Music con sus dispositivos y Online Music.
+
+### 0.5.1
 
 La 0.5.1 corrige la reproducción congelada cuando una interfaz de audio no puede ejecutar el formato de canales que anuncia:
 
