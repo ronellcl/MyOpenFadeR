@@ -30,6 +30,8 @@ const STALLED: u8 = 3;
 const RECOVERING: u8 = 4;
 const RETRY: Duration = Duration::from_secs(1);
 const STALL: Duration = Duration::from_secs(2);
+/// How long a new stream must last before its device counts as healthy again (see [`Engine::recover`]).
+const HEALTHY: Duration = Duration::from_secs(10);
 
 /// What the watchdog and the stream callbacks agree on: the state of the output, how many callbacks it made, which
 /// stream those belong to, and the headphone stream's own failure latch.
@@ -227,6 +229,11 @@ pub(super) struct Engine {
     cue: RefCell<Option<cue::Cue>>,
     health: Arc<Health>,
     recovery: RefCell<Option<Recovery>>,
+    /// Recoveries since the output last called back. A stream can start and die at once, so this counts attempts
+    /// across `install` successes; it resets only after the output ran for a while ([`HEALTHY`]).
+    attempts: Cell<u32>,
+    /// When the last recovery attempt opened a stream: a long healthy run clears [`Engine::attempts`].
+    last_attempt_at: Cell<Option<Instant>>,
 }
 
 /// A device an output stopped playing on, waiting for its next reconnect attempt.
@@ -249,7 +256,13 @@ impl Engine {
         let shared = [(); SLOTS].map(|_| Arc::new(Shared::new()));
         match Engine::build(&shared) {
             Ok(e) => Ok(e),
-            Err(first) if !output::settings().same_stream(&Settings::default()) => {
+            Err(first)
+                if !output::settings().same_stream(&Settings::default())
+                    || output::controller().is_some() =>
+            {
+                // A controller's audio interface can fail while the settings themselves
+                // are the defaults: drop that preference too before retrying.
+                output::set_wanted(None);
                 let keep = output::settings();
                 output::replace_settings(Settings {
                     device: String::new(),
@@ -288,6 +301,8 @@ impl Engine {
             cue: RefCell::new(out.cue.take()),
             health,
             recovery: RefCell::new(None),
+            attempts: Cell::new(0),
+            last_attempt_at: Cell::new(None),
         })
     }
 
@@ -331,9 +346,19 @@ impl Engine {
         !self.health.failed()
     }
 
-    /// Reconnects the output the status names when the health says it is gone. The device stays the same: a retry never
-    /// replaces it with the system default, and at most one attempt runs per [`RETRY`].
+    /// Reconnects the output the status names when the health says it is gone. The first retry keeps the same device;
+    /// after two consecutive failures it stops pinning it and lets the system default play in stereo, so a device that
+    /// advertises a layout it cannot run (a controller's 4-channel interface, say) does not silence the app.
     fn recover(&self, now: Instant) {
+        // A stream that has run for a while is healthy: forget earlier recoveries. Counting only short-lived
+        // streams is what lets a device that starts and dies at once reach the fallback.
+        if self
+            .last_attempt_at
+            .get()
+            .is_none_or(|t| now.duration_since(t) >= HEALTHY)
+        {
+            self.attempts.set(0);
+        }
         if self.available() {
             self.recovery.borrow_mut().take();
             output::set_recovery(None);
@@ -358,8 +383,38 @@ impl Engine {
             self.recovery.replace(Some(recovery));
             return;
         }
-        output::set_recovery(Some((recovery.name.clone(), recovery.source)));
-        match choose().and_then(|out| self.install(out)) {
+        let attempts = self.attempts.get().saturating_add(1);
+        self.attempts.set(attempts);
+        self.last_attempt_at.set(Some(now));
+        // The first two retries keep the device (a cable may have been reseated). A
+        // third consecutive recovery means the device or its layout does not run here:
+        // stop pinning it and let the system default play. The preferences stay
+        // untouched; a later CONFIGURE or controller connect can try them again.
+        let fallback = attempts >= 3;
+        if fallback {
+            output::set_recovery(None);
+            output::set_wanted(None);
+            output::replace_settings(Settings {
+                device: String::new(),
+                rate: 0,
+                buffer: 0,
+                mixer: route::Mixer::Internal,
+                master: 1,
+                phones: 0,
+                booth: 0,
+                ..output::settings()
+            });
+            output::note_error(format!(
+                "{}: the output did not start after two retries; using the system default",
+                recovery.name
+            ));
+        } else {
+            output::set_recovery(Some((recovery.name.clone(), recovery.source)));
+        }
+        output::set_force_stereo(fallback);
+        let result = choose().and_then(|out| self.install(out));
+        output::set_force_stereo(false);
+        match result {
             Ok(_) => {}
             Err(e) => {
                 self.health.state.store(RECOVERING, Relaxed);
@@ -501,6 +556,8 @@ mod tests {
             cue: RefCell::new(None),
             health: Arc::new(Health::default()),
             recovery: RefCell::new(None),
+            attempts: Cell::new(0),
+            last_attempt_at: Cell::new(None),
         });
         let player = Player {
             shared: engine.shared[0].clone(),

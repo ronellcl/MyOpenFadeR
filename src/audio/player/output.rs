@@ -52,6 +52,8 @@ thread_local! {
     static STATUS: RefCell<Status> = RefCell::new(Status::default());
     /// The exact device a recovery is retrying and where that choice came from (`None` = no recovery).
     static RECOVERY: RefCell<Option<(String, &'static str)>> = const { RefCell::new(None) };
+    /// A recovery gave up on the device's layout: the next stream is plain stereo.
+    static FORCE_STEREO: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// Pins the next [`choose`] to the exact device a recovery is retrying; `None` gives the normal precedence back.
@@ -76,6 +78,15 @@ pub(super) fn replace_wanted(w: Option<String>) -> Option<String> {
 
 pub(super) fn set_wanted(w: Option<String>) {
     WANTED.set(w);
+}
+
+/// Forces the next [`choose`] to a plain stereo plan (see [`prepare`]).
+pub(super) fn set_force_stereo(on: bool) {
+    FORCE_STEREO.set(on);
+}
+
+fn force_stereo() -> bool {
+    FORCE_STEREO.get()
 }
 
 /// The controller whose audio interface the app was asked to use (`set_output(Some(name))`, `None` = none connected / the
@@ -135,7 +146,7 @@ fn find_wanted(want: &str) -> Result<(String, cpal::Device), String> {
         .ok_or_else(|| format!("no output device named like {want:?}"))
 }
 
-/// The exact device a recovery retry asks for: never another one, and never the system default.
+/// The exact device a recovery retry asks for: never another one. The engine drops the pin after repeated failures.
 fn recovery_device(name: &str) -> Result<cpal::Device, String> {
     if device::unplugged(name) {
         return Err(format!("nothing is plugged into {name:?}"));
@@ -143,8 +154,29 @@ fn recovery_device(name: &str) -> Result<cpal::Device, String> {
     device::output_named(name).ok_or_else(|| format!("{name:?} is not available"))
 }
 
+/// The system default output, unless it is an HDMI/DisplayPort with nothing plugged in (it opens and plays silence);
+/// in that case, another output that is plugged in. `notes` explains the choice in the status.
+fn system_output(notes: &mut Vec<String>) -> Result<(String, cpal::Device), String> {
+    use cpal::traits::HostTrait;
+    let (name, dev) = device::default_output()?;
+    if !device::unplugged(&name) {
+        return Ok((name, dev));
+    }
+    notes.push(format!(
+        "nothing is plugged into {name:?} (no screen or receiver): using another output"
+    ));
+    let other = cpal::default_host()
+        .output_devices()
+        .map_err(|e| format!("cannot list output devices: {e}"))?
+        .filter_map(|d| Some((d.name().ok()?, d)))
+        .find(|(n, _)| n != &name && !device::unplugged(n));
+    other.ok_or_else(|| {
+        format!("nothing is plugged into {name:?} and no other output is available")
+    })
+}
+
 /// Device, config and layout for the next stream (see the module doc for the precedence). A pending recovery pins the
-/// exact device it names; it does not fall back to the system default.
+/// exact device it names; after repeated failures the engine drops the pin, so the system default can play.
 pub(super) fn choose() -> Result<Output, String> {
     if let Some((name, source)) = RECOVERY.with_borrow(Clone::clone) {
         let dev = recovery_device(&name)?;
@@ -180,13 +212,13 @@ pub(super) fn choose() -> Result<Output, String> {
                     } else {
                         format!("{:?} is not available: the system default plays", set.device)
                     });
-                    let (n, d) = device::default_output()?;
+                    let (n, d) = system_output(&mut notes)?;
                     (n, d, "system default")
                 }
             }
         }
         (None, None) => {
-            let (n, d) = device::default_output()?;
+            let (n, d) = system_output(&mut notes)?;
             (n, d, "system default")
         }
     };
@@ -205,7 +237,7 @@ fn prepare(
     let external = set.mixer == Mixer::External;
     let (cue_want, hp_env) = (env(cue::ENV), env(bus::HP_ENV));
     // Headphones on this device's own channels, unless a second device was asked for. A failure is kept for the UI, never papered over.
-    let mut multi = if external {
+    let mut multi = if external || force_stereo() {
         Ok(None)
     } else {
         match (&cue_want, &hp_env) {
