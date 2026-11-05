@@ -41,6 +41,7 @@ overrides:
       - libudev1
       - libgl1
       - libegl1
+      - ffmpeg
   archlinux:
     depends:
       - alsa-lib
@@ -49,3 +50,4 @@ overrides:
       - wayland
       - systemd-libs
       - libglvnd
+      - ffmpeg

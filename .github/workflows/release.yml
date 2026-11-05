@@ -145,6 +145,10 @@ jobs:
             pkgroot/usr/share/applications \
             pkgroot/usr/share/icons/hicolor/256x256/apps
           cp -a "$d"/. pkgroot/opt/myopenfader/
+          # The system packages use the distribution's ffmpeg (a dependency): the static
+          # copies would push each package past GitHub's 100 MB file limit. The portable
+          # tar.gz keeps them, so a fully self-contained install is still available.
+          rm -rf pkgroot/opt/myopenfader/tools
           ln -s /opt/myopenfader/openfader pkgroot/usr/bin/openfader
           cp packaging/linux/openfader.desktop pkgroot/usr/share/applications/
           cp assets/icon.png pkgroot/usr/share/icons/hicolor/256x256/apps/openfader.png
