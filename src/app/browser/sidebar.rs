@@ -244,7 +244,8 @@ fn online_source(i: &Inputs, plugin: &str) -> Option<usize> {
 /// Every row's entry and label, in display order.
 pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
     let mut rows: Vec<(Entry, String)> = Vec::new();
-    // Favorites stay at the top, where the user expects them.
+    // All tracks is the first row: the whole collection is what the browser opens on.
+    rows.push((Entry::All, "All tracks".to_owned()));
     let pinned: Vec<usize> = i
         .sources
         .iter()
@@ -258,7 +259,6 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             rows.push((Entry::Pinned(*n), indent(1, &format!("★ {}", i.sources[*n].name))));
         }
     }
-    rows.push((Entry::All, "All tracks".to_owned()));
     rows.push((Entry::Tags, format!("Tag List ({})", i.tag_list)));
     rows.push((Entry::Session, format!("Session history ({})", i.session)));
     rows.push((Entry::Dupes, "Duplicate tracks".to_owned()));
@@ -707,8 +707,8 @@ mod tests {
         assert_eq!(
             labels,
             [
-                "▸ Favorites",
                 "All tracks",
+                "▸ Favorites",
                 "Tag List (2)",
                 "Session history (4)",
                 "Duplicate tracks",
@@ -765,8 +765,8 @@ mod tests {
         assert_eq!(
             e,
             [
-                Entry::FavoritesRoot,
                 Entry::All,
+                Entry::FavoritesRoot,
                 Entry::Tags,
                 Entry::Session,
                 Entry::Dupes,
