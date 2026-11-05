@@ -480,6 +480,10 @@ impl View {
                 pinned: s.is_pinned(),
                 system_folder: matches!(s.kind, Kind::SystemFolder { .. }),
                 online_plugin: matches!(s.kind, Kind::OnlinePlugin { .. }),
+                plugin: match &s.kind {
+                    Kind::OnlinePlugin { plugin, .. } => Some(plugin.clone()),
+                    _ => None,
+                },
                 name: s.name.clone(),
                 open: s.lib.is_some(),
                 playlists: s.playlists.clone(),

@@ -8,7 +8,7 @@
 use crate::app::TreeRow;
 use openfader::{
     library::{Playlist, Track},
-    plugin::device::MAX_BANKS,
+    plugin::{device::MAX_BANKS, source},
     store::{HotCueBank, Tag, TagGroup, Node, NodeKind},
 };
 use std::collections::{HashMap, HashSet};
@@ -56,12 +56,18 @@ pub enum Entry {
     /// "Online Music" heading above the cloud plugins.
     OnlineMusicRoot,
     /// A cloud plugin source (Deezer, YouTube, SoundCloud): its sub-entries (Search, Downloads…) are listed under it.
+    /// Kept for the older tree layout; the providers now come from the library's `plugin:` rows.
+    #[allow(dead_code)]
     OnlinePlugin(usize),
     /// Search entry of a cloud plugin: (plugin index, sub-index).
+    /// Kept for the older tree layout; providers now list their library search row.
+    #[allow(dead_code)]
     OnlineSearch(usize, usize),
     /// Downloads entry of a cloud plugin: (plugin index, sub-index).
     OnlineDownloads(usize, usize),
     /// A playlist entry of a cloud plugin: (plugin index, playlist index).
+    /// Kept for the older tree layout; providers now list their library playlists.
+    #[allow(dead_code)]
     OnlinePlaylist(usize, usize),
     /// An external source (a device, iTunes, library xml, Explorer) by index into the browser's sources; it opens when chosen.
     Source(usize),
@@ -90,6 +96,9 @@ pub struct SourceRows {
     pub system_folder: bool,
     /// A cloud plugin source (Deezer, YouTube, SoundCloud): its sub-entries are listed under it.
     pub online_plugin: bool,
+    /// The plugin name of a cloud source (`yt-dlp`, `deezer`): the provider rows of the library
+    /// look their Downloads entry up by it.
+    pub plugin: Option<String>,
     pub name: String,
     /// Opened: its "All tracks" and playlists are listed under it.
     pub open: bool,
@@ -172,6 +181,64 @@ fn playlist_label(base: usize, p: &Playlist, open: bool) -> String {
             ""
         }, p.name),
     )
+}
+
+/// The top-level library lists and how many rows hang below each (depth-first).
+fn lib_roots(lib: &[Playlist]) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while at < lib.len() {
+        let children = lib[at + 1..]
+            .iter()
+            .take_while(|c| c.depth > lib[at].depth)
+            .count();
+        if lib[at].depth == 0 {
+            out.push((at, children));
+        }
+        at += 1 + children;
+    }
+    out
+}
+
+/// The rows under library list `at`, folded branches left out (`base` is the indent of its own row).
+fn lib_children(i: &Inputs, at: usize, children: usize, base: usize) -> Vec<(Entry, String)> {
+    let end = at + 1 + children;
+    let mut out = Vec::new();
+    let mut k = at + 1;
+    while k < end {
+        let c = &i.lib[k];
+        let nested = i.lib[k + 1..end]
+            .iter()
+            .take_while(|x| x.depth > c.depth)
+            .count();
+        let folded = i.folded_lib.contains(&k);
+        out.push((Entry::Lib(k), playlist_label(base, c, !folded)));
+        if nested > 0 && !folded {
+            out.extend(lib_children(i, k, nested, base));
+        }
+        k += 1 + nested;
+    }
+    out
+}
+
+/// The plugin name of an online provider root (`plugin:<plugin>:<source>`), else `None`.
+fn online_root(id: &str) -> Option<&str> {
+    if !source::is_plugin(id) || source::is_search(id) {
+        return None;
+    }
+    id.strip_prefix(source::PREFIX)?.split(':').next()
+}
+
+/// Providers the tree leaves out: SoundCloud's plugin only fetches 37-second previews.
+fn hidden_provider(name: &str) -> bool {
+    name.to_lowercase().contains("soundcloud")
+}
+
+/// Index of the online source of `plugin` (what its Downloads entry reads).
+fn online_source(i: &Inputs, plugin: &str) -> Option<usize> {
+    i.sources
+        .iter()
+        .position(|s| s.plugin.as_deref() == Some(plugin))
 }
 
 /// Every row's entry and label, in display order.
@@ -299,7 +366,8 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             }
         }
     }
-    // ── Online Music: cloud plugins (YouTube, SoundCloud, Deezer) ─────────────
+    // ── Online Music: the provider rows the library exposes (YouTube,
+    //    SoundCloud, Deezer), each with its own playlists and a Downloads entry ──
     if i.sections.online_music {
         let online_folded = i.folded_sections.contains(&Entry::OnlineMusicRoot);
         rows.push((
@@ -307,68 +375,48 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             if online_folded { "▸ Online Music" } else { "▾ Online Music" }.to_owned(),
         ));
         if !online_folded {
-            let online: Vec<usize> = i
-                .sources
-                .iter()
-                .enumerate()
-                .filter(|(_, s)| s.online_plugin)
-                .map(|(n, _)| n)
-                .collect();
-            for n in &online {
-                rows.push((
-                    Entry::OnlinePlugin(*n),
-                    indent(1, &format!("▸ {}", i.sources[*n].name)),
-                ));
-                rows.push((Entry::OnlineSearch(*n, 0), indent(2, "Search")));
-                rows.push((Entry::OnlineDownloads(*n, 0), indent(2, "Downloads")));
-                // YouTube also offers its popular music videos. When the plugin lists it as a
-                // playlist we show that; otherwise the search entry is the closest it offers.
-                if i.sources[*n].name.to_lowercase().contains("youtube") {
-                    let popular = i.sources[*n]
-                        .playlists
-                        .iter()
-                        .position(|p| !p.is_folder && p.name.to_lowercase().contains("popular"));
-                    match popular {
-                        Some(j) => rows.push((
-                            Entry::OnlinePlaylist(*n, j),
-                            indent(2, "Popular Music Videos"),
-                        )),
-                        None => rows.push((
-                            Entry::OnlineSearch(*n, 1),
-                            indent(2, "Popular Music Videos"),
-                        )),
-                    }
+            for (at, children) in lib_roots(i.lib) {
+                let p = &i.lib[at];
+                let Some(plugin) = online_root(&p.id) else {
+                    continue;
+                };
+                // SoundCloud is left out: its plugin only downloads a 37-second preview.
+                if hidden_provider(&p.name) {
+                    continue;
                 }
-                // SoundCloud's example playlists come from the library plugin's lists.
-                for (j, p) in i.sources[*n].playlists.iter().enumerate() {
-                    if !p.is_folder {
-                        rows.push((Entry::OnlinePlaylist(*n, j), indent(2, &p.name)));
-                    }
+                let folded = i.folded_lib.contains(&at);
+                rows.push((
+                    Entry::Lib(at),
+                    indent(
+                        1,
+                        &format!("{} {}", if folded { "▸" } else { "▾" }, p.name),
+                    ),
+                ));
+                if folded {
+                    continue;
+                }
+                rows.extend(lib_children(i, at, children, 1));
+                if let Some(n) = online_source(i, plugin) {
+                    rows.push((Entry::OnlineDownloads(n, 0), indent(2, "Downloads")));
                 }
             }
         }
     }
-    // ── Library (read-only): only when it has something to show ───────────────
-    if !i.lib.is_empty() {
+    // ── Library (read-only): whatever is not an online provider; hidden when empty ──
+    if lib_roots(i.lib)
+        .iter()
+        .any(|(at, _)| online_root(&i.lib[*at].id).is_none())
+    {
         rows.push((Entry::LibRoot, "▸ Library (read-only)".to_owned()));
-        // A list with lists under it folds them (the plugin sources come this way).
-        let mut at = 0;
-        while at < i.lib.len() {
+        for (at, children) in lib_roots(i.lib) {
             let p = &i.lib[at];
-            let children = i.lib[at + 1..]
-                .iter()
-                .take_while(|c| c.depth > p.depth)
-                .count();
+            if online_root(&p.id).is_some() {
+                continue; // it lives under Online Music now
+            }
             rows.push((Entry::Lib(at), playlist_label(1, p, false)));
             if children > 0 && !i.folded_lib.contains(&at) {
-                rows.extend(
-                    i.lib[at + 1..at + 1 + children]
-                        .iter()
-                        .enumerate()
-                        .map(|(k, c)| (Entry::Lib(at + 1 + k), playlist_label(1, c, false))),
-                );
+                rows.extend(lib_children(i, at, children, 1));
             }
-            at += 1 + children;
         }
     }
     // ── Other sources (Explorer, iTunes, xml plugins) on their own ────────────
@@ -406,7 +454,14 @@ fn icon_of(entry: &Entry, i: &Inputs) -> &'static str {
         Entry::UserRoot | Entry::SystemFolder(_) => "folder",
         Entry::User(_) => "list",
         Entry::BankRoot | Entry::Bank(_) => "mixer",
-        Entry::LibRoot | Entry::Lib(_) => "library",
+        Entry::LibRoot => "library",
+        Entry::Lib(at) => match i.lib.get(*at) {
+            Some(p) if p.depth == 0 && online_root(&p.id).is_some() => {
+                provider_icon(&p.name)
+            }
+            Some(p) if p.is_folder => "folder",
+            _ => "list",
+        },
         Entry::DevicesRoot => "usb",
         Entry::DownloadedRoot => "download",
         Entry::FavoritesRoot | Entry::Pinned(_) => "star",
@@ -774,6 +829,7 @@ mod tests {
             pinned: false,
             system_folder: false,
             online_plugin: false,
+            plugin: None,
             name: name.into(),
             open: false,
             playlists: Vec::new(),
@@ -811,6 +867,93 @@ mod tests {
         assert!(!labels.iter().any(|l| l == "▸ YouTube"));
     }
 
+    /// The online providers are the library's `plugin:` rows, with their playlists and a Downloads entry;
+    /// SoundCloud is left out and the read-only Library disappears when only providers were in it.
+    #[test]
+    fn online_providers_come_from_the_library_and_soundcloud_is_hidden() {
+        let provider = |id: &str, name: &str| Playlist {
+            id: id.into(),
+            name: name.into(),
+            depth: 0,
+            is_folder: true,
+        };
+        let child = |id: &str, name: &str| Playlist {
+            id: id.into(),
+            name: name.into(),
+            depth: 1,
+            is_folder: false,
+        };
+        let lib = [
+            provider("plugin:yt-dlp:youtube", "YouTube"),
+            child("plugin:yt-dlp:youtube:search", "Search"),
+            child("plugin:yt-dlp:youtube:list:popular", "Popular Music Videos"),
+            provider("plugin:yt-dlp:soundcloud", "SoundCloud"),
+            child("plugin:yt-dlp:soundcloud:search", "Search"),
+            provider("plugin:deezer:deezer", "Deezer"),
+        ];
+        let online = |plugin: &str, name: &str| SourceRows {
+            device: false,
+            local: false,
+            downloaded: false,
+            pinned: false,
+            system_folder: false,
+            online_plugin: true,
+            plugin: Some(plugin.into()),
+            name: name.into(),
+            open: false,
+            playlists: Vec::new(),
+            missing: Vec::new(),
+            folders: Vec::new(),
+        };
+        let sources = [
+            online("yt-dlp", "YouTube / SoundCloud"),
+            online("deezer", "Deezer"),
+        ];
+        let inputs = Inputs {
+            tag_list: 0,
+            session: 0,
+            lib: &lib,
+            nodes: &[],
+            days: &[],
+            cats: &[],
+            tags: &[],
+            sources: &sources,
+            all_tracks: false,
+            cue_analysis: None,
+            banks: None,
+            sections: Sections::default(),
+            folded: &HashSet::new(),
+            folded_lib: &HashSet::new(),
+            folded_sections: &HashSet::new(),
+            folded_folders: &HashSet::new(),
+            day_names: &HashMap::new(),
+        };
+        let (entries, labels) = build(&inputs);
+        let has = |needle: &str| labels.iter().any(|l| l.contains(needle));
+        assert!(has("▾ YouTube"));
+        assert!(has("Search"));
+        assert!(has("Popular Music Videos"));
+        assert_eq!(
+            labels.iter().filter(|l| l.contains("Downloads")).count(),
+            2,
+            "one per visible provider"
+        );
+        assert!(has("▾ Deezer"));
+        assert!(!has("SoundCloud"), "its plugin only fetches 37-second previews");
+        assert!(!has("Library (read-only)"), "no non-provider lists remain");
+        assert!(entries.contains(&Entry::OnlineDownloads(0, 0)));
+        assert!(entries.contains(&Entry::OnlineDownloads(1, 0)));
+        let rows = tree_rows(&entries, &labels, &inputs);
+        let icon = |name: &str| {
+            rows.iter()
+                .find(|r| r.label == name)
+                .map(|r| r.icon.as_str())
+                .unwrap()
+        };
+        assert_eq!(icon("YouTube"), "youtube");
+        assert_eq!(icon("Deezer"), "deezer");
+    }
+
     /// A device lists its top-level folders (the ones with audio) under it, each with its own subfolders.
     #[test]
     fn a_device_lists_its_own_folders() {
@@ -821,6 +964,7 @@ mod tests {
             pinned: false,
             system_folder: false,
             online_plugin: false,
+            plugin: None,
             name: "USB (vfat)".into(),
             open: false,
             playlists: Vec::new(),
@@ -871,6 +1015,7 @@ mod tests {
             pinned: false,
             system_folder: false,
             online_plugin: false,
+            plugin: None,
             name: "USB (vfat)".into(),
             open: false,
             playlists: Vec::new(),
@@ -954,6 +1099,7 @@ mod tests {
             pinned: false,
             system_folder: false,
             online_plugin: false,
+            plugin: None,
             name: "C: (OS)".into(),
             open: false,
             playlists: Vec::new(),
@@ -1061,6 +1207,7 @@ mod tests {
             pinned: false,
             system_folder: false,
             online_plugin: false,
+            plugin: None,
             name: name.into(),
             open,
             playlists: vec![pl("Set", 0, true), pl("Inner", 1, false)],
