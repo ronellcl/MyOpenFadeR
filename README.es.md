@@ -27,7 +27,16 @@ MyOpenFadeR es un fork de [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): una
 
 Todas las capturas de esta página salen de la aplicación en marcha, con una biblioteca de pistas sintéticas generadas para estas imágenes. No hay música con derechos en ellas.
 
-## Novedades de la 0.5.0
+## Novedades de la 0.5.1
+
+La 0.5.1 corrige la reproducción congelada cuando una interfaz de audio no puede ejecutar el formato de canales que anuncia:
+
+- **El audio vuelve a una salida que funciona.** Cuando un controlador o una salida HDMI falla repetidamente (por ejemplo, un DDJ-FLX4 que expone un perfil `analog-surround-40` que PipeWire no puede ejecutar), el motor lo reintenta dos veces y luego pasa al dispositivo por defecto en estéreo. Los decks siguen sonando y el vídeo sigue avanzando en vez de esperar para siempre a un reloj congelado.
+- **Sin salidas HDMI desconectadas.** Si el dispositivo por defecto del sistema es un HDMI/DisplayPort sin pantalla, se ignora y se usa otra salida conectada.
+
+Los paquetes del sistema (`deb` y Arch) siguen usando el `ffmpeg` de la distribución.
+
+### 0.5.0
 
 La 0.5.0 pone el navegador al ritmo de la mezcla:
 

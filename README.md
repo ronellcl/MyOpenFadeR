@@ -27,7 +27,16 @@ MyOpenFadeR is a fork of [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): an o
 
 Every screenshot on this page comes from the running app, with a library of synthetic tracks generated for these pictures. There is no copyrighted music in them.
 
-## What's new in 0.5.0
+## What's new in 0.5.1
+
+0.5.1 fixes playback freezing when an audio interface cannot run the channel layout it advertises:
+
+- **Audio recovers to a working output.** When a controller or HDMI output keeps failing (for example a DDJ-FLX4 exposing an `analog-surround-40` profile that PipeWire cannot run), the engine now retries twice and then falls back to the system default in stereo. Decks keep playing and the video keeps advancing instead of waiting forever on a frozen clock.
+- **No unplugged HDMI output.** A system default that is an HDMI/DisplayPort without a screen is skipped in favour of another connected output.
+
+The system packages (`deb` and Arch) still use the distribution's `ffmpeg`.
+
+### 0.5.0
 
 0.5.0 brings the browser up to mixing speed:
 
