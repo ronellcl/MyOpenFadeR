@@ -197,11 +197,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: package-*
           path: out
           merge-multiple: true
+      - name: Build the apt and pacman repositories
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 packaging/linux/make-repo.py --version "$VERSION" --out public \
+            --deb out/*.deb --pkg out/*.pkg.tar.zst
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: public
+          force_orphan: true
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
@@ -215,8 +226,30 @@ jobs:
           body: |
             Archives (each holds the app with its themes, controller mappings and plugins, ready to run):
 
-            - **Linux** (x86_64): `MyOpenFadeR-<version>-linux-x86_64.tar.gz` (portable: unpack and run `./openfader`), or the system installers `myopenfader_<version>_amd64.deb` (Debian/Ubuntu: `sudo apt install ./myopenfader_<version>_amd64.deb`) and `myopenfader-<version>-1-x86_64.pkg.tar.zst` (Arch/CachyOS: `sudo pacman -U myopenfader-<version>-1-x86_64.pkg.tar.zst`). The installers put the app in `/opt/myopenfader`, add `openfader` to the PATH and a menu entry. Needs the usual desktop libraries (ALSA, X11 or Wayland, fontconfig). Install `zenity` or `kdialog` for the file chooser.
+            - **Linux** (x86_64): `MyOpenFadeR-<version>-linux-x86_64.tar.gz` (portable and self-contained: unpack and run `./openfader`), or the system packages `myopenfader_<version>_amd64.deb` (Debian/Ubuntu) and `myopenfader-<version>-1-x86_64.pkg.tar.zst` (Arch/CachyOS). They install into `/opt/myopenfader`, add `openfader` to the PATH and a menu entry, and use the distribution's `ffmpeg` (a package dependency).
             - **Windows** (x86_64): `MyOpenFadeR-<version>-windows-x86_64.zip`. Unzip and run `openfader.exe`. The app is not code-signed, so SmartScreen may warn: "More info" > "Run anyway".
             - **macOS** (Apple silicon): `MyOpenFadeR-<version>-macos-arm64.zip` holds `MyOpenFadeR.app`. It is **not signed or notarized**: move it to Applications, then right-click > Open (once) and confirm. If macOS says it is damaged, run `xattr -dr com.apple.quarantine /Applications/MyOpenFadeR.app`.
 
-            The archives include static `ffmpeg` and `ffprobe` (`tools/`) for video and mp3. Python 3 on the PATH is needed for the Python plugins (the Windows installer carries its own). Volume sliders of the audio page exist on Linux only: on Windows and macOS the volume is the system's.
+            ## Install from the package repository
+
+            The Linux packages are also published as an apt and pacman repository (unsigned; each client trusts it explicitly):
+
+            **Debian / Ubuntu (amd64)**
+
+            ```sh
+            echo "deb [trusted=yes] https://ronellcl.github.io/MyOpenFadeR/debian stable main" | sudo tee /etc/apt/sources.list.d/myopenfader.list
+            sudo apt update
+            sudo apt install myopenfader
+            ```
+
+            **Arch / CachyOS (x86_64)** — add this to `/etc/pacman.conf`:
+
+            ```ini
+            [myopenfader]
+            SigLevel = Optional TrustAll
+            Server = https://ronellcl.github.io/MyOpenFadeR/arch/x86_64
+            ```
+
+            then `sudo pacman -Sy myopenfader`.
+
+            The portable Linux archive, the Windows zip and the macOS app bundle include static `ffmpeg` and `ffprobe` (`tools/`); the Linux system packages use the distribution's. Python 3 on the PATH is needed for the Python plugins (the Windows installer carries its own). Volume sliders of the audio page exist on Linux only: on Windows and macOS the volume is the system's.
