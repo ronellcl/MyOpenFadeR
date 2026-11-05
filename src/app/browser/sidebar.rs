@@ -5,17 +5,13 @@
 //! the store), **History** (one entry per day the store logged), **Tags** (categories, their tags) and **Library**
 //! (the opened source's own playlists, read-only; its "Histories" folder is among them).
 
+use crate::app::TreeRow;
 use openfader::{
     library::{Playlist, Track},
     plugin::device::MAX_BANKS,
     store::{HotCueBank, Tag, TagGroup, Node, NodeKind},
 };
 use std::collections::{HashMap, HashSet};
-
-/// Sidebar row of the session Tag List (row 0 is "All tracks").
-pub const TAG_ROW: usize = 1;
-/// Sidebar row of the Session history, right after the Tag List.
-pub const HISTORY_ROW: usize = 2;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Entry {
@@ -50,6 +46,8 @@ pub enum Entry {
     /// A folder the user pinned: its index in the sources.
     Pinned(usize),
     /// "Downloaded" heading above what the plugin sources downloaded.
+    /// Kept for the old tree's hints; the redesigned tree lists downloads under each provider.
+    #[allow(dead_code)]
     DownloadedRoot,
     /// "Local Music" heading above the system folders (Music, Videos, Desktop).
     LocalMusicRoot,
@@ -178,30 +176,50 @@ fn playlist_label(base: usize, p: &Playlist, open: bool) -> String {
 
 /// Every row's entry and label, in display order.
 pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
-    let mut rows = vec![
-        (Entry::All, "All tracks".to_owned()),
-        (Entry::Tags, format!("Tag List ({})", i.tag_list)),
-        (Entry::Session, format!("Session history ({})", i.session)),
-        (Entry::Dupes, "Duplicate tracks".to_owned()),
-        (Entry::UserRoot, "▸ My Playlists".to_owned()),
-    ];
+    let mut rows: Vec<(Entry, String)> = Vec::new();
+    // Favorites stay at the top, where the user expects them.
+    let pinned: Vec<usize> = i
+        .sources
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.pinned)
+        .map(|(n, _)| n)
+        .collect();
+    if i.sections.favorites {
+        rows.push((Entry::FavoritesRoot, "▸ Favorites".to_owned()));
+        for n in &pinned {
+            rows.push((Entry::Pinned(*n), indent(1, &format!("★ {}", i.sources[*n].name))));
+        }
+    }
+    rows.push((Entry::All, "All tracks".to_owned()));
+    rows.push((Entry::Tags, format!("Tag List ({})", i.tag_list)));
+    rows.push((Entry::Session, format!("Session history ({})", i.session)));
+    rows.push((Entry::Dupes, "Duplicate tracks".to_owned()));
     if let Some(n) = i.cue_analysis {
-        rows.insert(4, (Entry::CueAnalysis, format!("CUE Analysis ({n})")));
+        rows.push((Entry::CueAnalysis, format!("CUE Analysis ({n})")));
     }
-    if i.all_tracks {
-        rows.push((Entry::PlaylistsAll, indent(1, "All Tracks")));
-    }
-    let mut depth: HashMap<i64, usize> = HashMap::new();
-    for n in i.nodes {
-        // Nodes come depth-first, so the parent is already known; an unknown parent counts as top level.
-        let d = n.parent.and_then(|p| depth.get(&p)).map_or(1, |d| d + 1);
-        depth.insert(n.id, d);
-        let label = match n.kind {
-            NodeKind::Folder => format!("▸ {}", n.name),
-            NodeKind::Playlist => n.name.clone(),
-            NodeKind::Smart => format!("{} (smart)", n.name),
-        };
-        rows.push((Entry::User(n.id), indent(d, &label)));
+    // My Playlists: a foldable heading over the user's folders / playlists.
+    let user_folded = i.folded_sections.contains(&Entry::UserRoot);
+    rows.push((
+        Entry::UserRoot,
+        if user_folded { "▸ My Playlists" } else { "▾ My Playlists" }.to_owned(),
+    ));
+    if !user_folded {
+        if i.all_tracks {
+            rows.push((Entry::PlaylistsAll, indent(1, "All Tracks")));
+        }
+        let mut depth: HashMap<i64, usize> = HashMap::new();
+        for n in i.nodes {
+            // Nodes come depth-first, so the parent is already known; an unknown parent counts as top level.
+            let d = n.parent.and_then(|p| depth.get(&p)).map_or(1, |d| d + 1);
+            depth.insert(n.id, d);
+            let label = match n.kind {
+                NodeKind::Folder => format!("▸ {}", n.name),
+                NodeKind::Playlist => n.name.clone(),
+                NodeKind::Smart => format!("{} (smart)", n.name),
+            };
+            rows.push((Entry::User(n.id), indent(d, &label)));
+        }
     }
     if let Some(banks) = i.banks {
         rows.push((Entry::BankRoot, "▸ Cue Bank".to_owned()));
@@ -211,7 +229,10 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         }));
     }
     let history_folded = i.folded_sections.contains(&Entry::HistoryRoot);
-    rows.push((Entry::HistoryRoot, if history_folded { "▸ History" } else { "▾ History" }.to_owned()));
+    rows.push((
+        Entry::HistoryRoot,
+        if history_folded { "▸ History" } else { "▾ History" }.to_owned(),
+    ));
     if !history_folded {
         rows.extend(
             i.days
@@ -235,30 +256,13 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             );
         }
     }
-    rows.push((Entry::LibRoot, "▸ Library (read-only)".to_owned()));
-    // The library's own playlists: a list with lists under it folds them (the plugin sources come this way).
-    let mut at = 0;
-    while at < i.lib.len() {
-        let p = &i.lib[at];
-        let children = i.lib[at + 1..]
-            .iter()
-            .take_while(|c| c.depth > p.depth)
-            .count();
-        rows.push((Entry::Lib(at), playlist_label(1, p, false)));
-        if children > 0 && !i.folded_lib.contains(&at) {
-            rows.extend(
-                i.lib[at + 1..at + 1 + children]
-                    .iter()
-                    .enumerate()
-                    .map(|(k, c)| (Entry::Lib(at + 1 + k), playlist_label(1, c, false))),
-            );
-        }
-        at += 1 + children;
-    }
-    // ── Local Music: system folders (Music, Videos, Desktop) ───────────────────
+    // ── Local Music: system folders (Music, Videos, Desktop) and the disks ─────
     if i.sections.local_music {
         let local_folded = i.folded_sections.contains(&Entry::LocalMusicRoot);
-        rows.push((Entry::LocalMusicRoot, if local_folded { "▸ Local Music" } else { "▾ Local Music" }.to_owned()));
+        rows.push((
+            Entry::LocalMusicRoot,
+            if local_folded { "▸ Local Music" } else { "▾ Local Music" }.to_owned(),
+        ));
         if !local_folded {
             let system: Vec<usize> = i
                 .sources
@@ -268,7 +272,10 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
                 .map(|(n, _)| n)
                 .collect();
             for n in &system {
-                rows.push((Entry::SystemFolder(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
+                rows.push((
+                    Entry::SystemFolder(*n),
+                    indent(1, &format!("▸ {}", i.sources[*n].name)),
+                ));
             }
             // Disks: devices and local volumes under their own heading.
             let disks: Vec<usize> = i
@@ -280,7 +287,10 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
                 .collect();
             if !disks.is_empty() {
                 let disks_folded = i.folded_sections.contains(&Entry::DevicesRoot);
-                rows.push((Entry::DevicesRoot, indent(1, if disks_folded { "▸ Devices" } else { "▾ Devices" })));
+                rows.push((
+                    Entry::DevicesRoot,
+                    indent(1, if disks_folded { "▸ Devices" } else { "▾ Devices" }),
+                ));
                 if !disks_folded {
                     for n in &disks {
                         source_rows(&mut rows, i, *n, 2);
@@ -289,10 +299,13 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
             }
         }
     }
-    // ── Online Music: cloud plugins (Deezer, YouTube, SoundCloud) with sub-entries ─
+    // ── Online Music: cloud plugins (YouTube, SoundCloud, Deezer) ─────────────
     if i.sections.online_music {
         let online_folded = i.folded_sections.contains(&Entry::OnlineMusicRoot);
-        rows.push((Entry::OnlineMusicRoot, if online_folded { "▸ Online Music" } else { "▾ Online Music" }.to_owned()));
+        rows.push((
+            Entry::OnlineMusicRoot,
+            if online_folded { "▸ Online Music" } else { "▾ Online Music" }.to_owned(),
+        ));
         if !online_folded {
             let online: Vec<usize> = i
                 .sources
@@ -302,55 +315,63 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
                 .map(|(n, _)| n)
                 .collect();
             for n in &online {
-                rows.push((Entry::OnlinePlugin(*n), indent(1, &format!("▸ {}", i.sources[*n].name))));
-                // Sub-entries: Search and Downloads (and SoundCloud's example playlists).
+                rows.push((
+                    Entry::OnlinePlugin(*n),
+                    indent(1, &format!("▸ {}", i.sources[*n].name)),
+                ));
                 rows.push((Entry::OnlineSearch(*n, 0), indent(2, "Search")));
                 rows.push((Entry::OnlineDownloads(*n, 0), indent(2, "Downloads")));
-                // SoundCloud's example playlists (Major Lazer, Diplo …) come from the library plugin's lists.
-                if let Some(s) = i.sources.get(*n) {
-                    if s.playlists.iter().any(|p| !p.is_folder) {
-                        for (j, p) in s.playlists.iter().enumerate() {
-                            if !p.is_folder {
-                                rows.push((Entry::OnlinePlaylist(*n, j), indent(2, &p.name)));
-                            }
-                        }
+                // YouTube also offers its popular music videos. When the plugin lists it as a
+                // playlist we show that; otherwise the search entry is the closest it offers.
+                if i.sources[*n].name.to_lowercase().contains("youtube") {
+                    let popular = i.sources[*n]
+                        .playlists
+                        .iter()
+                        .position(|p| !p.is_folder && p.name.to_lowercase().contains("popular"));
+                    match popular {
+                        Some(j) => rows.push((
+                            Entry::OnlinePlaylist(*n, j),
+                            indent(2, "Popular Music Videos"),
+                        )),
+                        None => rows.push((
+                            Entry::OnlineSearch(*n, 1),
+                            indent(2, "Popular Music Videos"),
+                        )),
+                    }
+                }
+                // SoundCloud's example playlists come from the library plugin's lists.
+                for (j, p) in i.sources[*n].playlists.iter().enumerate() {
+                    if !p.is_folder {
+                        rows.push((Entry::OnlinePlaylist(*n, j), indent(2, &p.name)));
                     }
                 }
             }
         }
     }
-    // ── Favorites (pinned folders) ───────────────────────────────────────────────
-    let pinned: Vec<usize> = i
-        .sources
-        .iter()
-        .enumerate()
-        .filter(|(_, s)| s.pinned)
-        .map(|(n, _)| n)
-        .collect();
-    if i.sections.favorites {
-        rows.push((Entry::FavoritesRoot, "▸ Favorites".to_owned()));
-        for n in &pinned {
-            rows.push((Entry::Pinned(*n), indent(1, &format!("★ {}", i.sources[*n].name))));
-        }
-    }
-    // ── Downloaded (lo que los plugins bajaron) ──────────────────────────────────
-    let downloaded: Vec<usize> = i
-        .sources
-        .iter()
-        .enumerate()
-        .filter(|(_, s)| s.downloaded)
-        .map(|(n, _)| n)
-        .collect();
-    if i.sections.downloaded {
-        let downloaded_folded = i.folded_sections.contains(&Entry::DownloadedRoot);
-        rows.push((Entry::DownloadedRoot, if downloaded_folded { "▸ Downloaded" } else { "▾ Downloaded" }.to_owned()));
-        if !downloaded_folded {
-            for n in downloaded {
-                source_rows(&mut rows, i, n, 1);
+    // ── Library (read-only): only when it has something to show ───────────────
+    if !i.lib.is_empty() {
+        rows.push((Entry::LibRoot, "▸ Library (read-only)".to_owned()));
+        // A list with lists under it folds them (the plugin sources come this way).
+        let mut at = 0;
+        while at < i.lib.len() {
+            let p = &i.lib[at];
+            let children = i.lib[at + 1..]
+                .iter()
+                .take_while(|c| c.depth > p.depth)
+                .count();
+            rows.push((Entry::Lib(at), playlist_label(1, p, false)));
+            if children > 0 && !i.folded_lib.contains(&at) {
+                rows.extend(
+                    i.lib[at + 1..at + 1 + children]
+                        .iter()
+                        .enumerate()
+                        .map(|(k, c)| (Entry::Lib(at + 1 + k), playlist_label(1, c, false))),
+                );
             }
+            at += 1 + children;
         }
     }
-    // ── Other sources (Explorer, iTunes, xml plugins) on their own ───────────────
+    // ── Other sources (Explorer, iTunes, xml plugins) on their own ────────────
     for (n, s) in i.sources.iter().enumerate() {
         if s.downloaded || s.pinned || s.system_folder || s.online_plugin || s.device || s.local {
             continue; // already listed above
@@ -358,6 +379,107 @@ pub fn build(i: &Inputs) -> (Vec<Entry>, Vec<String>) {
         source_rows(&mut rows, i, n, 0);
     }
     rows.into_iter().unzip()
+}
+
+/// The icons the tree shows by entry. `icon` is a name the Slint side maps to its `Icon` enum, so a
+/// provider can get its own glyph without Rust knowing the enum.
+fn provider_icon(name: &str) -> &'static str {
+    let n = name.to_lowercase();
+    if n.contains("youtube") {
+        "youtube"
+    } else if n.contains("soundcloud") {
+        "soundcloud"
+    } else if n.contains("deezer") {
+        "deezer"
+    } else {
+        "link"
+    }
+}
+
+fn icon_of(entry: &Entry, i: &Inputs) -> &'static str {
+    match entry {
+        Entry::All | Entry::PlaylistsAll => "list",
+        Entry::Tags | Entry::TagsRoot | Entry::Category(_) | Entry::Tag(_) => "tag",
+        Entry::Session | Entry::HistoryRoot | Entry::Day(_) => "loop",
+        Entry::Dupes => "grid",
+        Entry::CueAnalysis => "star",
+        Entry::UserRoot | Entry::SystemFolder(_) => "folder",
+        Entry::User(_) => "list",
+        Entry::BankRoot | Entry::Bank(_) => "mixer",
+        Entry::LibRoot | Entry::Lib(_) => "library",
+        Entry::DevicesRoot => "usb",
+        Entry::DownloadedRoot => "download",
+        Entry::FavoritesRoot | Entry::Pinned(_) => "star",
+        Entry::LocalMusicRoot => "folder",
+        Entry::OnlineMusicRoot => "link",
+        Entry::OnlinePlugin(n) => i.sources.get(*n).map_or("link", |s| provider_icon(&s.name)),
+        Entry::OnlineSearch(_, _) => "search",
+        Entry::OnlineDownloads(_, _) => "download",
+        Entry::OnlinePlaylist(_, _) => "list",
+        Entry::Source(n) => match i.sources.get(*n) {
+            Some(s) if s.online_plugin => provider_icon(&s.name),
+            Some(s) if s.device => "usb",
+            Some(s) if s.system_folder => "folder",
+            _ => "link",
+        },
+        Entry::SourceAll(_) | Entry::SourceList(_, _) | Entry::SourceMissing(_) => "list",
+        Entry::DeviceFolder(_, _) | Entry::DeviceFolderList(_, _, _) => "folder",
+    }
+}
+
+/// Turns the labels `build` made into UI rows: depth from the leading spaces, branch/open from the
+/// `▸`/`▾` marker, and the icon for each entry.
+pub fn tree_rows(entries: &[Entry], labels: &[String], i: &Inputs) -> Vec<TreeRow> {
+    entries
+        .iter()
+        .zip(labels)
+        .map(|(entry, label)| {
+            let depth = (label.len() - label.trim_start_matches(' ').len()) / 4;
+            let text = &label[depth * 4..];
+            let (branch, open, text) = if let Some(rest) = text.strip_prefix("▾ ") {
+                (true, true, rest)
+            } else if let Some(rest) = text.strip_prefix("▸ ") {
+                (true, false, rest)
+            } else {
+                (false, false, text)
+            };
+            let text = text.strip_prefix("★ ").unwrap_or(text);
+            TreeRow {
+                label: text.into(),
+                icon: icon_of(entry, i).into(),
+                depth: depth as i32,
+                branch,
+                open,
+            }
+        })
+        .collect()
+}
+
+/// The Tag List row, rebuilt when its count changes.
+pub fn tag_row(n: usize) -> TreeRow {
+    TreeRow {
+        label: format!("Tag List ({n})").into(),
+        icon: "tag".into(),
+        depth: 0,
+        branch: false,
+        open: false,
+    }
+}
+
+/// The Session history row, rebuilt when its count changes.
+pub fn session_row(n: usize) -> TreeRow {
+    TreeRow {
+        label: format!("Session history ({n})").into(),
+        icon: "loop".into(),
+        depth: 0,
+        branch: false,
+        open: false,
+    }
+}
+
+/// Row of `entry` in `entries` (0 when it is not there).
+pub fn row_of(entries: &[Entry], entry: &Entry) -> usize {
+    entries.iter().position(|e| e == entry).unwrap_or(0)
 }
 
 /// The rows of the source `n`: its own row and, when it is open, its tracks, its playlists and the tracks the
@@ -525,16 +647,17 @@ mod tests {
             folded_folders: &HashSet::new(),
             day_names: &HashMap::new(),
         });
-        assert_eq!(entries[TAG_ROW], Entry::Tags);
-        assert_eq!(entries[HISTORY_ROW], Entry::Session);
+        assert_eq!(entries[2], Entry::Tags);
+        assert_eq!(entries[3], Entry::Session);
         assert_eq!(
             labels,
             [
+                "▸ Favorites",
                 "All tracks",
                 "Tag List (2)",
                 "Session history (4)",
                 "Duplicate tracks",
-                "▸ My Playlists",
+                "▾ My Playlists",
                 "    ▸ Set",
                 "        Warmup",
                 "    House (smart)",
@@ -548,21 +671,19 @@ mod tests {
                 "        Deep",
                 "    ▸ Mood",
                 "        Dark",
+                "▾ Local Music",
+                "▾ Online Music",
                 "▸ Library (read-only)",
                 "    ▸ Folder",
                 "        Inner",
-                "▾ Local Music",
-                "▾ Online Music",
-                "▸ Favorites",
-                "▾ Downloaded",
             ]
         );
         assert_eq!(entries.len(), labels.len());
-        assert_eq!(entries[6], Entry::User(2));
-        assert_eq!(entries[9], Entry::Bank(7));
-        assert_eq!(entries[11], Entry::Day("2026-10-13".into()));
-        assert_eq!(entries[15], Entry::Tag(9));
-        assert_eq!(entries[20], Entry::Lib(1));
+        assert_eq!(entries[6], Entry::User(1));
+        assert_eq!(entries[10], Entry::Bank(7));
+        assert_eq!(entries[12], Entry::Day("2026-10-13".into()));
+        assert_eq!(entries[16], Entry::Tag(9));
+        assert_eq!(entries[23], Entry::Lib(1));
     }
 
     #[test]
@@ -589,6 +710,7 @@ mod tests {
         assert_eq!(
             e,
             [
+                Entry::FavoritesRoot,
                 Entry::All,
                 Entry::Tags,
                 Entry::Session,
@@ -596,22 +718,56 @@ mod tests {
                 Entry::UserRoot,
                 Entry::HistoryRoot,
                 Entry::TagsRoot,
-                Entry::LibRoot,
-                // The sections of the tree are always there (the devices one only when there is a disk), empty or not:
-                // the user sees them and can hide them.
                 Entry::LocalMusicRoot,
                 Entry::OnlineMusicRoot,
-                Entry::FavoritesRoot,
-                Entry::DownloadedRoot,
             ]
         );
     }
 
-    /// The downloads have their own section, before the devices, and an opened one lists its tracks and what the
-    /// Collection does not have.
     #[test]
-    fn the_downloads_have_their_own_section_with_their_tracks() {
-        let src = |name: &str, device, downloaded, open, missing| SourceRows {
+    fn tree_rows_carry_depth_icons_and_branch_state() {
+        let entries = [Entry::All, Entry::Tags, Entry::DevicesRoot];
+        let labels = [
+            "All tracks".to_owned(),
+            "    Tag List (2)".to_owned(),
+            "    ▾ Devices".to_owned(),
+        ];
+        let rows = tree_rows(
+            &entries,
+            &labels,
+            &Inputs {
+                tag_list: 2,
+                session: 0,
+                lib: &[],
+                nodes: &[],
+                days: &[],
+                cats: &[],
+                tags: &[],
+                sources: &[],
+                all_tracks: false,
+                cue_analysis: None,
+                banks: None,
+                sections: Sections::default(),
+                folded: &HashSet::new(),
+                folded_lib: &HashSet::new(),
+                folded_sections: &HashSet::new(),
+                folded_folders: &HashSet::new(),
+                day_names: &HashMap::new(),
+            },
+        );
+        let row = |i: usize| (rows[i].label.as_str(), rows[i].depth, rows[i].icon.as_str());
+        assert_eq!(row(0), ("All tracks", 0, "list"));
+        assert_eq!(row(1), ("Tag List (2)", 1, "tag"));
+        assert_eq!(row(2), ("Devices", 1, "usb"));
+        assert!(rows[2].branch && rows[2].open);
+        assert!(!rows[0].branch);
+    }
+
+    /// The global Downloaded section is gone: each provider lists its own downloads, and the
+    /// read-only Library only shows when the opened source has playlists.
+    #[test]
+    fn the_global_downloaded_and_the_empty_library_are_gone() {
+        let src = |name: &str, device, downloaded| SourceRows {
             device,
             local: false,
             downloaded,
@@ -619,15 +775,15 @@ mod tests {
             system_folder: false,
             online_plugin: false,
             name: name.into(),
-            open,
+            open: false,
             playlists: Vec::new(),
-            missing: vec![Track::default(); missing],
+            missing: Vec::new(),
             folders: Vec::new(),
         };
         let sources = [
-            src("YouTube", false, true, true, 3),
-            src("Explorer", false, false, false, 0),
-            src("USB", true, false, false, 0),
+            src("YouTube", false, true),
+            src("Explorer", false, false),
+            src("USB", true, false),
         ];
         let (entries, labels) = build(&Inputs {
             tag_list: 0,
@@ -648,25 +804,11 @@ mod tests {
             folded_folders: &HashSet::new(),
             day_names: &HashMap::new(),
         });
-        let at = labels
-            .iter()
-            .position(|l| l == "▾ Downloaded")
-            .expect("the downloads have their own section");
-        assert_eq!(entries[at], Entry::DownloadedRoot);
-        // The download lists its tracks and what the Collection lacks.
-        assert_eq!(entries[at + 1], Entry::Source(0));
-        assert_eq!(labels[at + 1], "    ▸ YouTube");
-        assert_eq!(entries[at + 2], Entry::SourceAll(0));
-        assert_eq!(labels[at + 2], "        All tracks");
-        assert_eq!(entries[at + 3], Entry::SourceMissing(0));
-        assert_eq!(labels[at + 3], "        Not in the Collection");
-        // The devices hang under Local Music, above it.
-        let discs = labels
-            .iter()
-            .position(|l| l == "    ▾ Devices")
-            .expect("the devices hang under Local Music");
-        assert!(discs < at);
-        assert!(!labels.iter().any(|l| l == "    ▸ Explorer"));
+        assert!(!labels.iter().any(|l| l.contains("Downloaded")));
+        assert!(!labels.iter().any(|l| l.contains("Library (read-only)")));
+        assert!(entries.contains(&Entry::DevicesRoot));
+        assert!(labels.iter().any(|l| l == "▸ Explorer"));
+        assert!(!labels.iter().any(|l| l == "▸ YouTube"));
     }
 
     /// A device lists its top-level folders (the ones with audio) under it, each with its own subfolders.
@@ -949,8 +1091,8 @@ mod tests {
             folded_folders: &HashSet::new(),
             day_names: &HashMap::new(),
         });
-        assert_eq!(l[4], "CUE Analysis (3)");
-        assert_eq!(l[6], "    All Tracks");
+        assert_eq!(l[5], "CUE Analysis (3)");
+        assert_eq!(l[7], "    All Tracks");
         let at = l
             .iter()
             .position(|x| x == "    ▾ Devices")
@@ -965,12 +1107,10 @@ mod tests {
                 "                Inner",
                 "        SD",
                 "▾ Online Music",
-                "▸ Favorites",
-                "▾ Downloaded",
                 "▸ iTunes",
                 "    All tracks",
                 "    ▸ Set",
-                "        Inner"
+                "        Inner",
             ]
         );
         assert_eq!(

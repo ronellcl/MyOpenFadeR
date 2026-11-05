@@ -11,6 +11,7 @@ export enum Icon {
     layout-1p, layout-2p, layout-dual, layout-simple, layout-full,
     eject, star, tag, lock, info, expand, trash, zoom-in, zoom-out, zoom-reset, stems, more, usb,
     music, film,
+    youtube, soundcloud, deezer, download, library,
 }
 
 /// One icon in `color`, `width`/`height` 16 px by default (the viewbox is 16×16, so a bigger box scales the shape;
@@ -45,6 +46,9 @@ export component Glyph inherits Rectangle {
         if i == Icon.layout-2p { return "M 2.5 4 H 4.5 V 6 H 2.5 Z M 2.5 10.5 H 4.5 V 12.5 H 2.5 Z"; }
         if i == Icon.more { return "M 9.5 3 A 1.5 1.5 0 1 1 6.5 3 A 1.5 1.5 0 1 1 9.5 3 Z M 9.5 8 A 1.5 1.5 0 1 1 6.5 8 A 1.5 1.5 0 1 1 9.5 8 Z M 9.5 13 A 1.5 1.5 0 1 1 6.5 13 A 1.5 1.5 0 1 1 9.5 13 Z"; }
         if i == Icon.usb { return "M 6.6 2.6 H 7.6 V 3.6 H 6.6 Z M 8.4 2.6 H 9.4 V 3.6 H 8.4 Z"; }
+        if i == Icon.youtube { return "M 6.5 5.5 L 11 8 L 6.5 10.5 Z"; }
+        if i == Icon.soundcloud { return "M 2 8 H 3.5 V 12 H 2 Z M 5 5 H 6.5 V 12 H 5 Z M 8 7 H 9.5 V 12 H 8 Z M 11 4 H 12.5 V 12 H 11 Z"; }
+        if i == Icon.deezer { return "M 2 3 H 14 V 5 H 2 Z M 2 7 H 14 V 9 H 2 Z M 2 11 H 14 V 13 H 2 Z"; }
         return "";
     }
 
@@ -93,6 +97,9 @@ export component Glyph inherits Rectangle {
         // A music note (the head and the stem) and a film strip (a frame with its holes).
         if i == Icon.music { return "M 6 12.5 A 2 2 0 1 0 6 8.5 M 6 8.5 V 3 L 13 1.5 V 10.5 A 2 2 0 1 1 13 12.5 M 6 8.5 L 13 7"; }
         if i == Icon.film { return "M 2 3 H 14 V 13 H 2 Z M 5.5 3 V 13 M 10.5 3 V 13 M 2 6 H 5.5 M 2 10 H 5.5 M 10.5 6 H 14 M 10.5 10 H 14"; }
+        if i == Icon.youtube { return "M 1.5 4 H 14.5 V 12 H 1.5 Z"; }
+        if i == Icon.download { return "M 8 2 V 10 M 4.5 7 L 8 10.5 L 11.5 7 M 2.5 13 H 13.5"; }
+        if i == Icon.library { return "M 2 2.5 H 14 V 13.5 H 2 Z M 6 2.5 V 13.5 M 10 2.5 V 13.5 M 2 6 H 6 M 2 10 H 6"; }
         return "";
     }
 

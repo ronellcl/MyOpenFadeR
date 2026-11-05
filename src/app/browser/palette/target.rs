@@ -88,7 +88,7 @@ impl Palette {
             Some(Drag::Tree(row)) => v
                 .sidebar
                 .row_data(row)
-                .map_or_else(String::new, |r| r.text.trim().to_owned()),
+                .map_or_else(String::new, |r| r.label.to_string()),
             Some(d) => self
                 .track_of(&v, &d)
                 .map_or_else(String::new, |t| track_label(&t.title, &t.artist)),

@@ -49,7 +49,7 @@ mod wire;
 pub use sources::SourceType;
 pub use wire::wire;
 
-use super::{deck::Decks, App, BrowserState};
+use super::{deck::Decks, App, BrowserState, TreeRow};
 use filter::Filter;
 use openfader::{
     library::{Library, Playlist, Track},
@@ -197,7 +197,7 @@ struct View {
     lib: Rc<dyn Library>,
     store: Arc<Store>,
     rows: Rc<VecModel<ModelRc<StandardListViewItem>>>,
-    sidebar: Rc<VecModel<StandardListViewItem>>,
+    sidebar: Rc<VecModel<TreeRow>>,
     panel_rows: Rc<VecModel<StandardListViewItem>>,
     list: Vec<Track>,
     /// Where each row of the search results comes from (the search view only).

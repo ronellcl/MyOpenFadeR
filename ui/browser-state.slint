@@ -1,8 +1,18 @@
 
+/// One row of the playlist tree: its text, an icon name (`row-icon` in browser-tree.slint maps it), its
+/// nesting depth and, for a branch the user folds, whether it is open.
+export struct TreeRow {
+    label: string,
+    icon: string,
+    depth: int,
+    branch: bool,
+    open: bool,
+}
+
 /// The state globals of the browser (Rust: src/app/browser/). The components are in browser.slint and its children.
 /// Library side: playlist tree + Tag List + search + track filter + track table. Rust drives it through this global (src/app/browser/).
 export global BrowserState {
-    in property <[StandardListViewItem]> playlists;
+    in property <[TreeRow]> playlists;
     in property <[[StandardListViewItem]]> tracks;
     /// "N of M tracks" or the last error, shown under the table.
     in property <string> status;
@@ -123,6 +133,10 @@ export global BrowserState {
     callback history-save();
     /// Sidebar row of the Tag List (the Rust side owns the row layout): where Area puts the tree.
     in property <int> tag-row;
+    /// Sidebar rows of the fixed rows above the sections (the Rust side owns the row layout).
+    in property <int> all-row: 1;
+    in property <int> session-row: 3;
+    in property <int> dupes-row: 4;
     /// Browse view (VIEW / W): the layout drops the deck panels, FX / sampler and mixer, so the browser fills the window under the waveforms.
     in-out property <bool> browse-max;
     /// VIEW > Browse > "Show the selected track to the center": choosing a row scrolls it to the middle of the list.

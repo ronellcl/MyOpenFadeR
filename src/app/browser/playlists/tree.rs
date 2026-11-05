@@ -6,7 +6,7 @@ use crate::app::browser::{
     sidebar::{self, Entry, Inputs},
 };
 use openfader::store::{self, NodeKind};
-use slint::{ComponentHandle, StandardListViewItem};
+use slint::ComponentHandle;
 
 /// "Folder › Playlist" path of node `id`.
 fn path_of(nodes: &[store::Node], mut id: i64) -> String {
@@ -180,7 +180,7 @@ impl View {
         } else {
             None
         };
-        let (entries, labels) = sidebar::build(&Inputs {
+        let inputs = Inputs {
             tag_list: self.tags.len(),
             session: self.history.len(),
             lib: &self.lib_playlists,
@@ -204,14 +204,12 @@ impl View {
             folded_sections: &self.folded_sections,
             folded_folders: &self.folded_folders,
             day_names: &self.day_names,
-        });
+        };
+        let (entries, labels) = sidebar::build(&inputs);
+        let rows = sidebar::tree_rows(&entries, &labels, &inputs);
+        drop(inputs);
         self.entries = entries;
-        self.sidebar.set_vec(
-            labels
-                .iter()
-                .map(|l| StandardListViewItem::from(l.as_str()))
-                .collect::<Vec<_>>(),
-        );
+        self.sidebar.set_vec(rows);
         let row = self
             .entries
             .iter()
@@ -220,6 +218,10 @@ impl View {
         self.entry = self.entries[row].clone();
         let state = app.global::<BrowserState>();
         state.set_side_row(row as i32);
+        state.set_tag_row(sidebar::row_of(&self.entries, &Entry::Tags) as i32);
+        state.set_all_row(sidebar::row_of(&self.entries, &Entry::All) as i32);
+        state.set_session_row(sidebar::row_of(&self.entries, &Entry::Session) as i32);
+        state.set_dupes_row(sidebar::row_of(&self.entries, &Entry::Dupes) as i32);
         state.set_side_kind(self.side_kind(&self.entry));
         self.publish_source(app);
     }
@@ -292,8 +294,15 @@ impl View {
                     self.rebuild(app);
                 }
             }
-            // Root sections: click folds/unfolds their children (History, Tags, Devices, Downloaded, Local Music, Online Music).
-            Entry::HistoryRoot | Entry::TagsRoot | Entry::DevicesRoot | Entry::DownloadedRoot | Entry::LocalMusicRoot | Entry::OnlineMusicRoot => {
+            // Root sections: click folds/unfolds their children (Favorites stay a leaf heading;
+            // My Playlists, History, Tags, Devices, Local Music and Online Music fold).
+            Entry::UserRoot
+            | Entry::HistoryRoot
+            | Entry::TagsRoot
+            | Entry::DevicesRoot
+            | Entry::DownloadedRoot
+            | Entry::LocalMusicRoot
+            | Entry::OnlineMusicRoot => {
                 if !self.folded_sections.remove(&e) {
                     self.folded_sections.insert(e);
                 }

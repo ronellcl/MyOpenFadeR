@@ -1,5 +1,5 @@
 import { ListView } from "std-widgets.slint";
-import { Chip, IconButton, Icon, MenuItem, TextField } from "widgets.slint";
+import { Chip, Glyph, IconButton, Icon, MenuItem, TextField } from "widgets.slint";
 import { Theme } from "theme.slint";
 import { BrowserState } from "browser-state.slint";
 import { DragState, TreeDropTarget } from "dnd.slint";
@@ -15,6 +15,25 @@ export component TreeView inherits Rectangle {
     out property <bool> has-focus: fs.has-focus;
     background: Theme.panel;
     clip: true;
+    /// The `Icon` for a row's icon name (Rust sends names, not the enum).
+    pure function row-icon(name: string) -> Icon {
+        if name == "youtube" { return Icon.youtube; }
+        if name == "soundcloud" { return Icon.soundcloud; }
+        if name == "deezer" { return Icon.deezer; }
+        if name == "download" { return Icon.download; }
+        if name == "library" { return Icon.library; }
+        if name == "folder" { return Icon.folder; }
+        if name == "list" { return Icon.list; }
+        if name == "tag" { return Icon.tag; }
+        if name == "loop" { return Icon.loop; }
+        if name == "grid" { return Icon.grid; }
+        if name == "star" { return Icon.star; }
+        if name == "usb" { return Icon.usb; }
+        if name == "mixer" { return Icon.mixer; }
+        if name == "search" { return Icon.search; }
+        if name == "link" { return Icon.link; }
+        return Icon.none;
+    }
     property <int> menu-row: -1;
     property <length> menu-x;
     property <length> menu-y;
@@ -43,11 +62,27 @@ export component TreeView inherits Rectangle {
             for item[i] in BrowserState.playlists: Rectangle {
                 height: Theme.h-row;
                 background: i == root.current-item ? Theme.select : (ta.has-hover ? Theme.hover-row : transparent);
+                if item.branch: Glyph {
+                    x: Theme.space-sm + item.depth * 12px;
+                    y: (parent.height - self.height) / 2;
+                    width: 12px;
+                    height: 12px;
+                    icon: item.open ? Icon.tri-down : Icon.chevron-right;
+                    tint: i == root.current-item ? Theme.text-bright : Theme.text-dim;
+                }
+                Glyph {
+                    x: Theme.space-sm + item.depth * 12px + (item.branch ? 14px : 0px);
+                    y: (parent.height - self.height) / 2;
+                    width: 14px;
+                    height: 14px;
+                    icon: root.row-icon(item.icon);
+                    tint: i == root.current-item ? Theme.text-bright : Theme.text-dim;
+                }
                 Text {
-                    x: Theme.space-md;
-                    width: parent.width - 2 * Theme.space-md;
+                    x: Theme.space-sm + item.depth * 12px + (item.branch ? 14px : 0px) + 18px;
+                    width: parent.width - self.x - Theme.space-sm;
                     height: parent.height;
-                    text: item.text;
+                    text: item.label;
                     vertical-alignment: center;
                     overflow: elide;
                     color: i == root.current-item ? Theme.text-bright : Theme.text-dim;

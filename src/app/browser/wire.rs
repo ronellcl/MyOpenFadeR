@@ -6,7 +6,7 @@ use super::{
     history, palette, tagging,
     playlists::{self, Panel},
     preview, session,
-    sidebar::{Entry, TAG_ROW},
+    sidebar::Entry,
     strip, suggest,
     table::{Look, Reference},
     track_at,
@@ -68,7 +68,6 @@ pub fn wire(
     let state = app.global::<BrowserState>();
     let sidebar = Rc::new(VecModel::default());
     state.set_playlists(sidebar.clone().into());
-    state.set_tag_row(TAG_ROW as i32);
     let rows = Rc::new(VecModel::default());
     state.set_tracks(rows.clone().into());
     let panel_rows = Rc::new(VecModel::default());
