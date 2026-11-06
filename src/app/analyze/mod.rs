@@ -153,12 +153,12 @@ pub fn wire(app: &App, lib: Rc<dyn Library>) -> Analyzer {
     });
     set_options(&prefs::get());
     prefs::on_change(set_options);
-    prefs::on_action("analyze_now", run_pending);
+    prefs::on_action("analyze_now", || run_pending(true));
     let auto = prefs::with(|p| p.analysis.auto_analysis);
     if cache::legacy_dir().is_some_and(|d| d.is_dir()) {
         migrate_then(auto);
     } else if auto {
-        run_pending();
+        run_pending(false);
     }
     Analyzer
 }
@@ -184,7 +184,7 @@ fn migrate_then(then_run: bool) {
         finished.set(true);
         weak_timer.upgrade().inspect(|t| t.stop());
         if then_run {
-            run_pending();
+            run_pending(false);
         }
     });
     RUNS.with(|r| {
@@ -224,7 +224,11 @@ fn context() -> Option<(App, Rc<dyn Library>)> {
 }
 
 /// Analyses what the enabled parts would fill in (the Auto Analysis set), whatever the Auto Analysis setting says.
-fn run_pending() {
+/// Auto Analysis runs at start-up on the tracks that need it. A large backlog is not started by itself: on a
+/// 60 000-track library it would keep every core busy for hours and make the app crawl. ANALYZE NOW still runs it.
+const AUTO_LIMIT: usize = 500;
+
+fn run_pending(explicit: bool) {
     let Some((app, lib)) = context() else { return };
     let tracks = match lib.tracks_all() {
         Ok(t) => t,
@@ -233,11 +237,25 @@ fn run_pending() {
         }
     };
     let todo = detected::pending(&tracks, &detected(), &options::get().parts);
+    if !explicit && todo.len() > AUTO_LIMIT {
+        return trackinfo::set_progress(
+            &app,
+            &format!(
+                "analysis: {} tracks need it — press ANALYZE NOW to run the whole backlog",
+                todo.len()
+            ),
+        );
+    }
     start_run(
         &app,
         jobs(&*lib, &todo, false, false),
         prefs::with(settings),
     );
+}
+
+/// Whether a bulk run is still collecting results (the browser stops rebuilding its whole list per track).
+pub fn busy() -> bool {
+    RUNS.with(|r| r.borrow().iter().any(|run| !run.done.get()))
 }
 
 /// Explicit analysis (the track menu's ANALYZE TRACK): `tracks` are analysed again, whatever the cache holds and whether

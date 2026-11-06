@@ -112,6 +112,8 @@ pub(super) fn start_poll(app: &App, view: &Rc<RefCell<View>>, decks: Decks) {
     );
     let (weak_view, weak) = (Rc::downgrade(view), app.as_weak());
     let (mut ticks, mut seen) = (0u32, Vec::<(String, String)>::new());
+    // A bulk run changes detected BPMs/keys constantly: rebuild the whole table once when it ends, not per track.
+    let mut detected_pending = false;
     view.borrow()
         ._timer
         .start(TimerMode::Repeated, Duration::from_millis(200), move || {
@@ -148,6 +150,8 @@ pub(super) fn start_poll(app: &App, view: &Rc<RefCell<View>>, decks: Decks) {
                 }
                 if v.related.is_none() && matches!(v.home, Home::CueAnalysis) {
                     v.load(&app);
+                } else if crate::app::analyze::busy() {
+                    detected_pending = true;
                 } else {
                     v.refresh(&app);
                 }
@@ -158,6 +162,10 @@ pub(super) fn start_poll(app: &App, view: &Rc<RefCell<View>>, decks: Decks) {
                 } else {
                     v.remark(r);
                 }
+            }
+            if detected_pending && !crate::app::analyze::busy() {
+                detected_pending = false;
+                v.refresh(&app);
             }
         });
 }
