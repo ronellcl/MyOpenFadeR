@@ -58,6 +58,7 @@ fn frame_buffer() -> SharedPixelBuffer<Rgb8Pixel> {
 }
 
 pub fn wire(app: &App, lib: Rc<dyn Library>, decks: Decks) -> impl Sized {
+    openfader::video::local::init();
     let rows = Rc::new(VecModel::default());
     let state = app.global::<VideoState>();
     state.set_decks(ModelRc::from(rows.clone()));

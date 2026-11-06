@@ -9,6 +9,7 @@ use openfader::{
     audio, device,
     library::{Library, Track},
     stems::{self, Quality},
+    video,
 };
 use slint::{ComponentHandle, Timer, TimerMode};
 use std::{
@@ -84,7 +85,14 @@ fn bytes(t: &Track) -> u64 {
     } else {
         ASSUMED_SECS
     };
-    secs * BYTES_PER_SEC
+    // A video is copied to the local media cache too, unless that copy is already there.
+    let media = t
+        .file
+        .as_deref()
+        .filter(|f| video::is_video(f) && video::local::cached(f).is_none())
+        .and_then(|f| std::fs::metadata(f).ok())
+        .map_or(0, |m| m.len());
+    secs.saturating_mul(BYTES_PER_SEC).saturating_add(media)
 }
 
 fn gb(bytes: u64) -> String {
@@ -309,10 +317,30 @@ fn work(tracks: Vec<Track>, multithread: bool, state: Arc<State>) {
             *current = t.title.clone();
         }
         state.part.store(0, Ordering::Relaxed);
-        match audio::decode_track16_cancellable(&file, &|| state.cancel.load(Ordering::Relaxed)) {
+        // A video is also kept in the local media cache, so a later session survives the drive going away. The
+        // separation still reads the PCM once; `original` keeps the stems cache keyed by the original file.
+        let original = file.clone();
+        let play = if video::is_video(&file) {
+            video::local::ensure(&file).unwrap_or_else(|e| {
+                eprintln!("video cache: {e}");
+                file.clone()
+            })
+        } else {
+            file.clone()
+        };
+        let copied = play != original;
+        if copied {
+            video::local::pin(&play);
+        }
+        let decoded =
+            audio::decode_track16_cancellable(&play, &|| state.cancel.load(Ordering::Relaxed));
+        if copied {
+            video::local::unpin(&play);
+        }
+        match decoded {
             Ok((pcm, _)) => {
                 let job = stems::Job::start(
-                    file.clone(),
+                    original.clone(),
                     Arc::new(pcm),
                     Quality::Quality,
                     multithread,

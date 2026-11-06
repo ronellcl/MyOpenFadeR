@@ -3,7 +3,7 @@
 use super::frame_buffer;
 use crate::app::deck::Deck;
 use openfader::video::{
-    self, Frame, clock,
+    self, Frame, clock, local,
     probe::{self, Info},
     stream::Stream,
 };
@@ -22,8 +22,8 @@ pub(super) enum Source {
     /// Nothing loaded, or an audio track.
     #[default]
     None,
-    /// `ffprobe` runs on a thread; its answer decides between [`Source::Ready`] and [`Source::Failed`].
-    Probing(Receiver<Result<Info, String>>, PathBuf),
+    /// `ffprobe` and the local copy run on a thread; its answer decides between [`Source::Ready`] and [`Source::Failed`].
+    Probing(Receiver<(Result<Info, String>, PathBuf)>),
     Ready(Stream, Info),
     Failed(String),
 }
@@ -34,6 +34,8 @@ pub(super) struct Slot {
     pub serial: u32,
     /// The file this slot was set up for: a source track gets it when its download ends, with the serial unchanged.
     file: Option<PathBuf>,
+    /// The local copy being read, when it is one: pinned so the LRU does not delete it under the stream.
+    play: Option<PathBuf>,
     pub title: String,
     pub src: Source,
     pub frame: Option<Arc<Frame>>,
@@ -55,6 +57,14 @@ pub(super) fn picture(rgb: &[u8]) -> Image {
     Image::from_rgb8(buf)
 }
 
+impl Drop for Slot {
+    fn drop(&mut self) {
+        if let Some(play) = &self.play {
+            local::unpin(play);
+        }
+    }
+}
+
 impl Slot {
     /// Follows the deck's loads: a new track resets the slot, a video one starts probing.
     pub fn follow(&mut self, deck: &Deck) {
@@ -65,28 +75,43 @@ impl Slot {
         // The file is compared too: a track from a plugin source arrives without one and gets it when its download ends,
         // and the deck keeps the same load counter for that (a downloaded video would otherwise stay "audio only").
         if serial != self.serial || file != self.file {
-            *self = Slot {
-                serial,
-                title,
-                file: file.clone(),
-                ..Slot::default()
-            };
+            if let Some(p) = self.play.take() {
+                local::unpin(&p);
+            }
+            self.serial = serial;
+            self.title = title;
+            self.file = file.clone();
+            self.src = Source::None;
+            self.frame = None;
+            self.thumb = Image::default();
+            self.thumb_of = 0;
+            self.pos = 0.0;
             if let Some(path) = file.filter(|p| video::is_video(p)) {
                 let (tx, rx) = channel();
-                let p = path.clone();
                 std::thread::spawn(move || {
-                    let _ = tx.send(probe::probe(&p));
+                    // The copy protects the deck if the drive goes away; when it cannot be made (full disk, no
+                    // permission), the original still plays and the deck behaves as before.
+                    let play = local::ensure(&path).unwrap_or_else(|e| {
+                        eprintln!("video cache: {e}");
+                        path.clone()
+                    });
+                    let info = probe::probe(&play);
+                    let _ = tx.send((info, play));
                 });
-                self.src = Source::Probing(rx, path);
+                self.src = Source::Probing(rx);
             }
         }
-        let Source::Probing(rx, path) = &self.src else {
+        let Source::Probing(rx) = &self.src else {
             return;
         };
         let next = match rx.try_recv() {
             Err(TryRecvError::Empty) => return,
-            Ok(Ok(info)) => Source::Ready(Stream::open(path.clone(), info.clone()), info),
-            Ok(Err(e)) => Source::Failed(e),
+            Ok((Ok(info), play)) => {
+                local::pin(&play);
+                self.play = Some(play.clone());
+                Source::Ready(Stream::open(play, info.clone()), info)
+            }
+            Ok((Err(e), _)) => Source::Failed(e),
             Err(TryRecvError::Disconnected) => Source::Failed("ffprobe stopped".into()),
         };
         self.src = next;

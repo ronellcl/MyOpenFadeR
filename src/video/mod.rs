@@ -16,6 +16,7 @@
 
 pub mod audio;
 pub mod clock;
+pub mod local;
 pub mod mix;
 pub mod probe;
 pub mod stream;

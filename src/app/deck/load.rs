@@ -19,7 +19,7 @@ use openfader::{
     analysis, audio,
     library::{Library, Track, folder},
     plugin::{event, source},
-    store,
+    store, video,
 };
 use serde_json::json;
 use slint::{ModelRc, VecModel};
@@ -36,13 +36,25 @@ fn decode_and_analyze(t: Track, need: bool) -> Receiver<Result<Decoded, String>>
         let Some(file) = t.file.as_deref() else {
             return;
         };
-        let _ = tx.send(
-            audio::decode_track16_cancellable(file, &|| false).map(|(track, print)| {
-                analysis::cache::remember_fingerprint(&t, &print);
-                let a = need.then(|| analysis::cache::analyze_cached(&t, &track, track.rate).0);
-                (track, a)
-            }),
-        );
+        // A video is read from its local copy when there is one, so unplugging the drive does not stop the decode.
+        let play = if video::is_video(file) {
+            video::local::playable(file)
+        } else {
+            file.to_path_buf()
+        };
+        let copied = play.as_path() != file;
+        if copied {
+            video::local::pin(&play);
+        }
+        let decoded = audio::decode_track16_cancellable(&play, &|| false);
+        if copied {
+            video::local::unpin(&play);
+        }
+        let _ = tx.send(decoded.map(|(track, print)| {
+            analysis::cache::remember_fingerprint(&t, &print);
+            let a = need.then(|| analysis::cache::analyze_cached(&t, &track, track.rate).0);
+            (track, a)
+        }));
     });
     rx
 }
