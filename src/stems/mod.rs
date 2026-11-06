@@ -124,6 +124,19 @@ pub fn threads(multithread: bool) -> usize {
     std::thread::available_parallelism().map_or(2, |n| (n.get() / 2).max(2))
 }
 
+/// Separation workers run below the UI and the audio thread, so a long job never makes the app crawl.
+/// ONNX Runtime's own intra-op threads are created by these workers and inherit the nice value.
+#[cfg(unix)]
+fn lower_priority() {
+    // SAFETY: setpriority on the calling thread (0) with a plain integer never dereferences.
+    unsafe {
+        libc::setpriority(libc::PRIO_PROCESS, 0, 10);
+    }
+}
+
+#[cfg(not(unix))]
+fn lower_priority() {}
+
 /// Opens the engines in the background (about 2 s each, the GPU's shaders another second) so the first track after STEMS is
 /// switched on finds them ready. Does nothing without the model; a missing model is reported by the first [`Job`].
 pub fn warm(multithread: bool) {
@@ -215,6 +228,7 @@ fn work(
         for (i, &engine) in engines.iter().enumerate() {
             let (finished, per_engine, errors) = (&finished, &per_engine, &errors);
             sc.spawn(move || {
+                lower_priority();
                 // A GPU that will not open is logged by `open`; the other engine carries on.
                 let result = engine.open().and_then(|()| {
                     let done = |_: usize| {

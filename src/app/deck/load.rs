@@ -457,12 +457,15 @@ impl Deck {
                         l.cue_ms = ms;
                     }
                 }
-                // STEMS start after the player has the audio.
+                // STEMS start after the player has the audio. A video track is skipped: separating its audio
+                // keeps every core busy for minutes and starves the picture and the UI while two videos mix.
                 stem_src = l
                     .track
                     .as_ref()
                     .and_then(|t| t.file.clone())
-                    .filter(|_| prefs::with(|p| p.stems));
+                    .filter(|f| {
+                        prefs::with(|p| p.stems) && !openfader::video::is_video(f)
+                    });
                 if let Some(player) = &self.player {
                     let mut player = player.borrow_mut();
                     src_rate = decoded_rate;

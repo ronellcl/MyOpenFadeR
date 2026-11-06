@@ -99,7 +99,11 @@ impl Deck {
                 Quality::Quality
             };
             // A cached track separates nothing: the job reads the entry, so no engine is needed.
-            if p.stems && !file.is_some_and(|f| openfader::stems::cache::has(f, quality)) {
+            if p.stems
+                && !file.is_some_and(|f| {
+                    openfader::video::is_video(f) || openfader::stems::cache::has(f, quality)
+                })
+            {
                 WARM.store(true, Relaxed);
                 LAST_BUSY.store(now_s(), Relaxed);
                 openfader::stems::warm(p.extensions.stems_multithread);
