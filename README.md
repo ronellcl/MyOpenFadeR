@@ -27,7 +27,13 @@ MyOpenFadeR is a fork of [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): an o
 
 Every screenshot on this page comes from the running app, with a library of synthetic tracks generated for these pictures. There is no copyrighted music in them.
 
-## What's new in 0.5.2
+## What's new in 0.5.3
+
+- **Removable media is cached locally.** Videos are copied once to `~/.cache/openfader/media/` with an atomic rename, a size/mtime sidecar and a 20 GB LRU limit. The deck plays the local copy, so unplugging the drive no longer freezes the picture; audio was already playing from memory.
+- **Prepare Stems in bulk.** Right-click a favorite folder or a My Playlists playlist to separate its stems before the session, with a free-space check, progress, cancel and a final summary. Videos are included when preparing.
+- **No more CPU saturation.** Videos no longer start live stem separation, automatic analysis stops at 500 pending tracks (ANALYZE NOW runs the rest), and the table refreshes once when the run ends. Stem workers run at nice 19.
+
+### 0.5.2
 
 0.5.2 redesigns the browser tree, with icons and a clearer order:
 

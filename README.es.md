@@ -27,7 +27,13 @@ MyOpenFadeR es un fork de [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): una
 
 Todas las capturas de esta página salen de la aplicación en marcha, con una biblioteca de pistas sintéticas generadas para estas imágenes. No hay música con derechos en ellas.
 
-## Novedades de la 0.5.2
+## Novedades de la 0.5.3
+
+- **Medios extraíbles en caché local.** Los vídeos se copian una vez a `~/.cache/openfader/media/` con rename atómico, control de tamaño/fecha y un límite LRU de 20 GB. El deck reproduce la copia local, así que desenchufar el disco ya no congela la imagen; el audio ya sonaba desde memoria.
+- **Preparar Stems por lotes.** Clic derecho en una carpeta favorita o en una playlist de My Playlists para separar sus stems antes de la sesión, con comprobación de espacio, progreso, cancelación y resumen final. Incluye los vídeos al preparar.
+- **Sin saturación de CPU.** Los vídeos ya no inician stems en vivo, el análisis automático se detiene a las 500 pistas pendientes (ANALYZE NOW hace el resto) y la tabla se refresca una sola vez al terminar. Los stems corren con nice 19.
+
+### 0.5.2
 
 La 0.5.2 rediseña el árbol del navegador, con iconos y un orden más claro:
 
