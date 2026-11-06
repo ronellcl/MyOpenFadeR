@@ -491,4 +491,74 @@ export component Browser inherits Rectangle {
             }
         }
     }
+    // Preparar stems por lotes: confirmación con espacio, progreso y resumen final.
+    stems-popup := PopupWindow {
+        visible: BrowserState.stems-open;
+        width: 460px;
+        height: 260px;
+        Rectangle {
+            background: Theme.panel-raised;
+            border-width: 1px;
+            border-color: Theme.line-strong;
+            border-radius: Theme.radius;
+            VerticalLayout {
+                padding: Theme.space-md;
+                spacing: Theme.space-sm;
+                Text {
+                    text: BrowserState.stems-title;
+                    color: Theme.text-bright;
+                    font-family: Theme.font;
+                    font-size: Theme.font-lg;
+                    font-weight: Theme.weight-bold;
+                    overflow: elide;
+                }
+                Text {
+                    text: BrowserState.stems-message;
+                    color: Theme.text;
+                    font-family: Theme.font;
+                    font-size: Theme.font-size;
+                    overflow: elide;
+                }
+                Text {
+                    text: BrowserState.stems-detail;
+                    color: Theme.text-dim;
+                    font-family: Theme.font;
+                    font-size: Theme.font-sm;
+                    overflow: elide;
+                }
+                Text {
+                    text: BrowserState.stems-warning;
+                    color: Theme.text-dim;
+                    font-family: Theme.font;
+                    font-size: Theme.font-xs;
+                    overflow: elide;
+                }
+                if BrowserState.stems-progress >= 0: Rectangle {
+                    height: 6px;
+                    background: Theme.bg-deep;
+                    Rectangle {
+                        width: parent.width * BrowserState.stems-progress;
+                        height: parent.height;
+                        background: Theme.accent;
+                    }
+                }
+                Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: Theme.space-sm;
+                    alignment: end;
+                    if BrowserState.stems-secondary != "": Chip {
+                        text: BrowserState.stems-secondary;
+                        height: Theme.h-ctl;
+                        clicked => { BrowserState.stems-secondary-action(); }
+                    }
+                    if BrowserState.stems-primary != "": Chip {
+                        text: BrowserState.stems-primary;
+                        height: Theme.h-ctl;
+                        active: true;
+                        clicked => { BrowserState.stems-primary-action(); }
+                    }
+                }
+            }
+        }
+    }
 }

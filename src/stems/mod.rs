@@ -130,7 +130,7 @@ pub fn threads(multithread: bool) -> usize {
 fn lower_priority() {
     // SAFETY: setpriority on the calling thread (0) with a plain integer never dereferences.
     unsafe {
-        libc::setpriority(libc::PRIO_PROCESS, 0, 10);
+        libc::setpriority(libc::PRIO_PROCESS, 0, 19);
     }
 }
 

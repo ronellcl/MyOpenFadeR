@@ -541,4 +541,16 @@ fn wire_selection(
         app.global::<BrowserState>()
             .set_analyzer_version_message("".into());
     });
+    let weak = app.as_weak();
+    state.on_stems_primary_action(move || {
+        if let Some(app) = weak.upgrade() {
+            super::stems_batch::primary(&app);
+        }
+    });
+    let weak = app.as_weak();
+    state.on_stems_secondary_action(move || {
+        if let Some(app) = weak.upgrade() {
+            super::stems_batch::secondary(&app);
+        }
+    });
 }

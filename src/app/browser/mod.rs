@@ -40,6 +40,7 @@ mod session;
 mod sidebar;
 mod smart;
 mod sources;
+mod stems_batch;
 mod strip;
 mod suggest;
 mod table;

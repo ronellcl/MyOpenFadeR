@@ -226,15 +226,26 @@ impl super::View {
         let Some(entry) = self.entries.get(row).cloned() else {
             return;
         };
-        if !matches!(
+        let folder = matches!(
             entry,
             super::sidebar::Entry::DeviceFolder(..)
                 | super::sidebar::Entry::DeviceFolderList(..)
                 | super::sidebar::Entry::Pinned(_)
-        ) {
+        );
+        let playlist = matches!(
+            &entry,
+            super::sidebar::Entry::User(id)
+                if self
+                    .nodes
+                    .iter()
+                    .any(|n| n.id == *id && n.kind == openfader::store::NodeKind::Playlist)
+        );
+        if !folder && !playlist {
             return;
         }
         match what {
+            "stems" => super::stems_batch::prepare_entry(self, app, &entry),
+            _ if !folder => {}
             "favorite" => self.set_favorite(app, entry, true),
             "unfavorite" => self.set_favorite(app, entry, false),
             "analyze" => {

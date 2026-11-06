@@ -39,7 +39,7 @@ export component TreeView inherits Rectangle {
     property <length> menu-y;
     function place-menu(x: length, y: length) {
         root.menu-x = min(x, root.width - 190px);
-        root.menu-y = min(y, max(0px, root.height - 4 * Theme.h-row - 4px));
+        root.menu-y = min(y, max(0px, root.height - 5 * Theme.h-row - 4px));
     }
 
     forward-focus: fs;
@@ -120,7 +120,7 @@ export component TreeView inherits Rectangle {
         x: root.menu-x;
         y: root.menu-y;
         width: 190px;
-        height: 4 * Theme.h-row + 4px;
+        height: 5 * Theme.h-row + 4px;
         Rectangle {
             background: Theme.panel-raised;
             border-width: 1px;
@@ -132,6 +132,7 @@ export component TreeView inherits Rectangle {
                 MenuItem { text: "Remove from favorites"; activated => { BrowserState.folder-action(root.menu-row, "unfavorite"); menu.close(); } }
                 MenuItem { text: "Analyze folder"; activated => { BrowserState.folder-action(root.menu-row, "analyze"); menu.close(); } }
                 MenuItem { text: "Refresh folder"; activated => { BrowserState.folder-action(root.menu-row, "refresh"); menu.close(); } }
+                MenuItem { text: "Preparar Stems"; activated => { BrowserState.folder-action(root.menu-row, "stems"); menu.close(); } }
             }
         }
     }

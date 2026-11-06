@@ -225,6 +225,19 @@ export global BrowserState {
     /// El usuario descartó el popup ("Reanalizar ahora" o "Más tarde").
     /// Ambos marcan la versión como vista para no repetir el aviso.
     callback analyzer-version-dismiss();
+    /// Preparar stems por lotes de una carpeta favorita o una playlist.
+    in property <bool> stems-open;
+    in property <string> stems-title;
+    in property <string> stems-message;
+    in property <string> stems-detail;
+    in property <string> stems-warning;
+    /// 0..1 while preparing; -1 hides the bar.
+    in property <float> stems-progress: -1;
+    in property <bool> stems-busy;
+    in property <string> stems-primary;
+    in property <string> stems-secondary;
+    callback stems-primary-action();
+    callback stems-secondary-action();
 }
 
 /// Automix (src/app/automix/): plays the shown list over both decks. The AUTOMIX button is handled by the browser
