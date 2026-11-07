@@ -4,6 +4,7 @@
 //! decks.
 
 use super::{App, BrowserState, View};
+use super::stems_queue::Queue;
 use crate::app::prefs;
 use openfader::{
     audio, device,
@@ -47,6 +48,8 @@ struct State {
     part: AtomicU64,
     current: Mutex<String>,
     cancel: AtomicBool,
+    /// Paused after the current track (the worker waits before starting the next one).
+    paused: AtomicBool,
     finished: AtomicBool,
     stopped_for_space: AtomicBool,
     error: Mutex<Option<String>>,
@@ -62,6 +65,7 @@ impl State {
             part: AtomicU64::new(0),
             current: Mutex::new(String::new()),
             cancel: AtomicBool::new(false),
+            paused: AtomicBool::new(false),
             finished: AtomicBool::new(false),
             stopped_for_space: AtomicBool::new(false),
             error: Mutex::new(None),
@@ -71,12 +75,14 @@ impl State {
 
 struct Running {
     state: Arc<State>,
+    queue: Arc<Mutex<Queue>>,
     _timer: Rc<Timer>,
 }
 
 thread_local! {
     static PENDING: RefCell<Option<Plan>> = const { RefCell::new(None) };
     static RUNNING: RefCell<Option<Running>> = const { RefCell::new(None) };
+    static RESUME: RefCell<Option<Queue>> = const { RefCell::new(None) };
 }
 
 fn bytes(t: &Track) -> u64 {
@@ -218,6 +224,7 @@ fn close(app: &App) {
 fn start(app: &App, plan: Plan) {
     let s = app.global::<BrowserState>();
     s.set_stems_busy(true);
+    s.set_stems_paused(false);
     s.set_stems_progress(0.0);
     s.set_stems_title(format!("Preparando stems · {}", plan.title).into());
     s.set_stems_message("0 preparadas · 0 omitidas · 0 fallidas".into());
@@ -225,11 +232,16 @@ fn start(app: &App, plan: Plan) {
     s.set_stems_warning("".into());
     s.set_stems_primary("".into());
     s.set_stems_secondary("Cancelar".into());
+    let queue = Arc::new(Mutex::new(Queue::new(&plan.title, &plan.tracks)));
+    if let Ok(q) = queue.lock() {
+        super::stems_queue::save(&q);
+    }
     let state = Arc::new(State::new(plan.tracks.len()));
     let worker = state.clone();
+    let worker_queue = queue.clone();
     let tracks = plan.tracks;
     let multithread = prefs::with(|p| p.extensions.stems_multithread);
-    std::thread::spawn(move || work(tracks, multithread, worker));
+    std::thread::spawn(move || work(tracks, multithread, worker, worker_queue));
     let weak = app.as_weak();
     let polled = state.clone();
     let timer = Rc::new(Timer::default());
@@ -241,7 +253,7 @@ fn start(app: &App, plan: Plan) {
             stop.stop();
         }
     });
-    RUNNING.with(|r| *r.borrow_mut() = Some(Running { state, _timer: timer }));
+    RUNNING.with(|r| *r.borrow_mut() = Some(Running { state, queue, _timer: timer }));
     let _ = plan.estimate;
     let _ = plan.free;
 }
@@ -294,8 +306,11 @@ fn update(app: &App, state: &State) {
     s.set_stems_detail(current.into());
 }
 
-fn work(tracks: Vec<Track>, multithread: bool, state: Arc<State>) {
+fn work(tracks: Vec<Track>, multithread: bool, state: Arc<State>, queue: Arc<Mutex<Queue>>) {
     for t in tracks {
+        while state.paused.load(Ordering::Relaxed) && !state.cancel.load(Ordering::Relaxed) {
+            std::thread::sleep(POLL);
+        }
         if state.cancel.load(Ordering::Relaxed) {
             break;
         }
@@ -307,10 +322,13 @@ fn work(tracks: Vec<Track>, multithread: bool, state: Arc<State>) {
             && free < bytes(&t) + MARGIN
         {
             state.stopped_for_space.store(true, Ordering::Relaxed);
+            state.paused.store(true, Ordering::Relaxed);
+            note(&queue, &state, None);
             break;
         }
         if stems::cache::has(&file, Quality::Quality) {
             state.skipped.fetch_add(1, Ordering::Relaxed);
+            note(&queue, &state, Some(&file));
             continue;
         }
         if let Ok(mut current) = state.current.lock() {
@@ -362,6 +380,7 @@ fn work(tracks: Vec<Track>, multithread: bool, state: Arc<State>) {
                                 }
                             }
                         }
+                        note(&queue, &state, Some(&file));
                         break;
                     }
                     let (_, part) = job.progress.get();
@@ -381,14 +400,102 @@ fn work(tracks: Vec<Track>, multithread: bool, state: Arc<State>) {
                     if let Ok(mut error) = state.error.lock() {
                         *error = Some(format!("{}: {e}", t.title));
                     }
+                    note(&queue, &state, Some(&file));
                 }
             }
         }
     }
+    if state.cancel.load(Ordering::Relaxed) {
+        super::stems_queue::clear();
+    }
     if let Ok(mut current) = state.current.lock() {
         current.clear();
     }
-    state.finished.store(true, Ordering::Relaxed);
+}
+
+fn note(queue: &Arc<Mutex<Queue>>, state: &State, done: Option<&std::path::Path>) {
+    let Ok(mut q) = queue.lock() else { return; };
+    if let Some(file) = done {
+        q.pending.retain(|i| i.file.as_path() != file);
+    }
+    q.done = state.done.load(Ordering::Relaxed);
+    q.skipped = state.skipped.load(Ordering::Relaxed);
+    q.failed = state.failed.load(Ordering::Relaxed);
+    q.paused = state.paused.load(Ordering::Relaxed);
+    if q.pending.is_empty() {
+        super::stems_queue::clear();
+    } else {
+        super::stems_queue::save(&q);
+    }
+}
+
+/// Pauses or resumes the running batch (a pause waits for the current track to end).
+pub(super) fn toggle_pause(app: &App) {
+    let s = app.global::<BrowserState>();
+    RUNNING.with(|r| {
+        let binding = r.borrow();
+        let Some(run) = binding.as_ref() else { return; };
+        let paused = !run.state.paused.load(Ordering::Relaxed);
+        run.state.paused.store(paused, Ordering::Relaxed);
+        if let Ok(mut q) = run.queue.lock() {
+            q.paused = paused;
+            if q.pending.is_empty() {
+                super::stems_queue::clear();
+            } else {
+                super::stems_queue::save(&q);
+            }
+        }
+        s.set_stems_paused(paused);
+        if paused {
+            s.set_stems_detail("Pausando al terminar el tema actual…".into());
+        } else {
+            s.set_stems_detail("".into());
+        }
+    });
+}
+
+/// Offers the persisted queue after a restart.
+pub(super) fn startup(app: &App) {
+    let Some(queue) = super::stems_queue::load() else { return; };
+    let n = queue.pending.len();
+    let s = app.global::<BrowserState>();
+    s.set_stems_queue_message(
+        format!("Hay una operación de stems por lotes pausada ({n} pendientes).").into(),
+    );
+    s.set_stems_queue_open(true);
+    RESUME.with(|r| *r.borrow_mut() = Some(queue));
+}
+
+pub(super) fn resume_queue(app: &App) {
+    let Some(queue) = RESUME.with(|r| r.borrow_mut().take()) else { return; };
+    app.global::<BrowserState>().set_stems_queue_open(false);
+    start(
+        app,
+        Plan {
+            title: queue.title.clone(),
+            tracks: queue.tracks(),
+            estimate: 0,
+            free: None,
+        },
+    );
+}
+
+pub(super) fn keep_queue(app: &App) {
+    if let Some(mut queue) = RESUME.with(|r| r.borrow_mut().take()) {
+        queue.paused = true;
+        super::stems_queue::save(&queue);
+    }
+    let s = app.global::<BrowserState>();
+    s.set_stems_queue_open(false);
+    s.set_status("la operación de stems queda pausada".into());
+}
+
+pub(super) fn cancel_queue(app: &App) {
+    RESUME.with(|r| *r.borrow_mut() = None);
+    super::stems_queue::clear();
+    let s = app.global::<BrowserState>();
+    s.set_stems_queue_open(false);
+    s.set_status("operación de stems cancelada".into());
 }
 
 /// Starts the batch for the folder or playlist of `entry`.

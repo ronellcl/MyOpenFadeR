@@ -43,6 +43,7 @@ mod sources;
 mod downloads;
 mod stems_batch;
 mod stems_index;
+mod stems_queue;
 mod strip;
 mod suggest;
 mod table;

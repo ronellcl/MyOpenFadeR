@@ -238,6 +238,15 @@ export global BrowserState {
     in property <string> stems-secondary;
     callback stems-primary-action();
     callback stems-secondary-action();
+    /// Una cola de stems pendiente o pausada de una sesión anterior.
+    in property <bool> stems-queue-open;
+    in property <string> stems-queue-message;
+    /// El lote está pausado: termina el tema actual y espera.
+    in property <bool> stems-paused;
+    callback stems-pause-toggle();
+    callback stems-queue-resume();
+    callback stems-queue-keep();
+    callback stems-queue-cancel();
 }
 
 /// Automix (src/app/automix/): plays the shown list over both decks. The AUTOMIX button is handled by the browser

@@ -368,6 +368,10 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
                 drop(v);
                 super::downloads::start(&app, tracks);
             }
+            "stems" => {
+                drop(v);
+                super::stems_batch::prepare(&app, "Selected tracks".into(), tracks);
+            }
             "analyze" => crate::app::analyze::request(&tracks),
             _ => {}
         }
@@ -557,4 +561,29 @@ fn wire_selection(
             super::stems_batch::secondary(&app);
         }
     });
+    let weak = app.as_weak();
+    state.on_stems_pause_toggle(move || {
+        if let Some(app) = weak.upgrade() {
+            super::stems_batch::toggle_pause(&app);
+        }
+    });
+    let weak = app.as_weak();
+    state.on_stems_queue_resume(move || {
+        if let Some(app) = weak.upgrade() {
+            super::stems_batch::resume_queue(&app);
+        }
+    });
+    let weak = app.as_weak();
+    state.on_stems_queue_keep(move || {
+        if let Some(app) = weak.upgrade() {
+            super::stems_batch::keep_queue(&app);
+        }
+    });
+    let weak = app.as_weak();
+    state.on_stems_queue_cancel(move || {
+        if let Some(app) = weak.upgrade() {
+            super::stems_batch::cancel_queue(&app);
+        }
+    });
+    super::stems_batch::startup(app);
 }
