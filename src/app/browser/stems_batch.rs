@@ -352,6 +352,7 @@ fn work(tracks: Vec<Track>, multithread: bool, state: Arc<State>) {
                     if let Some(result) = job.poll() {
                         match result {
                             Ok(()) => {
+                                super::stems_index::mark_ready(&file);
                                 state.done.fetch_add(1, Ordering::Relaxed);
                             }
                             Err(e) => {

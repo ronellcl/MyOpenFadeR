@@ -42,6 +42,7 @@ mod smart;
 mod sources;
 mod downloads;
 mod stems_batch;
+mod stems_index;
 mod strip;
 mod suggest;
 mod table;

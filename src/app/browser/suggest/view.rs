@@ -9,7 +9,7 @@
 
 use super::super::{
     View,
-    table::{Facts, PICKED, row},
+    table::{Facts, PICKED, STEMS, row},
 };
 use super::{Conditions, Item, Links, Mode, max_list, rank};
 use crate::app::{App, BrowserState, DeckState, deck, plural, prefs};
@@ -293,6 +293,11 @@ impl View {
         let r = row(t, f, &self.reference, self.is_played(t), &self.look);
         if self.picked.contains(&i) {
             r.set_row_data(PICKED, "1".into());
+        }
+        if let Some(file) = t.file.as_deref() {
+            if super::super::stems_index::ready(file) {
+                r.set_row_data(STEMS, "1".into());
+            }
         }
         if let Some(note) = self
             .suggest

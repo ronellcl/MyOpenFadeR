@@ -99,10 +99,11 @@ export component TrackTable inherits Rectangle {
     property <length> w-time: Math.max(PaneState.min-col, 50px + PaneState.col-time-d);
     property <length> w-key: Math.max(PaneState.min-col, 52px + PaneState.col-key-d);
     property <length> w-format: Math.max(PaneState.min-col, 68px + PaneState.col-format-d);
+    property <length> w-stems: 46px;
     property <length> w-bitrate: Math.max(PaneState.min-col, 56px + PaneState.col-bitrate-d);
     property <length> w-origin: root.show-origin ? 130px : 0px;
     property <length> w-scroll: 14px;
-    property <length> w-title: max(PaneState.min-title, root.width - root.w-scroll - root.w-lead - root.w-preview - root.w-artist - root.w-genre - root.w-comment - root.w-bpm - root.w-rating - root.w-time - root.w-key - root.w-format - root.w-bitrate - root.w-origin);
+    property <length> w-title: max(PaneState.min-title, root.width - root.w-scroll - root.w-lead - root.w-preview - root.w-artist - root.w-genre - root.w-comment - root.w-bpm - root.w-rating - root.w-time - root.w-key - root.w-format - root.w-stems - root.w-bitrate - root.w-origin);
     property <length> x-preview: root.w-lead;
     property <length> x-title: root.x-preview + root.w-preview;
     property <length> x-artist: root.x-title + root.w-title;
@@ -113,7 +114,8 @@ export component TrackTable inherits Rectangle {
     property <length> x-time: root.x-rating + root.w-rating;
     property <length> x-key: root.x-time + root.w-time;
     property <length> x-format: root.x-key + root.w-key;
-    property <length> x-bitrate: root.x-format + root.w-format;
+    property <length> x-stems: root.x-format + root.w-format;
+    property <length> x-bitrate: root.x-stems + root.w-stems;
     /// The search results say where each row comes from.
     in property <bool> show-origin: false;
     property <length> x-origin: root.x-bitrate + root.w-bitrate;
@@ -157,6 +159,7 @@ export component TrackTable inherits Rectangle {
                 HeaderCell { x: root.x-time; width: root.w-time; height: parent.height; title: "TIME"; right: true; sorted: root.sorted-col == 5; asc: root.sorted-asc; clicked => { root.sort-clicked(5); } }
                 HeaderCell { x: root.x-key; width: root.w-key; height: parent.height; title: "KEY"; sorted: root.sorted-col == 3; asc: root.sorted-asc; clicked => { root.sort-clicked(3); } }
                 HeaderCell { x: root.x-format; width: root.w-format; height: parent.height; title: "FORMATO"; sorted: root.sorted-col == 12; asc: root.sorted-asc; clicked => { root.sort-clicked(12); } }
+                HeaderCell { x: root.x-stems; width: root.w-stems; height: parent.height; title: "STEMS"; }
                 HeaderCell { x: root.x-bitrate; width: root.w-bitrate; height: parent.height; title: "BITRATE"; right: true; sorted: root.sorted-col == 14; asc: root.sorted-asc; clicked => { root.sort-clicked(14); } }
                 if root.show-origin: HeaderCell { x: root.x-origin; width: root.w-origin; height: parent.height; title: "ORIGIN"; }
                 // The column borders (drag; double-click = the default width); the title's right border drags the artist column.
@@ -222,6 +225,8 @@ export component TrackTable inherits Rectangle {
                     if cells[12].text == "?": Cell { x: root.x-format + Theme.space-md; width: root.w-format - Theme.space-md; text: "?"; color: Theme.text-faint; }
                     // The file's extension after the icon (cells[16], src/app/browser/table.rs).
                     Cell { x: root.x-format + Theme.space-md + 18px; width: root.w-format - Theme.space-md - 18px; text: cells[16].text; color: Theme.text-faint; font-size: Theme.font-sm; }
+                    // ✓ when the track's stems are already in the analysis cache (cells[18], src/app/browser/stems_index.rs).
+                    if cells[18].text == "1": Text { x: root.x-stems; width: root.w-stems; height: parent.height; text: "✓"; horizontal-alignment: center; vertical-alignment: center; color: Theme.play; font-size: Theme.font-sm; }
                     Cell { x: root.x-bitrate + Theme.space-md; width: root.w-bitrate - Theme.space-md; text: cells[14].text; right: true; color: Theme.row-dim; }
                     if root.show-origin: Cell { x: root.x-origin + Theme.space-md; width: root.w-origin - Theme.space-md; text: cells[13].text; color: Theme.row-dim; }
                     DragArea {

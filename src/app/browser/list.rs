@@ -395,6 +395,8 @@ impl View {
                 ..Facts::of(t)
             })
             .collect();
+        let files: Vec<_> = self.list.iter().filter_map(|t| t.file.clone()).collect();
+        super::stems_index::ensure(app, files);
         self.shown = filter::shown(
             &self.list,
             &facts,
