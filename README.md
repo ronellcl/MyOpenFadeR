@@ -27,7 +27,15 @@ MyOpenFadeR is a fork of [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): an o
 
 Every screenshot on this page comes from the running app, with a library of synthetic tracks generated for these pictures. There is no copyrighted music in them.
 
-## What's new in 0.5.4
+## What's new in 0.5.5
+
+- **Bulk downloads.** Right-click one or several YouTube/Deezer tracks and choose Download: they are fetched in parallel, with progress in the status line and a final summary.
+- **Stems column.** The track table shows a ✓ when a track's stems are already in the cache, so you know what is ready without opening it.
+- **Stem queue in the background.** Right-click a selection and choose Generate stems in background: a persistent queue separates one track at a time, pauses at the end of the current track, and resumes or is cancelled from the toolbar. If the app closes with work pending, the next start asks whether to continue, keep it paused or cancel.
+- **Online Music > Downloads opens the real downloads**, from the configured folder, instead of showing the current list.
+- **Old id-named downloads are renamed** to `Artist - Title` the next time they are fetched or loaded.
+
+### 0.5.4
 
 - **Folders open one level at a time.** Opening a favorite folder, a device folder or Explorer no longer walks the whole tree and reads tags from every audio file, so a huge external drive cannot freeze the browser. SUBFOLDERS, Analyze folder and Prepare Stems still walk recursively, in workers.
 - **Choose where downloads go.** Preferences > Advanced > Database has a new DOWNLOADS folder; empty keeps `<data folder>/plugins`.

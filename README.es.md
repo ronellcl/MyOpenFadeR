@@ -27,7 +27,15 @@ MyOpenFadeR es un fork de [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): una
 
 Todas las capturas de esta página salen de la aplicación en marcha, con una biblioteca de pistas sintéticas generadas para estas imágenes. No hay música con derechos en ellas.
 
-## Novedades de la 0.5.4
+## Novedades de la 0.5.5
+
+- **Descargas por lotes.** Clic derecho en una o varias pistas de YouTube/Deezer y elige Download: se descargan en paralelo, con progreso en la barra de estado y un resumen final.
+- **Columna STEMS.** La tabla muestra un ✓ cuando los stems de una pista ya están en la caché, así sabes qué está listo sin abrirla.
+- **Cola de stems en segundo plano.** Clic derecho en una selección y elige Generate stems in background: una cola persistente separa un tema a la vez, se pausa al terminar el tema actual y se reanuda o cancela desde la barra. Si se cierra la app con trabajo pendiente, al volver a abrir pregunta si continuar, mantener pausado o cancelar.
+- **Online Music > Downloads abre las descargas reales**, desde la carpeta configurada, en vez de mostrar la lista actual.
+- **Las descargas antiguas con nombre por id se renombran** a `Artista - Título` la siguiente vez que se descargan o cargan.
+
+### 0.5.4
 
 - **Las carpetas se abren un nivel a la vez.** Abrir una carpeta favorita, de un dispositivo o del Explorador ya no recorre todo el árbol ni lee las etiquetas de cada audio, así que un disco externo enorme no puede congelar el navegador. SUBFOLDERS, Analizar carpeta y Preparar Stems siguen recorriendo en workers.
 - **Elige dónde se guardan las descargas.** En Preferencias > Avanzado > Base de datos hay una nueva carpeta DOWNLOADS; vacía mantiene `<carpeta de datos>/plugins`.
