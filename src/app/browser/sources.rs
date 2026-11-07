@@ -153,14 +153,14 @@ impl Kind {
             Kind::Plugin { plugin, path, .. } => {
                 Ok(Box::new(plugin::library::open_with(plugin, path)?))
             }
-            Kind::Explorer(p) => Ok(Box::new(Folder::open(p)?)),
+            Kind::Explorer(p) => Ok(Box::new(Folder::open_level(p)?)),
             Kind::Downloaded {
                 plugin,
                 source,
                 path,
                 ..
             } => {
-                let inner = Box::new(Folder::open(path)?);
+                let inner = Box::new(Folder::open_level(path)?);
                 let mut names = store::global()
                     .collection_remote_titles(plugin, source)
                     .unwrap_or_default();
@@ -184,10 +184,10 @@ impl Kind {
                 }
                 Ok(Box::new(Named { inner, names }))
             }
-            Kind::DeviceFolder { path } => Ok(Box::new(Folder::open(path)?)),
-            Kind::Pinned { path, .. } => Ok(Box::new(Folder::open(path)?)),
+            Kind::DeviceFolder { path } => Ok(Box::new(Folder::open_level(path)?)),
+            Kind::Pinned { path, .. } => Ok(Box::new(Folder::open_level(path)?)),
             // A system folder (Music, Videos, Desktop) is browsed as a folder of files.
-            Kind::SystemFolder { path, .. } => Ok(Box::new(Folder::open(path)?)),
+            Kind::SystemFolder { path, .. } => Ok(Box::new(Folder::open_level(path)?)),
             // A local volume is browsed by its folders: it holds no library of its own (reading the whole volume would
             // take hours).
             Kind::LocalDisk { .. } => Err("it is browsed by its folders".to_owned()),
