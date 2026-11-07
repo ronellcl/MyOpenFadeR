@@ -364,6 +364,10 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
                     format!("tagged {added} track{}", if added == 1 { "" } else { "s" }).into(),
                 );
             }
+            "download" => {
+                drop(v);
+                super::downloads::start(&app, tracks);
+            }
             "analyze" => crate::app::analyze::request(&tracks),
             _ => {}
         }

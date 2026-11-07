@@ -121,7 +121,7 @@ export component TrackTable inherits Rectangle {
     property <length> menu-y;
     property <bool> list-view: BrowserState.tag-view || BrowserState.user-view;
     /// Rows of the right-click menu (the library entries come last).
-    property <int> menu-rows: (root.list-view ? 8 : 5) + 7 + (BrowserState.palette-enabled ? 3 : 0);
+    property <int> menu-rows: (root.list-view ? 8 : 5) + 8 + (BrowserState.palette-enabled ? 3 : 0);
     function place-menu(x: length, y: length) {
         root.menu-x = min(x, root.width - 190px);
         root.menu-y = min(y, max(0px, root.height - root.menu-rows * Theme.h-row - 4px));
@@ -299,6 +299,7 @@ export component TrackTable inherits Rectangle {
                 if root.list-view: MenuItem { text: "Move up"; activated => { BrowserState.list-move(-1); menu.close(); } }
                 if root.list-view: MenuItem { text: "Move down"; activated => { BrowserState.list-move(1); menu.close(); } }
                 if root.list-view: MenuItem { text: "Remove from list"; activated => { BrowserState.list-remove(); menu.close(); } }
+                MenuItem { text: "Download"; activated => { BrowserState.selection-action("download"); menu.close(); } }
                 MenuItem { text: "Analyze track"; activated => { BrowserState.selection-action("analyze"); menu.close(); } }
                 MenuItem { text: "Analysis lock"; activated => { LibraryState.action("track-lock"); menu.close(); } }
                 MenuItem { text: "Reload tag (discard edits)"; activated => { LibraryState.action("track-reload-tag-discard"); menu.close(); } }
