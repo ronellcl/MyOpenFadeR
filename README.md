@@ -27,7 +27,13 @@ MyOpenFadeR is a fork of [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): an o
 
 Every screenshot on this page comes from the running app, with a library of synthetic tracks generated for these pictures. There is no copyrighted music in them.
 
-## What's new in 0.5.3
+## What's new in 0.5.4
+
+- **Folders open one level at a time.** Opening a favorite folder, a device folder or Explorer no longer walks the whole tree and reads tags from every audio file, so a huge external drive cannot freeze the browser. SUBFOLDERS, Analyze folder and Prepare Stems still walk recursively, in workers.
+- **Choose where downloads go.** Preferences > Advanced > Database has a new DOWNLOADS folder; empty keeps `<data folder>/plugins`.
+- **Readable download names.** New downloads are saved as `Artist - Title`, with the source folder keeping a hidden index of ids, so the file is found later even if the title changes. Old id-named downloads are still reused.
+
+### 0.5.3
 
 - **Removable media is cached locally.** Videos are copied once to `~/.cache/openfader/media/` with an atomic rename, a size/mtime sidecar and a 20 GB LRU limit. The deck plays the local copy, so unplugging the drive no longer freezes the picture; audio was already playing from memory.
 - **Prepare Stems in bulk.** Right-click a favorite folder or a My Playlists playlist to separate its stems before the session, with a free-space check, progress, cancel and a final summary. Videos are included when preparing.

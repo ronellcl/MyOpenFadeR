@@ -27,7 +27,13 @@ MyOpenFadeR es un fork de [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): una
 
 Todas las capturas de esta página salen de la aplicación en marcha, con una biblioteca de pistas sintéticas generadas para estas imágenes. No hay música con derechos en ellas.
 
-## Novedades de la 0.5.3
+## Novedades de la 0.5.4
+
+- **Las carpetas se abren un nivel a la vez.** Abrir una carpeta favorita, de un dispositivo o del Explorador ya no recorre todo el árbol ni lee las etiquetas de cada audio, así que un disco externo enorme no puede congelar el navegador. SUBFOLDERS, Analizar carpeta y Preparar Stems siguen recorriendo en workers.
+- **Elige dónde se guardan las descargas.** En Preferencias > Avanzado > Base de datos hay una nueva carpeta DOWNLOADS; vacía mantiene `<carpeta de datos>/plugins`.
+- **Nombres de descarga legibles.** Las descargas nuevas se guardan como `Artista - Título`, con un índice oculto de ids en la carpeta de origen, para encontrar el archivo aunque cambie el título. Las descargas antiguas con nombre por id se siguen reutilizando.
+
+### 0.5.3
 
 - **Medios extraíbles en caché local.** Los vídeos se copian una vez a `~/.cache/openfader/media/` con rename atómico, control de tamaño/fecha y un límite LRU de 20 GB. El deck reproduce la copia local, así que desenchufar el disco ya no congela la imagen; el audio ya sonaba desde memoria.
 - **Preparar Stems por lotes.** Clic derecho en una carpeta favorita o en una playlist de My Playlists para separar sus stems antes de la sesión, con comprobación de espacio, progreso, cancelación y resumen final. Incluye los vídeos al preparar.

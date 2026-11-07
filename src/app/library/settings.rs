@@ -81,9 +81,19 @@ pub fn database_path() -> Option<PathBuf> {
     p.is_file().then_some(p)
 }
 
+/// Tells the plugin downloader where downloads go (empty = `<data dir>/plugins`).
+fn apply_downloads(p: &Prefs) {
+    let dir = p.extra("download_dir").unwrap_or("").trim();
+    openfader::plugin::source::set_download_root(
+        (!dir.is_empty()).then(|| PathBuf::from(dir)),
+    );
+}
+
 /// Registers the text rows' handlers (call once, UI thread).
 pub fn wire() {
-    for key in ["lib_search", "lib_db"] {
+    apply_downloads(&prefs::get());
+    prefs::on_change(apply_downloads);
+    for key in ["lib_search", "lib_db", "download_dir"] {
         prefs::on_text(key, move |v| prefs::update(|p| p.set_extra(key, v.trim())));
     }
 }
@@ -107,6 +117,13 @@ pub fn database_rows(p: &Prefs) -> Vec<Row> {
         Row::header("DATABASE MANAGEMENT"),
         Row::text("lib_db", "LIBRARY DATABASE", &l.db)
             .hint("opened at start-up when no path is given"),
+        Row::header("DOWNLOADS"),
+        Row::text(
+            "download_dir",
+            "FOLDER",
+            p.extra("download_dir").unwrap_or_default(),
+        )
+        .hint("empty = data folder/plugins"),
     ]
 }
 

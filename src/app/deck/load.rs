@@ -88,11 +88,12 @@ fn prefetch_next(t: &Track) {
     let Some(next) = NEXT.with(|n| n.borrow().as_ref().and_then(|next| next(t))) else {
         return; // the list does not say (or the browser is not on this thread)
     };
+    let (title, artist) = (next.title.clone(), next.artist.clone());
     let Some(remote) = next.remote.filter(|_| next.file.is_none()) else {
         return; // it is already in the disk
     };
     std::thread::spawn(move || {
-        let _ = source::fetch(&remote);
+        let _ = source::fetch_named(&remote, &title, &artist);
     });
 }
 
@@ -143,9 +144,10 @@ impl Deck {
             l.base_beats = Some(b);
         }
         if let Some(remote) = t.remote.clone().filter(|_| downloading) {
+            let (title, artist) = (t.title.clone(), t.artist.clone());
             let (tx, rx) = channel();
             std::thread::spawn(move || {
-                let _ = tx.send(source::fetch(&remote));
+                let _ = tx.send(source::fetch_named(&remote, &title, &artist));
             });
             *self.download.borrow_mut() = Some(Download {
                 rx,
