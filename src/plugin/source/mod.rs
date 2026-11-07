@@ -15,7 +15,8 @@ mod fetch;
 mod reply;
 
 pub use fetch::{
-    fetch, fetch_in, fetch_named, file_name, info, is_downloaded, set_download_root,
+    download_root, fetch, fetch_in, fetch_named, file_name, info, is_downloaded,
+    set_download_root,
 };
 pub use reply::track_json;
 

@@ -350,16 +350,16 @@ impl Source {
     }
 }
 
-/// The folders where the plugin sources keep the audio they downloaded: `<data dir>/plugins/<plugin>/<source>`, when
-/// the folder is there and holds audio. What is in them is a real file: it can be loaded, imported and searched.
+/// The folders where the plugin sources keep the audio they downloaded: the chosen download folder (default
+/// `<data dir>/plugins`) plus `<plugin>/<source>`, when the folder is there and holds audio.
 fn downloaded() -> Vec<Kind> {
-    let Some(base) = openfader::paths::data_dir() else {
+    let Some(base) = plugin::source::download_root() else {
         return Vec::new();
     };
     let mut out = Vec::new();
     for p in plugin::registry().plugins.iter() {
         for s in p.manifest.sources.iter() {
-            let dir = base.join("plugins").join(&p.manifest.name).join(&s.id);
+            let dir = base.join(&p.manifest.name).join(&s.id);
             if dir.is_dir() && holds_audio(&dir) {
                 out.push(Kind::Downloaded {
                     plugin: p.manifest.name.clone(),
@@ -688,6 +688,39 @@ impl View {
     }
 
     /// Source row `i` was chosen: read it (once) and list what is in it; a device also opens its window.
+    /// Opens the downloaded-files source of the cloud provider at `online` (the Downloads row).
+    pub(super) fn open_downloads(&mut self, app: &App, online: usize) {
+        let Some(Kind::OnlinePlugin { plugin, .. }) =
+            self.sources.get(online).map(|s| &s.kind)
+        else {
+            return;
+        };
+        let plugin = plugin.clone();
+        match self
+            .sources
+            .iter()
+            .position(|s| matches!(&s.kind, Kind::Downloaded { plugin: p, .. } if p == &plugin))
+        {
+            Some(i) => self.open_source(app, i),
+            None => self.say(app, format!("{plugin}: no downloads yet")),
+        }
+    }
+
+    /// Whether the source `i` is the downloads source the chosen `OnlineDownloads` row shows.
+    fn entry_on_downloads(&self, i: usize) -> bool {
+        let Entry::OnlineDownloads(online, _) = &self.entry else {
+            return false;
+        };
+        let Some(Kind::OnlinePlugin { plugin, .. }) =
+            self.sources.get(*online).map(|s| &s.kind)
+        else {
+            return false;
+        };
+        self.sources.get(i).is_some_and(|s| {
+            matches!(&s.kind, Kind::Downloaded { plugin: p, .. } if p == plugin)
+        })
+    }
+
     pub(super) fn open_source(&mut self, app: &App, i: usize) {
         self.read_source(app, i);
         if let Some(Source {
@@ -829,11 +862,16 @@ impl View {
         toast::show(app, &text);
         self.say(app, text);
         self.rebuild(app);
-        if matches!(
-            self.entry,
-            Entry::Source(j) | Entry::Pinned(j) | Entry::SourceAll(j) | Entry::SourceList(j, _)
-                if j == i
-        ) {
+        if self.entry_on_downloads(i)
+            || matches!(
+                self.entry,
+                Entry::Source(j)
+                    | Entry::Pinned(j)
+                    | Entry::SourceAll(j)
+                    | Entry::SourceList(j, _)
+                    if j == i
+            )
+        {
             self.show(app);
         }
     }
@@ -931,11 +969,16 @@ impl View {
         eprintln!("{text}");
         self.say(app, text);
         self.rebuild(app);
-        if matches!(
-            self.entry,
-            Entry::Source(j) | Entry::Pinned(j) | Entry::SourceAll(j) | Entry::SourceList(j, _)
-                if j == i
-        ) {
+        if self.entry_on_downloads(i)
+            || matches!(
+                self.entry,
+                Entry::Source(j)
+                    | Entry::Pinned(j)
+                    | Entry::SourceAll(j)
+                    | Entry::SourceList(j, _)
+                    if j == i
+            )
+        {
             self.show(app);
         }
     }

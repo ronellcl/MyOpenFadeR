@@ -125,16 +125,27 @@ impl View {
                 state.set_status("use the plugin's search box to look up tracks".into());
                 Ok(Vec::new())
             }
-            // A cloud plugin's downloads: list what it downloaded (the Downloaded section already shows them all).
+            // A cloud plugin's downloads: list the files it downloaded.
             (None, Home::PluginDownloads(s, _)) => {
-                let plugin_name = self.sources.get(*s).map(|src| src.name.clone()).unwrap_or_default();
-                self.sources
-                    .iter()
-                    .find(|src| {
-                        matches!(src.kind, super::sources::Kind::Downloaded { ref plugin, .. } if plugin == &plugin_name)
-                    })
-                    .map(|src| src.missing.clone())
-                    .ok_or_else(|| "the plugin's downloads are not open".to_owned())
+                let plugin = self.sources.get(*s).and_then(|src| match &src.kind {
+                    super::sources::Kind::OnlinePlugin { plugin, .. } => Some(plugin.clone()),
+                    _ => None,
+                });
+                match plugin {
+                    Some(plugin) => {
+                        let src = self.sources.iter().find(|src| {
+                            matches!(
+                                &src.kind,
+                                super::sources::Kind::Downloaded { plugin: p, .. } if p == &plugin
+                            )
+                        });
+                        match src.and_then(|src| src.lib.as_ref()) {
+                            Some(lib) => lib.tracks(None),
+                            None => Ok(Vec::new()),
+                        }
+                    }
+                    None => Ok(Vec::new()),
+                }
             }
             // A cloud plugin's example playlist: list its tracks if they were read.
             (None, Home::PluginPlaylist(s, j)) => self

@@ -262,7 +262,7 @@ impl View {
             Entry::SystemFolder(i) => self.open_source(app, i),
             Entry::OnlinePlugin(i) => self.open_source(app, i),
             Entry::OnlineSearch(i, _) => self.open_source(app, i),
-            Entry::OnlineDownloads(i, _) => self.open_source(app, i),
+            Entry::OnlineDownloads(i, _) => self.open_downloads(app, i),
             Entry::OnlinePlaylist(i, _) => self.open_source(app, i),
             Entry::DeviceFolder(d, j) => self.open_device_folder(app, d, j),
             _ => {}

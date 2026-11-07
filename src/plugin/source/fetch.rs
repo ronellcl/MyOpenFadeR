@@ -110,15 +110,16 @@ fn write_index(dir: &Path, map: &HashMap<String, String>) -> Result<(), String> 
     Ok(())
 }
 
+/// The download of `id` in `dir`, only from the index.
+fn indexed_only(dir: &Path, id: &str) -> Option<PathBuf> {
+    let name = index_for(dir).get(id)?.clone();
+    let path = dir.join(name);
+    path.is_file().then_some(path)
+}
+
 /// The download of `id` in `dir`, from the index or (older downloads) from its id.
 fn indexed(dir: &Path, id: &str) -> Option<PathBuf> {
-    if let Some(name) = index_for(dir).get(id) {
-        let path = dir.join(name);
-        if path.is_file() {
-            return Some(path);
-        }
-    }
-    downloaded(dir, &file_name(id))
+    indexed_only(dir, id).or_else(|| downloaded(dir, &file_name(id)))
 }
 
 fn remember(dir: &Path, id: &str, file: &Path) -> Result<(), String> {
@@ -267,8 +268,25 @@ pub fn fetch_in_named(
     display: Option<(&str, &str)>,
 ) -> Result<PathBuf, String> {
     let dir = root.join(&r.plugin).join(&r.source);
-    if let Some(done) = indexed(&dir, &r.id) {
+    if let Some(done) = indexed_only(&dir, &r.id) {
         return Ok(done);
+    }
+    if let Some(old) = downloaded(&dir, &file_name(&r.id)) {
+        if let Some((title, artist)) = display {
+            let base = safe_name(title, artist, &r.id);
+            let name = unique_name(&dir, &base, &r.id, &index_for(&dir));
+            let ext = old.extension().and_then(|e| e.to_str()).unwrap_or("");
+            let target = if ext.is_empty() {
+                dir.join(&name)
+            } else {
+                dir.join(format!("{name}.{ext}"))
+            };
+            if !target.exists() && std::fs::rename(&old, &target).is_ok() {
+                let _ = remember(&dir, &r.id, &target);
+                return Ok(target);
+            }
+        }
+        return Ok(old);
     }
     let name = match display {
         Some((title, artist)) => {
