@@ -1,0 +1,11 @@
+Origin: MyOpenFadeR
+Label: MyOpenFadeR
+Suite: stable
+Codename: stable
+Architectures: amd64
+Components: main
+Description: MyOpenFadeR apt repository
+Date: Mon, 09 Nov 2026 19:57:34 UTC
+SHA256:
+ 491f8b30aad56e1997bd713e4ac1620abb8907b1bcf6c076a53e9a32f68e83e3 558 main/binary-amd64/Packages
+ 5194b61c927e44be4b1c60b00097777e9c067f49cc74ff048efc443f56d03dd3 398 main/binary-amd64/Packages.gz

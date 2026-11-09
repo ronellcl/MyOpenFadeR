@@ -1,0 +1,14 @@
+Package: myopenfader
+Version: 0.5.6
+Section: sound
+Priority: optional
+Architecture: amd64
+Maintainer: Ronell <ronellcl@users.noreply.github.com>
+Installed-Size: 147732
+Depends: libasound2, libfontconfig1, libxkbcommon0, libwayland-client0, libudev1, libgl1, libegl1, ffmpeg
+Homepage: https://github.com/ronellcl/MyOpenFadeR
+Description: MyOpenFadeR: open-source DJ software with stems, video and streaming.
+Filename: pool/main/m/myopenfader/myopenfader_0.5.6_amd64.deb
+Size: 56211448
+SHA256: ebf100fc714529cceab17d20d75c291d4571e9fdd71dc416079541a2e3dfe4b0
+
