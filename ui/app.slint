@@ -415,8 +415,31 @@ export component App inherits Window {
             border-radius: Theme.radius;
             Rectangle { x: 0; width: parent.width * BrowserState.load-progress; background: Theme.accent; border-radius: Theme.radius; }
         }
-        Text {
+        // Stems minimized: a clickable marker on the left of the status bar reopens the window.
+        if BrowserState.stems-minimized: Rectangle {
             x: BrowserState.load-progress >= 0 ? 270px : 100px;
+            y: 2px;
+            width: 190px;
+            height: parent.height - 4px;
+            background: stems-ta.has-hover ? Theme.panel-high : Theme.panel-raised;
+            border-radius: Theme.radius;
+            stems-ta := TouchArea { width: parent.width; height: parent.height; clicked => { BrowserState.stems-reopen(); } }
+            Text {
+                x: 6px;
+                width: parent.width - 12px;
+                height: parent.height;
+                text: BrowserState.stems-busy
+                    ? "STEMS " + BrowserState.stems-done + "/" + BrowserState.stems-total + (BrowserState.stems-paused ? " · PAUSADO" : "")
+                    : "STEMS · listo · abrir";
+                vertical-alignment: center;
+                overflow: elide;
+                color: Theme.text;
+                font-size: Theme.font-sm;
+                font-weight: Theme.weight-bold;
+            }
+        }
+        Text {
+            x: (BrowserState.load-progress >= 0 ? 270px : 100px) + (BrowserState.stems-minimized ? 198px : 0px);
             width: parent.width - self.x - prog.width - 92px;
             height: parent.height;
             text: BrowserState.load-progress >= 0 ? BrowserState.load-text : AutomixState.running ? AutomixState.status : BrowserState.status;

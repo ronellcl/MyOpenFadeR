@@ -291,7 +291,18 @@ export component Browser inherits Rectangle {
                         font-size: Theme.font-sm;
                         horizontal-stretch: 0;
                     }
-                    if BrowserState.stems-busy: Chip { text: BrowserState.stems-paused ? "REANUDAR STEMS" : "PAUSAR STEMS"; width: 116px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: BrowserState.stems-paused; clicked => { BrowserState.stems-pause-toggle(); } }
+                    if BrowserState.stems-busy: Chip {
+                        text: BrowserState.stems-paused ? "REANUDAR STEMS" : "PAUSAR STEMS";
+                        width: 116px;
+                        height: Theme.h-ctl;
+                        y: (parent.height - self.height) / 2;
+                        horizontal-stretch: 0;
+                        active: BrowserState.stems-paused;
+                        tooltip: BrowserState.stems-paused
+                            ? "Reanuda la preparación de stems"
+                            : "Pausa la preparación de stems al terminar el tema actual";
+                        clicked => { BrowserState.stems-pause-toggle(); }
+                    }
                     Chip { text: "FILTER"; width: 54px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; active: root.filter-open; clicked => { root.filter-open = !root.filter-open; } }
                     if BrowserState.folder-view: Chip { text: "SUBFOLDERS"; width: 92px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; tooltip: "List every file under this folder, not just this level"; active: BrowserState.subfolders; clicked => { BrowserState.subfolders = !BrowserState.subfolders; BrowserState.subfolders-toggled(); } }
                     Chip { text: "FAV"; width: 44px; height: Theme.h-ctl; y: (parent.height - self.height) / 2; horizontal-stretch: 0; tooltip: "Pin the chosen folder (a volume's folder) or take the pin off"; enabled: BrowserState.fav-possible; active: BrowserState.fav-pinned; clicked => { BrowserState.fav-toggle(); } }
@@ -361,7 +372,7 @@ export component Browser inherits Rectangle {
                     height: parent.height;
                     sorted-col: root.sorted-col;
                     sorted-asc: root.sorted-asc;
-                    show-origin: BrowserState.search-view;
+                    show-origin: BrowserState.search-view || BrowserState.user-view;
                     sort-clicked(c) => { root.sort-by(c); }
                     focused => { root.tree-focus = false; }
                 }
@@ -466,7 +477,9 @@ export component Browser inherits Rectangle {
         }
     }
     analyzer-popup := PopupWindow {
-        visible: BrowserState.analyzer-version-pending;
+        close-policy: no-auto-close;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
         width: 420px;
         height: 3 * Theme.h-row + 4px;
         Rectangle {
@@ -494,9 +507,11 @@ export component Browser inherits Rectangle {
     }
     // Preparar stems por lotes: confirmación con espacio, progreso y resumen final.
     stems-popup := PopupWindow {
-        visible: BrowserState.stems-open;
+        close-policy: no-auto-close;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
         width: 460px;
-        height: 260px;
+        height: 320px;
         Rectangle {
             background: Theme.panel-raised;
             border-width: 1px;
@@ -518,21 +533,21 @@ export component Browser inherits Rectangle {
                     color: Theme.text;
                     font-family: Theme.font;
                     font-size: Theme.font-size;
-                    overflow: elide;
+                    wrap: word-wrap;
                 }
                 Text {
                     text: BrowserState.stems-detail;
                     color: Theme.text-dim;
                     font-family: Theme.font;
                     font-size: Theme.font-sm;
-                    overflow: elide;
+                    wrap: word-wrap;
                 }
                 Text {
                     text: BrowserState.stems-warning;
                     color: Theme.text-dim;
                     font-family: Theme.font;
                     font-size: Theme.font-xs;
-                    overflow: elide;
+                    wrap: word-wrap;
                 }
                 if BrowserState.stems-progress >= 0: Rectangle {
                     height: 6px;
@@ -547,6 +562,18 @@ export component Browser inherits Rectangle {
                 HorizontalLayout {
                     spacing: Theme.space-sm;
                     alignment: end;
+                    if BrowserState.stems-busy: Chip {
+                        text: BrowserState.stems-paused ? "Reanudar" : "Pausar";
+                        height: Theme.h-ctl;
+                        active: BrowserState.stems-paused;
+                        clicked => { BrowserState.stems-pause-toggle(); }
+                    }
+                    if BrowserState.stems-busy: Chip {
+                        text: "Minimizar";
+                        height: Theme.h-ctl;
+                        tooltip: "Oculta esta ventana; el proceso sigue en segundo plano";
+                        clicked => { BrowserState.stems-minimize(); }
+                    }
                     if BrowserState.stems-secondary != "": Chip {
                         text: BrowserState.stems-secondary;
                         height: Theme.h-ctl;
@@ -563,7 +590,9 @@ export component Browser inherits Rectangle {
         }
     }
     stems-queue-popup := PopupWindow {
-        visible: BrowserState.stems-queue-open;
+        close-policy: no-auto-close;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
         width: 460px;
         height: 240px;
         Rectangle {
@@ -586,6 +615,7 @@ export component Browser inherits Rectangle {
                     color: Theme.text;
                     font-family: Theme.font;
                     font-size: Theme.font-size;
+                    wrap: word-wrap;
                 }
                 HorizontalLayout {
                     spacing: Theme.space-sm;
@@ -596,5 +626,18 @@ export component Browser inherits Rectangle {
                 }
             }
         }
+    }
+    // PopupWindow is shown and closed imperatively; `visible` is not what opens it.
+    property <bool> stems-visible: BrowserState.stems-open;
+    changed stems-visible => {
+        if (root.stems-visible) { stems-popup.show(); } else { stems-popup.close(); }
+    }
+    property <bool> stems-queue-visible: BrowserState.stems-queue-open;
+    changed stems-queue-visible => {
+        if (root.stems-queue-visible) { stems-queue-popup.show(); } else { stems-queue-popup.close(); }
+    }
+    property <bool> analyzer-visible: BrowserState.analyzer-version-pending;
+    changed analyzer-visible => {
+        if (root.analyzer-visible) { analyzer-popup.show(); } else { analyzer-popup.close(); }
     }
 }

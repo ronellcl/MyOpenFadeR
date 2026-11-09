@@ -27,7 +27,15 @@ MyOpenFadeR is a fork of [OpenFadeR](https://github.com/OpenRsG/OpenFadeR): an o
 
 Every screenshot on this page comes from the running app, with a library of synthetic tracks generated for these pictures. There is no copyrighted music in them.
 
-## What's new in 0.5.5
+## What's new in 0.5.6
+
+- **One instance only.** A second launch shows a clear message and exits before opening the store or the audio device; the lock is released automatically even after a crash.
+- **Stems batches you can leave running.** The preparation window estimates time and disk space, offers Pause/Resume, Minimize and Cancel, and leaves a clickable marker in the bottom status bar while minimized; its progress and remaining time stay current.
+- **Playlist entries stay visible.** Adding a downloaded or cloud track stores its Collection id, so tracks such as Deezer downloads appear in the playlist instead of remaining hidden; old file-keyed entries are repaired when added again.
+- **ORIGIN in My Playlists.** User playlists show whether each track comes from Deezer, YouTube, another plugin or the Collection.
+- **Search stays in context.** All Tracks searches the whole library; a playlist, folder or Deezer searches only that list. The plugin search box still searches online with Enter.
+
+### 0.5.5
 
 - **Bulk downloads.** Right-click one or several YouTube/Deezer tracks and choose Download: they are fetched in parallel, with progress in the status line and a final summary.
 - **Stems column.** The track table shows a ✓ when a track's stems are already in the cache, so you know what is ready without opening it.

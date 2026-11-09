@@ -2,6 +2,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod app;
+mod single_instance;
 
 use std::path::PathBuf;
 
@@ -43,6 +44,19 @@ fn bundled_tools_first_in_path() {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     low_memory_malloc();
+    // One copy only: a second instance must not open the store or the audio device behind this one.
+    let instance = match single_instance::acquire() {
+        Ok(Some(lock)) => Some(lock),
+        Ok(None) => {
+            single_instance::report_already_running();
+            return Ok(());
+        }
+        Err(e) => {
+            // A missing/unwritable lock file must not keep the user out; report it and run.
+            eprintln!("single-instance lock unavailable: {e}");
+            None
+        }
+    };
     // Draw the menu bar in-window instead of handing it to the OS: the native Windows menu (muda) runs a modal Win32
     // tracking loop that blocks winit, so while it is open Slint's timers and redraws stall (the playhead and the
     // waveforms freeze although audio keeps playing). Set before any Slint call and before threads are spawned.
@@ -57,7 +71,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = app::run(legacy, own_folder());
     openfader::stems::model::shutdown(); // Dawn (the GPU engine of STEMS) crashes in `exit()` with a session still open
     if result.is_ok() && app::restart_requested() {
-        // The plugin manager's RESTART NOW: the same program with the same arguments.
+        // The plugin manager's RESTART NOW: release the lock before the replacement starts.
+        drop(instance);
         let exe = std::env::current_exe()?;
         let mut cmd = std::process::Command::new(exe);
         cmd.args(std::env::args_os().skip(1));

@@ -355,10 +355,11 @@ impl View {
             .clone())
     }
 
-    /// `t` with a Collection row id: a cloud track is added to the Collection first (its audio downloads when a deck
-    /// loads it, src/app/deck/load.rs), so a playlist or palette can hold it like any other track's `t<id>`.
+    /// `t` with a Collection row id: a track without one (a cloud track, or a downloaded file the source handed us)
+    /// is added to the Collection first, so a playlist or palette can hold it as `t<id>` instead of a file-keyed
+    /// identity that the playlist would not resolve later.
     pub(in crate::app::browser) fn in_collection(&self, mut t: Track) -> Result<Track, String> {
-        if t.id.is_none() && t.remote.is_some() {
+        if t.id.is_none() && (t.file.is_some() || t.remote.is_some()) {
             t.id = Some(self.store.collection_upsert(&t, None)?);
         }
         Ok(t)

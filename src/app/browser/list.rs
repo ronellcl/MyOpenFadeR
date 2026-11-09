@@ -16,6 +16,16 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
 
+/// What the ORIGIN column says for a playlist row: the plugin it came from, else the Collection.
+fn origin_label(t: &Track) -> String {
+    match t.remote.as_ref().map(|r| r.plugin.as_str()) {
+        Some("deezer") => "Deezer".to_owned(),
+        Some("yt-dlp") => "YouTube".to_owned(),
+        Some(plugin) => plugin.to_owned(),
+        None => "Collection".to_owned(),
+    }
+}
+
 /// Whether the track's file lies on one of the device / local volume roots (case-insensitive on Windows drive letters).
 fn on_device(t: &Track, roots: &[PathBuf]) -> bool {
     let Some(file) = t.file.as_deref() else {
@@ -385,12 +395,17 @@ impl View {
         } else {
             Vec::new()
         };
+        let user_origin = matches!(self.home, Home::User(_) | Home::Bank(_));
         let facts: Vec<Facts> = self
             .list
             .iter()
             .enumerate()
             .map(|(i, t)| Facts {
-                origin: self.origins.get(i).cloned().unwrap_or_default(),
+                origin: if user_origin {
+                    origin_label(t)
+                } else {
+                    self.origins.get(i).cloned().unwrap_or_default()
+                },
                 on_device: on_device(t, &device_roots),
                 ..Facts::of(t)
             })

@@ -331,8 +331,9 @@ impl View {
 
     /// `t` goes to the end of playlist `id` (ADD TO, a drop on the tree row).
     pub(in crate::app::browser) fn add_track_to(&mut self, app: &App, id: i64, t: &Track) {
-        // A cloud track joins the Collection first, so it gets a row id and the playlist stores it like any other track's
-        // (its audio downloads when a deck loads it, src/app/deck/load.rs).
+        // A track without a Collection row joins it first, so it gets a stable `t<id>` key (a cloud track's audio
+        // downloads when a deck loads it, src/app/deck/load.rs).
+        let legacy = t.id.is_none().then(|| store::key(t));
         let t = match self.in_collection(t.clone()) {
             Ok(t) => t,
             Err(e) => return self.say(app, format!("store: {e}")),
@@ -340,8 +341,16 @@ impl View {
         let key = store::key(&t);
         let name = self.node(id).map(|n| n.name.clone()).unwrap_or_default();
         let add = || -> Result<String, String> {
-            if self.store.entries(id)?.contains(&key) {
+            let mut keys = self.store.entries(id)?;
+            if keys.contains(&key) {
                 return Ok(format!("“{}” is already in {name}", t.title));
+            }
+            // An entry added before this fix may hold the file key of the very same track: rewrite it in place
+            // instead of leaving an invisible duplicate.
+            if let Some(pos) = legacy.as_ref().and_then(|old| keys.iter().position(|k| k == old)) {
+                keys[pos] = key.clone();
+                self.store.set_entries(id, &keys)?;
+                return Ok(format!("added “{}” to {name}", t.title));
             }
             self.store.add_entries(id, std::slice::from_ref(&key))?;
             Ok(format!("added “{}” to {name}", t.title))

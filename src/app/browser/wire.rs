@@ -239,8 +239,12 @@ fn wire_list(app: &App, view: &Rc<RefCell<View>>) {
         let app = weak.unwrap();
         let mut v = v.borrow_mut();
         v.query = text.to_string();
-        // The box searches everything local (the Collection, the pinned folders' index, the read sources).
-        v.search_all(&app);
+        // All Tracks searches everything local; a playlist, a folder or a cloud provider searches its own list.
+        if matches!(v.home, Home::Playlist(None) | Home::Search) {
+            v.search_all(&app);
+        } else {
+            v.refresh(&app);
+        }
     });
     let (v, weak) = (view.clone(), app.as_weak());
     state.on_search_accepted(move |text| v.borrow_mut().search_online(&weak.unwrap(), &text));
@@ -565,6 +569,18 @@ fn wire_selection(
     state.on_stems_pause_toggle(move || {
         if let Some(app) = weak.upgrade() {
             super::stems_batch::toggle_pause(&app);
+        }
+    });
+    let weak = app.as_weak();
+    state.on_stems_minimize(move || {
+        if let Some(app) = weak.upgrade() {
+            super::stems_batch::minimize(&app);
+        }
+    });
+    let weak = app.as_weak();
+    state.on_stems_reopen(move || {
+        if let Some(app) = weak.upgrade() {
+            super::stems_batch::reopen(&app);
         }
     });
     let weak = app.as_weak();

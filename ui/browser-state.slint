@@ -234,10 +234,17 @@ export global BrowserState {
     /// 0..1 while preparing; -1 hides the bar.
     in property <float> stems-progress: -1;
     in property <bool> stems-busy;
+    /// Procesando en segundo plano: el diálogo está oculto y la barra inferior ofrece reabrirlo.
+    in property <bool> stems-minimized;
+    /// Pistas procesadas / total, para el indicador de la barra inferior.
+    in property <int> stems-done: 0;
+    in property <int> stems-total: 0;
     in property <string> stems-primary;
     in property <string> stems-secondary;
     callback stems-primary-action();
     callback stems-secondary-action();
+    callback stems-minimize();
+    callback stems-reopen();
     /// Una cola de stems pendiente o pausada de una sesión anterior.
     in property <bool> stems-queue-open;
     in property <string> stems-queue-message;

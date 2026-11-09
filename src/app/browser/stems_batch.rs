@@ -20,7 +20,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /// Four stereo i16 stems at 44.1 kHz.
@@ -53,6 +53,8 @@ struct State {
     finished: AtomicBool,
     stopped_for_space: AtomicBool,
     error: Mutex<Option<String>>,
+    /// When the batch started, for the remaining-time estimate.
+    started: Instant,
 }
 
 impl State {
@@ -69,6 +71,7 @@ impl State {
             finished: AtomicBool::new(false),
             stopped_for_space: AtomicBool::new(false),
             error: Mutex::new(None),
+            started: Instant::now(),
         }
     }
 }
@@ -117,29 +120,92 @@ fn free_space() -> Option<u64> {
     device::space(&dir).map(|(_, free)| free)
 }
 
-/// Opens the confirmation for `title`'s `tracks`.
+/// Opens the confirmation for `title`'s `tracks`. The per-track cache check and the size/estimate
+/// pass run on a worker: doing them here would block the UI on a slow USB disk.
 pub(super) fn prepare(app: &App, title: String, tracks: Vec<Track>) {
-    let mut cached = 0;
-    let mut estimate = 0;
-    let mut todo = Vec::new();
-    for t in tracks {
-        let Some(file) = t.file.clone() else { continue };
-        if stems::cache::has(&file, Quality::Quality) {
-            cached += 1;
-        } else {
-            estimate += bytes(&t);
-            todo.push(t);
+    let weak = app.as_weak();
+    app.global::<BrowserState>().set_status(
+        format!("{title}: contando pistas, espacio y duración…").into(),
+    );
+    std::thread::spawn(move || {
+        let mut cached = 0;
+        let mut estimate: u64 = 0;
+        let mut audio_s: u64 = 0;
+        let mut with_file = 0;
+        let mut todo = Vec::new();
+        for t in tracks {
+            let Some(file) = t.file.clone() else { continue };
+            with_file += 1;
+            let secs = if t.length_s > 0 {
+                t.length_s as u64
+            } else {
+                ASSUMED_SECS
+            };
+            if stems::cache::has(&file, Quality::Quality) {
+                cached += 1;
+                super::stems_index::mark_ready(&file);
+            } else {
+                estimate += bytes(&t);
+                audio_s = audio_s.saturating_add(secs);
+                todo.push(t);
+            }
+        }
+        let free = free_space();
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(app) = weak.upgrade() else { return };
+            show_plan(&app, title, cached, estimate, audio_s, with_file, todo, free);
+        });
+    });
+}
+
+/// Shows the confirmation once the worker has measured the collection.
+fn show_plan(
+    app: &App,
+    title: String,
+    cached: usize,
+    estimate: u64,
+    audio_s: u64,
+    with_file: usize,
+    todo: Vec<Track>,
+    free: Option<u64>,
+) {
+    eprintln!(
+        "stems: “{title}”: {} to prepare, {} cached, ~{} GB, {}",
+        todo.len(),
+        cached,
+        estimate as f64 / 1e9,
+        eta(audio_s)
+    );
+    if cached > 0 {
+        // The cached files may belong to a list loaded after the first index pass (a Deezer source,
+        // a playlist opened later); redraw the table now that they are marked.
+        if let Some(view) = super::view() {
+            view.borrow_mut().refresh(app);
         }
     }
     if todo.is_empty() {
-        app.global::<BrowserState>()
-            .set_status(format!("every track of “{title}” already has its stems").into());
+        let msg = if with_file == 0 {
+            format!("“{title}” no tiene pistas con archivo para preparar.")
+        } else {
+            format!("Todas las pistas de “{title}” ya tienen sus stems.")
+        };
+        app.global::<BrowserState>().set_status(msg.into());
         return;
     }
-    let free = free_space();
     let enough = free.is_none_or(|f| f >= estimate + MARGIN);
     let s = app.global::<BrowserState>();
+    // Keep a summary in the status bar too: it stays visible even if the popup is dismissed.
+    s.set_status(
+        format!(
+            "{title}: {} por preparar · ~{} · {}",
+            todo.len(),
+            gb(estimate),
+            eta(audio_s)
+        )
+        .into(),
+    );
     s.set_stems_open(true);
+    s.set_stems_minimized(false);
     s.set_stems_busy(false);
     s.set_stems_progress(-1.0);
     s.set_stems_title(format!("Preparar stems · {title}").into());
@@ -150,9 +216,10 @@ pub(super) fn prepare(app: &App, title: String, tracks: Vec<Track>) {
         String::new()
     };
     detail += &format!(
-        "Necesitas ~{} y tienes {}.",
+        "Necesitas ~{} y tienes {}. Duración estimada: {}.",
         gb(estimate),
-        free.map_or_else(|| "espacio libre desconocido".to_owned(), gb)
+        free.map_or_else(|| "espacio libre desconocido".to_owned(), gb),
+        eta(audio_s)
     );
     s.set_stems_detail(detail.into());
     s.set_stems_warning(
@@ -164,8 +231,11 @@ pub(super) fn prepare(app: &App, title: String, tracks: Vec<Track>) {
         s.set_stems_secondary("Cancelar".into());
     } else {
         s.set_stems_message(
-            format!("No hay espacio suficiente: faltan {}.", gb(estimate + MARGIN - free.unwrap_or(0)))
-                .into(),
+            format!(
+                "No hay espacio suficiente: faltan {}.",
+                gb(estimate + MARGIN - free.unwrap_or(0))
+            )
+            .into(),
         );
         s.set_stems_detail(
             "Puedes continuar: se prepararán solo las canciones que quepan.".into(),
@@ -181,6 +251,21 @@ pub(super) fn prepare(app: &App, title: String, tracks: Vec<Track>) {
             free,
         });
     });
+}
+
+/// Rough wall-clock estimate for a QUALITY batch (four threads). The dialog labels it as an
+/// estimate; the cached files are measured by the batch itself.
+fn eta(audio_s: u64) -> String {
+    eta_secs(audio_s.saturating_mul(2))
+}
+
+fn eta_secs(secs: u64) -> String {
+    let mins = secs.div_ceil(60).max(1);
+    if mins < 60 {
+        format!("~{mins} min")
+    } else {
+        format!("~{} h {} min", mins / 60, mins % 60)
+    }
 }
 
 /// The primary button: start the plan, or close the summary when there is none.
@@ -210,6 +295,9 @@ pub(super) fn secondary(app: &App) {
 fn close(app: &App) {
     let s = app.global::<BrowserState>();
     s.set_stems_open(false);
+    s.set_stems_minimized(false);
+    s.set_stems_done(0);
+    s.set_stems_total(0);
     s.set_stems_busy(false);
     s.set_stems_progress(-1.0);
     s.set_stems_title("".into());
@@ -221,8 +309,31 @@ fn close(app: &App) {
     RUNNING.with(|r| *r.borrow_mut() = None);
 }
 
-fn start(app: &App, plan: Plan) {
+/// Hides the confirmation/progress window while the worker keeps separating.
+pub(super) fn minimize(app: &App) {
     let s = app.global::<BrowserState>();
+    s.set_stems_open(false);
+    s.set_stems_minimized(true);
+}
+
+/// Brings the hidden stems window back (from the bottom status bar).
+pub(super) fn reopen(app: &App) {
+    let s = app.global::<BrowserState>();
+    s.set_stems_open(true);
+    s.set_stems_minimized(false);
+}
+
+fn start(app: &App, plan: Plan) {
+    eprintln!(
+        "stems: batch “{}”: {} tracks",
+        plan.title,
+        plan.tracks.len()
+    );
+    let s = app.global::<BrowserState>();
+    s.set_stems_open(true);
+    s.set_stems_minimized(false);
+    s.set_stems_done(0);
+    s.set_stems_total(plan.tracks.len() as i32);
     s.set_stems_busy(true);
     s.set_stems_paused(false);
     s.set_stems_progress(0.0);
@@ -265,6 +376,8 @@ fn update(app: &App, state: &State) {
         state.skipped.load(Ordering::Relaxed),
         state.failed.load(Ordering::Relaxed),
     );
+    s.set_stems_done((done + skipped + failed) as i32);
+    s.set_stems_total(state.total as i32);
     if state.finished.load(Ordering::Relaxed) {
         let cancelled = state.cancel.load(Ordering::Relaxed);
         let stopped = state.stopped_for_space.load(Ordering::Relaxed);
@@ -278,6 +391,9 @@ fn update(app: &App, state: &State) {
         let mut message = format!("{done} preparadas · {skipped} omitidas · {failed} fallidas");
         if stopped {
             message += " · se detuvo al llenarse el disco";
+        }
+        if s.get_stems_minimized() {
+            s.set_status(format!("{title}: {message}").into());
         }
         s.set_stems_title(title.into());
         s.set_stems_message(message.into());
@@ -302,8 +418,30 @@ fn update(app: &App, state: &State) {
     s.set_stems_message(
         format!("{done} preparadas · {skipped} omitidas · {failed} fallidas").into(),
     );
-    let current = state.current.lock().map(|c| c.clone()).unwrap_or_default();
-    s.set_stems_detail(current.into());
+    let mut detail = state.current.lock().map(|c| c.clone()).unwrap_or_default();
+    let worked = (done + failed) as f64;
+    let left = state
+        .total
+        .saturating_sub((done + skipped + failed) as usize) as f64;
+    if worked > 0.0 && left > 0.0 {
+        let remain = state.started.elapsed().as_secs_f64() / worked * left;
+        let eta = eta_secs(remain as u64);
+        detail = if detail.is_empty() {
+            format!("Quedan {eta}")
+        } else {
+            format!("{detail} · quedan {eta}")
+        };
+    }
+    if state.paused.load(Ordering::Relaxed) {
+        // The timer must not overwrite the pause message with an ETA while the worker
+        // finishes the current track and waits before the next one.
+        detail = if state.part.load(Ordering::Relaxed) > 0 {
+            "Pausa solicitada: termina el tema actual…".into()
+        } else {
+            "Pausado. Pulsa Reanudar para continuar.".into()
+        };
+    }
+    s.set_stems_detail(detail.into());
 }
 
 fn work(tracks: Vec<Track>, multithread: bool, state: Arc<State>, queue: Arc<Mutex<Queue>>) {
